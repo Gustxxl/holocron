@@ -9,3 +9,7 @@ __pycache__/
 venv/
 .venv/
 env/
+
+data/
+.version
+__pycache__/
