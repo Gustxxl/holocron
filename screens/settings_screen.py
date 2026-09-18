@@ -1,5 +1,5 @@
 from core.settings import operator_name, update_operator_name
-from ui.interface import clear_screen, dim
+from ui.interface import clear_screen, dim, pause
 
 
 def settings_screen():
@@ -22,7 +22,7 @@ def settings_screen():
             if chapter == 'y':
                 ask_new_name()
                 print()
-                input(dim('Press any key to continue...'))
+                pause()
                 clear_screen()
                 continue
             elif chapter == 'b':
