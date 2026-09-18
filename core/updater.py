@@ -8,10 +8,11 @@ import tarfile
 import tempfile
 import urllib.request
 
+
 REPO = 'Gustxxl/holocron'
 BRANCH = 'main'
 
-# project root (folder containing main.py); core/ is one level down
+
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VERSION_FILE = os.path.join(APP_DIR, '.version')
 
@@ -43,7 +44,7 @@ def remote_version():
 
 
 def _apply(src_root):
-    '''Copy new code over the old, leaving PRESERVE entries untouched.'''
+    """Copy new code over the old, leaving PRESERVE entries untouched."""
     for name in os.listdir(src_root):
         if name in PRESERVE:
             continue
@@ -57,7 +58,7 @@ def _apply(src_root):
 
 
 def _restart():
-    '''Relaunch with the same interpreter and arguments.'''
+    """Relaunch with the same interpreter and arguments."""
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
 

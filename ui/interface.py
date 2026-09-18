@@ -1,4 +1,5 @@
 from core.os_info import user_os
+from core.haptic import Holocron, emit
 
 
 def dim(text):
@@ -10,10 +11,11 @@ def clear_screen():
 
 
 def pause():
-    current_os = user_os()
-    if current_os == 'macOS':
+    if user_os() == 'macOS':
         print()
         input(dim('Press return to continue...'))
+        with Holocron() as core:
+            core.success()
     else:
         print()
         input(dim('Press Enter to continue...'))
