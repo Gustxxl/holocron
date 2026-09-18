@@ -34,7 +34,8 @@ def main_screen():
             print(user_os())
             pause()
         elif command == 'update':
-            update()
+            if update() is False:
+                pause()
         else:
             ...
 
