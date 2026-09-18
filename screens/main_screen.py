@@ -10,7 +10,8 @@ from ui.interface import dim, clear_screen, pause
 from core.updater import update
 
 
-LOGO = Path("ui/logo.txt")
+APP_DIR = Path(__file__).resolve().parent.parent
+LOGO = APP_DIR / "ui" / "logo.txt"
 LOGO_TEXT = "HOLOCRON"
 
 
