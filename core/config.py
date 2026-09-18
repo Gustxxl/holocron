@@ -9,6 +9,7 @@ DEFAULTS = {
     "operator_name": ""
 }
 
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DATA_DIR = os.path.join(APP_DIR, "data")
 CONFIG = os.path.join(DATA_DIR, "config.json")
