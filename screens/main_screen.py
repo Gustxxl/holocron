@@ -7,7 +7,7 @@ import sys
 import time
 from screens.settings_screen import operator_name, settings_screen
 from ui.interface import dim, clear_screen, pause
-from core.updater import update()
+from core.updater import update
 
 
 LOGO = Path("ui/logo.txt")
