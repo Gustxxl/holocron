@@ -1,0 +1,11 @@
+notes
+test.py
+data/config.py
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+venv/
+.venv/
+env/
