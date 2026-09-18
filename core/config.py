@@ -1,5 +1,5 @@
 import json
-import os
+import os, shutil
 from pathlib import Path
 
 
@@ -8,6 +8,16 @@ CONFIG_PATH = Path("data/config.json")
 DEFAULTS = {
     "operator_name": ""
 }
+
+
+DATA_DIR = os.path.join(APP_DIR, "data")
+CONFIG = os.path.join(DATA_DIR, "config.json")
+TEMPLATE = os.path.join(APP_DIR, "config.example.json")
+
+def ensure_config():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    if not os.path.exists(CONFIG):
+        shutil.copy2(TEMPLATE, CONFIG)
 
 
 def load():
