@@ -21,7 +21,12 @@ def ensure_config():
         shutil.copy2(TEMPLATE, CONFIG)
 
 
+def ensure_data_dir():
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+
 def load():
+    ensure_data_dir()
     cfg = dict(DEFAULTS)
     if CONFIG_PATH.exists():
         try:
@@ -32,6 +37,7 @@ def load():
     return cfg
 
 def save(cfg):
+    ensure_data_dir()
     try:
         CONFIG_PATH.write_text(
             json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8"
