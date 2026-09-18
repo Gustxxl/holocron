@@ -60,7 +60,11 @@ def show_today_date():
 
 
 def greet():
-    print(f"Welcome back, {operator_name()}")
+    operator = operator_name()
+    if operator == "":
+        return
+    else:
+        print(f"Welcome back, {operator}")
 
 
 def disconnect():
