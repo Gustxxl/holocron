@@ -80,7 +80,7 @@ def update():
         return False
 
     if current_version() == remote:
-        print("System is up to date.")
+        print(f"System is up to date — build {remote[:7]}.")
         return False
 
     print("Update found. Retrieving...")
