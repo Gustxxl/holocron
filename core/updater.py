@@ -124,17 +124,6 @@ def _restart():
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
-def _notify_updated():
-    try:
-        from core.os_info import user_os
-        if user_os() == 'macOS':
-            from core.haptic import Holocron
-            with Holocron() as h:
-                h.confirm()
-    except Exception:
-        pass
-
-
 def _file_changed(a, b):
     def read(p):
         try:
@@ -199,7 +188,6 @@ def update(restart=True):
 
 
     print('System updated.')
-    _notify_updated()
     if restart:
         print('Restarting...')
         _restart()
