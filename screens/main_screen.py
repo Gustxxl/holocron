@@ -22,7 +22,7 @@ def main_screen():
         show_logo()
         show_today_date()
         greet()
-        print('test'')
+        print('test')
         user_input = input('system> ')
         command = user_input.lower()
         if command == 'q':
