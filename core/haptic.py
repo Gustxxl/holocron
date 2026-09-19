@@ -2,32 +2,38 @@ import argparse
 import ctypes
 import sys
 import time
+from core.os_info import user_os
 
-mt = ctypes.CDLL(
-    "/System/Library/PrivateFrameworks/MultitouchSupport.framework/MultitouchSupport"
-)
-cf = ctypes.CDLL(
-    "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
-)
 
-mt.MTDeviceCreateList.restype = ctypes.c_void_p
-mt.MTDeviceGetDeviceID.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint64)]
-mt.MTDeviceGetDeviceID.restype = ctypes.c_int
-mt.MTActuatorCreateFromDeviceID.argtypes = [ctypes.c_uint64]
-mt.MTActuatorCreateFromDeviceID.restype = ctypes.c_void_p
-mt.MTActuatorOpen.argtypes = [ctypes.c_void_p]
-mt.MTActuatorOpen.restype = ctypes.c_int
-mt.MTActuatorClose.argtypes = [ctypes.c_void_p]
-mt.MTActuatorClose.restype = ctypes.c_int
-mt.MTActuatorActuate.argtypes = [
-    ctypes.c_void_p, ctypes.c_int32, ctypes.c_uint32, ctypes.c_float, ctypes.c_float
-]
-mt.MTActuatorActuate.restype = ctypes.c_int
+IS_MACOS = user_os() == 'macOS'
 
-cf.CFArrayGetCount.argtypes = [ctypes.c_void_p]
-cf.CFArrayGetCount.restype = ctypes.c_long
-cf.CFArrayGetValueAtIndex.argtypes = [ctypes.c_void_p, ctypes.c_long]
-cf.CFArrayGetValueAtIndex.restype = ctypes.c_void_p
+if IS_MACOS:
+    mt = ctypes.CDLL(
+        "/System/Library/PrivateFrameworks/MultitouchSupport.framework/MultitouchSupport"
+    )
+    cf = ctypes.CDLL(
+        "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
+    )
+
+if IS_MACOS:
+    mt.MTDeviceCreateList.restype = ctypes.c_void_p
+    mt.MTDeviceGetDeviceID.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint64)]
+    mt.MTDeviceGetDeviceID.restype = ctypes.c_int
+    mt.MTActuatorCreateFromDeviceID.argtypes = [ctypes.c_uint64]
+    mt.MTActuatorCreateFromDeviceID.restype = ctypes.c_void_p
+    mt.MTActuatorOpen.argtypes = [ctypes.c_void_p]
+    mt.MTActuatorOpen.restype = ctypes.c_int
+    mt.MTActuatorClose.argtypes = [ctypes.c_void_p]
+    mt.MTActuatorClose.restype = ctypes.c_int
+    mt.MTActuatorActuate.argtypes = [
+        ctypes.c_void_p, ctypes.c_int32, ctypes.c_uint32, ctypes.c_float, ctypes.c_float
+    ]
+    mt.MTActuatorActuate.restype = ctypes.c_int
+
+    cf.CFArrayGetCount.argtypes = [ctypes.c_void_p]
+    cf.CFArrayGetCount.restype = ctypes.c_long
+    cf.CFArrayGetValueAtIndex.argtypes = [ctypes.c_void_p, ctypes.c_long]
+    cf.CFArrayGetValueAtIndex.restype = ctypes.c_void_p
 
 RESONANCE = {"weak": 3, "medium": 4, "strong": 6}
 
@@ -51,8 +57,12 @@ class Holocron:
         self._verbose = verbose
 
     def awaken(self) -> "Holocron":
+        if not IS_MACOS:
+            return self
+
         if self._core is not None:
             return self
+
 
         devices = mt.MTDeviceCreateList()
         if not devices:
@@ -75,6 +85,9 @@ class Holocron:
         raise SystemExit(f"no actuator found. Device IDs seen: {seen}")
 
     def seal(self) -> None:
+        if not IS_MACOS:
+            return
+
         if self._core is not None:
             mt.MTActuatorClose(self._core)
             self._core = None
@@ -86,21 +99,36 @@ class Holocron:
         self.seal()
 
     def pulse(self, strength: str = "medium") -> None:
+        if not IS_MACOS:
+            return
+
         if self._core is None:
             self.awaken()
-        mt.MTActuatorActuate(self._core, RESONANCE[strength], 0, 0.0, 0.0)
+
+        mt.MTActuatorActuate(
+            self._core,
+            RESONANCE[strength],
+            0,
+            0.0,
+            0.0,
+        )
 
     def invoke(self, sequence: str, repeat: int = 1, gap_ms: int = 200) -> None:
+        if not IS_MACOS:
+            return
+
         steps = SEQUENCES.get(sequence)
         if steps is None:
             raise ValueError(
                 f"unknown sequence {sequence!r}. Available: {', '.join(SEQUENCES)}"
             )
+
         for r in range(repeat):
             for strength, pause in steps:
                 self.pulse(strength)
                 if pause:
                     time.sleep(pause / 1000)
+
             if r + 1 < repeat:
                 time.sleep(gap_ms / 1000)
 

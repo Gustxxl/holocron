@@ -8,7 +8,9 @@ def settings_screen():
         print()
         items = ['User', '...', '...']
         for i, item in enumerate(items, start=1):
-            print(f'{i}. {item}')
+            print(f'{i}) {item}')
+        print()
+        print("  [number] open section   [b] back   [q] quit")
         print()
         command = input('settings> ')
         if command == '1':
@@ -32,16 +34,15 @@ def settings_screen():
                 continue
         elif command == '2':
             clear_screen()
-            print()
             continue
         elif command == '3':
             clear_screen()
-            print()
             continue
         elif command == 'b':
             return
         else:
-            ...
+            clear_screen()
+            continue
 
 
 def ask_new_name():
