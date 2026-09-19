@@ -1,3 +1,10 @@
+from core.check_requirements import ensure_environment
+ensure_environment()
+
+import colorama
+colorama.init()
+
+
 from screens.main_screen import main_screen, disconnect
 import os
 from time import sleep
