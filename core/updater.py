@@ -8,6 +8,7 @@ import sys
 import tarfile
 import tempfile
 import urllib.request
+from ui.interface import restart
 
 
 REPO = 'Gustxxl/holocron'
@@ -186,5 +187,12 @@ def update():
     with open(VERSION_FILE, 'w') as f:
         f.write(remote)
 
-    print('System updated. Restarting...')
-    _restart()
+    restart()
+    if restart:
+        print('Restarting...')
+        _restart()
+    return True
+
+
+if __name__ == '__main__':
+    update(restart=False)

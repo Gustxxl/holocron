@@ -4,3 +4,9 @@ Holocron is an independent, unofficial project inspired by the Star Wars univers
 
 - macOS 14+ (Sonoma or newer)
 - Python-dependencies: `pip install -r requirements.txt`
+
+To force update:
+
+```zsh
+python -m core.updater
+```
