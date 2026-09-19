@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import os
@@ -12,39 +13,84 @@ import urllib.request
 REPO = 'Gustxxl/holocron'
 BRANCH = 'main'
 
-
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VERSION_FILE = os.path.join(APP_DIR, '.version')
 
-# never overwritten on update: user data and local files
-PRESERVE = {'.version', 'data', '.git', 'venv', '.venv', '__pycache__', }
+PRESERVE = {'.version', 'data', '.git', 'venv', '.venv', '__pycache__'}
 
 API = f'https://api.github.com/repos/{REPO}/commits/{BRANCH}'
-TARBALL = f'https://codeload.github.com/{REPO}/tar.gz/refs/heads/{BRANCH}'
+TREE = f'https://api.github.com/repos/{REPO}/git/trees/{{sha}}?recursive=1'
+TARBALL = f'https://github.com/{REPO}/archive/refs/heads/{BRANCH}.tar.gz'
+
+MIRRORS = [
+    'https://gh-proxy.com/',
+    'https://ghproxy.net/',
+    'https://ghfast.top/',
+    'https://gh.llkk.cc/',
+]
+
+
+def _candidates(url):
+    yield url
+    override = os.environ.get('HOLOCRON_MIRROR')
+    prefixes = [p.strip() for p in override.split(',') if p.strip()] if override else MIRRORS
+    for p in prefixes:
+        yield p.rstrip('/') + '/' + url
 
 
 def _get(url, raw=False):
-    req = urllib.request.Request(url, headers={
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'holocron',
-    })
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return r.read() if raw else json.load(r)
+    last = None
+    for candidate in _candidates(url):
+        try:
+            req = urllib.request.Request(candidate, headers={
+                'Accept': 'application/vnd.github+json',
+                'User-Agent': 'holocron',
+            })
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return r.read() if raw else json.load(r)
+        except Exception as e:
+            last = e
+            continue
+    raise last
 
 
 def current_version():
     if os.path.exists(VERSION_FILE):
         with open(VERSION_FILE) as f:
             return f.read().strip()
-    return None  # first run — no version recorded yet
+    return None
 
 
 def remote_version():
     return _get(API)['sha']
 
 
+def _tree(sha):
+    data = _get(TREE.format(sha=sha))
+    if data.get('truncated'):
+        raise RuntimeError('tree listing truncated; integrity cannot be verified')
+    return [e for e in data['tree'] if e.get('type') == 'blob']
+
+
+def _git_blob_sha(path):
+    h = hashlib.sha1()
+    h.update(b'blob ' + str(os.path.getsize(path)).encode() + b'\0')
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(65536), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _verify(root, blobs):
+    for entry in blobs:
+        target = os.path.join(root, entry['path'])
+        if not os.path.isfile(target):
+            raise RuntimeError(f"missing file in payload: {entry['path']}")
+        if _git_blob_sha(target) != entry['sha']:
+            raise RuntimeError(f"integrity mismatch: {entry['path']}")
+
+
 def _apply(src_root):
-    """Copy new code over the old, leaving PRESERVE entries untouched."""
     for name in os.listdir(src_root):
         if name in PRESERVE:
             continue
@@ -58,7 +104,6 @@ def _apply(src_root):
 
 
 def _restart():
-    """Relaunch with the same interpreter and arguments."""
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
@@ -76,6 +121,7 @@ def update():
     print('Checking the system...')
     try:
         remote = remote_version()
+        blobs = _tree(remote)
     except Exception as e:
         print(f'System unreachable: {e}')
         return False
@@ -95,8 +141,13 @@ def update():
     try:
         with tarfile.open(fileobj=io.BytesIO(blob)) as tar:
             tar.extractall(tmp, filter='data')
-        # tarball unpacks into a single subfolder like holocron-<sha>/
         root = os.path.join(tmp, os.listdir(tmp)[0])
+
+        try:
+            _verify(root, blobs)
+        except Exception as e:
+            print(f'Integrity check failed, update aborted: {e}')
+            return False
 
         new_reqs = os.path.join(root, 'requirements.txt')
         old_reqs = os.path.join(APP_DIR, 'requirements.txt')
