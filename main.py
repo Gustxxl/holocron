@@ -1,7 +1,6 @@
 from screens.main_screen import main_screen, disconnect
 import os
 from time import sleep
-import readline
 from ui.interface import clear_screen
 
 

@@ -9,7 +9,6 @@ from screens.settings_screen import operator_name, settings_screen
 from ui.interface import dim, clear_screen, pause
 from core.updater import update
 import platform
-import readline
 
 
 APP_DIR = Path(__file__).resolve().parent.parent
