@@ -135,7 +135,7 @@ def _file_changed(a, b):
     return read(a) != read(b)
 
 
-def update():
+def update(restart=True):
     print('Checking the system...')
     try:
         remote = remote_version()
