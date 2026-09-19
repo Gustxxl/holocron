@@ -20,7 +20,7 @@ PRESERVE = {'.version', 'data', '.git', 'venv', '.venv', '__pycache__'}
 
 API = f'https://api.github.com/repos/{REPO}/commits/{BRANCH}'
 TREE = f'https://api.github.com/repos/{REPO}/git/trees/{{sha}}?recursive=1'
-TARBALL = f'https://github.com/{REPO}/archive/refs/heads/{BRANCH}.tar.gz'
+TARBALL = f'https://github.com/{REPO}/archive/{{sha}}.tar.gz'
 
 MIRRORS = [
     'https://gh-proxy.com/',
@@ -149,7 +149,7 @@ def update():
 
     print('Update found. Retrieving...')
     try:
-        blob = _get(TARBALL, raw=True)
+        blob = _get(TARBALL.format(sha=remote), raw=True)
     except Exception as e:
         print(f'Retrieval failed: {e}')
         return False
