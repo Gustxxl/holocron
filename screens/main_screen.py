@@ -2,12 +2,13 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 import shutil
 from core.config import load
-from core.os_info import user_os
+from core.os_info import user_os, os_version
 import sys
 import time
 from screens.settings_screen import operator_name, settings_screen
 from ui.interface import dim, clear_screen, pause
 from core.updater import update
+import platform
 
 
 APP_DIR = Path(__file__).resolve().parent.parent
@@ -32,7 +33,7 @@ def main_screen():
             clear_screen()
             settings_screen()
         elif command == 'system':
-            print(user_os())
+            print(f"{user_os()} {os_version()} ({platform.machine()})")
             pause()
         elif command == 'update':
             if update() is False:

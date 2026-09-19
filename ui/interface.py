@@ -19,11 +19,3 @@ def pause():
     else:
         print()
         input(dim('Press Enter to continue...'))
-
-
-def restart():
-    print('System updated')
-    if user_os() == 'macOS':
-        with Holocron() as core:
-            core.confirm()
-    else: print('System updated')
