@@ -91,16 +91,33 @@ def _verify(root, blobs):
 
 
 def _apply(src_root):
-    for name in os.listdir(src_root):
-        if name in PRESERVE:
-            continue
-        src = os.path.join(src_root, name)
-        dst = os.path.join(APP_DIR, name)
-        if os.path.isdir(src):
-            shutil.rmtree(dst, ignore_errors=True)
-            shutil.copytree(src, dst)
-        else:
-            shutil.copy2(src, dst)
+    names = [n for n in os.listdir(src_root) if n not in PRESERVE]
+    backup = tempfile.mkdtemp(prefix='.holocron_bak_', dir=os.path.dirname(APP_DIR))
+    try:
+        for name in names:
+            dst = os.path.join(APP_DIR, name)
+            if os.path.lexists(dst):
+                shutil.move(dst, os.path.join(backup, name))
+        for name in names:
+            src = os.path.join(src_root, name)
+            dst = os.path.join(APP_DIR, name)
+            if os.path.isdir(src):
+                shutil.copytree(src, dst)
+            else:
+                shutil.copy2(src, dst)
+    except Exception:
+        for name in names:
+            dst = os.path.join(APP_DIR, name)
+            if os.path.isdir(dst) and not os.path.islink(dst):
+                shutil.rmtree(dst, ignore_errors=True)
+            elif os.path.lexists(dst):
+                os.remove(dst)
+            saved = os.path.join(backup, name)
+            if os.path.lexists(saved):
+                shutil.move(saved, os.path.join(APP_DIR, name))
+        raise
+    finally:
+        shutil.rmtree(backup, ignore_errors=True)
 
 
 def _restart():
@@ -153,7 +170,11 @@ def update():
         old_reqs = os.path.join(APP_DIR, 'requirements.txt')
         reqs_changed = _file_changed(old_reqs, new_reqs)
 
-        _apply(root)
+        try:
+            _apply(root)
+        except Exception as e:
+            print(f'Apply failed, rolled back to previous build: {e}')
+            return False
 
         if reqs_changed:
             print('Realigning dependencies...')
