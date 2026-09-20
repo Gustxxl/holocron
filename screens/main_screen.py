@@ -6,15 +6,17 @@ from core.os_info import user_os, os_version
 import sys
 import time
 from screens.settings_screen import operator_name, settings_screen
-from ui.interface import dim, clear_screen, pause
+from ui.interface import dim, clear_screen, pause, read_command
 from core.updater import update
 import platform
+from screens.search_screen import search_screen
+from core.settings import archive_path
+from core import archive
 
 
 APP_DIR = Path(__file__).resolve().parent.parent
 LOGO = APP_DIR / "ui" / "logo.txt"
 LOGO_TEXT = "HOLOCRON"
-
 
 
 def main_screen():
@@ -23,13 +25,11 @@ def main_screen():
         show_logo()
         show_today_date()
         greet()
+        show_status()
         print()
-        user_input = input('system> ')
-        command = user_input.lower()
-        if command == 'q':
-            disconnect()
-            break
-        elif command == 'settings':
+        raw = read_command('system> ')
+        command = raw.lower()
+        if command == 'settings':
             clear_screen()
             settings_screen()
         elif command == 'system':
@@ -38,9 +38,15 @@ def main_screen():
         elif command == 'update':
             if update() is False:
                 pause()
+        elif command == '':
+            clear_screen()
+            continue
         else:
-            ...
-
+            if not archive.is_loaded():
+                print(dim('No archive set — add a path in settings.'))
+                pause()
+                continue
+            search_screen(raw)
 
 
 def show_logo():
@@ -70,14 +76,14 @@ def greet():
         print(f"Welcome back, {operator}")
 
 
-def disconnect():
-    clear_screen()
-    msg = "Disconnecting from the archives"
-    sys.stdout.write(msg)
-    sys.stdout.flush()
-    for _ in range(3):
-        time.sleep(0.12)
-        sys.stdout.write(".")
-        sys.stdout.flush()
-    time.sleep(0.12)
-    clear_screen()
+def show_status():
+    if not archive.is_loaded():
+        return
+    print(dim(f'{Path(archive.path()).stem}  Indexed cases: {archive.count()}'))
+
+
+def count_cases(path):
+    try:
+        return len(excalidraw.load_path(path))
+    except (OSError, excalidraw.SceneError):
+        return 0

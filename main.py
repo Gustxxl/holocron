@@ -4,24 +4,31 @@ ensure_environment()
 import colorama
 colorama.init()
 
+try:
+    import readline
+except ImportError:
+    pass
 
-from screens.main_screen import main_screen, disconnect
-import os
+from core import archive
+import sys
+from pathlib import Path
 from time import sleep
-from ui.interface import clear_screen
+from core.settings import update_archive_path
+from ui.clean_path import clean_input_path
+from screens.main_screen import main_screen
+from ui.interface import clear_screen, disconnect
 
 
 def start():
+    if len(sys.argv) > 1:
+        p = clean_input_path(sys.argv[1])
+        if p and Path(p).exists():
+            update_archive_path(p)
     try:
         clear_screen()
         print('Accessing the archives...')
-        sleep(0.4)
-        clear_screen()
-
-        # start cycle
+        archive.load()
         main_screen()
-
-    # errors
     except (KeyboardInterrupt, EOFError):
         disconnect()
 

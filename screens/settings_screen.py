@@ -1,50 +1,70 @@
-from core.settings import operator_name, update_operator_name
-from ui.interface import clear_screen, dim, pause
+from core.settings import (
+    operator_name,
+    update_operator_name,
+    archive_path,
+    update_archive_path,
+)
+from ui.interface import clear_screen, dim, pause, read_command, show_menu
 
 
 def settings_screen():
     while True:
-        print(f'\033[2mSettings\033[0m')
-        print()
-        items = ['User', '...', '...']
-        for i, item in enumerate(items, start=1):
-            print(f'{i}) {item}')
-        print()
-        print("  [number] open section   [b] back   [q] quit")
-        print()
-        command = input('settings> ')
+        show_menu('Settings', ['User', 'Archive', '...'])
+        command = read_command('settings> ')
         if command == '1':
-            clear_screen()
-            print(f'\033[2mSettings > User\033[0m')
-            print()
-            print(f'Current name: {operator_name()}')
-            print()
-            chapter = input('Change name? [y/n]> ')
-            print()
-            if chapter == 'y':
-                ask_new_name()
-                print()
-                pause()
-                clear_screen()
-                continue
-            elif chapter == 'b':
-                return
-            else:
-                clear_screen()
-                continue
+            user_screen()
         elif command == '2':
-            clear_screen()
-            continue
-        elif command == '3':
-            clear_screen()
-            continue
+            archive_screen()
         elif command == 'b':
             return
+
+
+def archive_screen():
+    while True:
+        show_menu('Settings > Archive',
+                  ['Excalidraw for Obsidian', 'Excalidraw       (Soon)', 'Vault            (Soon)'])
+        command = read_command('settings> ')
+        if command == '1':
+            excalidraw_screen()
+        elif command == 'b':
+            return
+
+
+def user_screen():
+    while True:
+        clear_screen()
+        print(dim('Settings > User'))
+        print()
+        print(f'Current name: {operator_name()}')
+        print()
+        print(dim('  [y] change name   [b] back   [q] quit'))
+        print()
+        command = read_command('Change name? [y/n]> ')
+        if command == 'y':
+            ask_new_name()
+            pause()
+        elif command == 'b':
+            return
+
+
+def excalidraw_screen():
+    while True:
+        clear_screen()
+        print(dim('Settings > Archive > Excalidraw'))
+        print()
+        print(f'Current path: {archive_path() or "(not set)"}')
+        print()
+        print(dim('  [enter path] set path   [b] back   [q] quit'))
+        print()
+        command = read_command('path> ')
+        if command == 'b':
+            return
         else:
-            clear_screen()
-            continue
+            update_archive_path(command)
+            archive.load()
+            pause()
+            return
 
 
 def ask_new_name():
-    new_name = input('Enter new name: ')
-    update_operator_name(new_name)
+    update_operator_name(input("New name: ").strip())

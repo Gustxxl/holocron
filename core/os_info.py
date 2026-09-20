@@ -1,12 +1,11 @@
 import platform
 
-name_sys = platform.system()
 
 def user_os():
+    name_sys = platform.system()
     if name_sys == 'Darwin':
         return 'macOS'
-    else:
-        return platform.system()
+    return name_sys
 
 
 def os_version():
