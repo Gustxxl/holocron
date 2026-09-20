@@ -4,10 +4,14 @@ ensure_environment()
 import colorama
 colorama.init()
 
-try:
-    import readline
-except ImportError:
-    pass
+import os
+
+if os.name != 'nt':
+    try:
+        import readline
+    except ImportError:
+        pass
+
 
 from core import archive
 import sys

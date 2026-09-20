@@ -1,8 +1,10 @@
 import re
 import difflib
-
+from core.os_info import user_os
 from core import archive, search
 from ui.interface import clear_screen, dim, pause, read_command
+from ui.haptic import Holocron, emit
+
 
 _HL = "\033[1;38;2;116;167;254m"
 _RESET = "\033[0m"
@@ -58,6 +60,12 @@ def search_screen(initial_query=None):
                 print(dim("Maybe: " + ", ".join(tips)))
             print()
             print(dim('  [type] search   [b] back'))
+            print()
+            if user_os() == 'macOS':
+                with Holocron() as core:
+                    core.error()
+            else:
+                pass
         elif results:
             page = show_list(results, page, query)
         else:
@@ -65,6 +73,7 @@ def search_screen(initial_query=None):
             print(dim('Search the archive'))
             print()
             print(dim('  [type] search   [b] back'))
+            print()
 
         command = read_command('search> ')
         low = command.lower()
@@ -122,6 +131,7 @@ def show_list(results, page, query):
     nav += '[p] prev   ' if page > 0 else ''
     nav += '[b] back'
     print(dim(nav))
+    print()
     return page
 
 
@@ -137,6 +147,7 @@ def show_case(case, query=""):
         print(highlight(body, query))
     print()
     print(dim('  [b] back   [number] open   [q] quit'))
+    print()
 
 
 def first_line(case):
