@@ -98,16 +98,19 @@ def search_screen(initial_query=None):
 
 def open_case(results, number, query):
     while 1 <= number <= len(results):
-        score, case = results[number - 1]
-        show_case(case, query)
+        show_case(results[number - 1][1], query)
         command = read_command('case> ')
         low = command.lower()
-        if low in ('', 'b', 'back'):
+        if low in ('b', 'back'):
             return
+        if command == '':
+            archive.load()
+            if query:
+                results = search.search(archive.cases(), query)
+            continue
         if command.isdigit():
             number = int(command)
-            continue
-        return
+
 
 
 def show_list(results, page, query):
@@ -119,7 +122,7 @@ def show_list(results, page, query):
     print(dim(f'Search: "{query}"   ·   {total} found   ·   page {page + 1}/{pages}'))
     print()
     for n, (score, case) in enumerate(chunk, page * PAGE + 1):
-        print(f'  {n:>3}) {case.get("source", "")}  {highlight(first_line(case), query)}')
+        print(f'  {n:>3}) {highlight(first_line(case), query)}')
     print()
     nav = '  [number] open   '
     nav += '[n] next   ' if page + 1 < pages else ''
