@@ -83,7 +83,7 @@ def greet():
 def show_status():
     if not archive.is_loaded():
         return
-    print(dim(f'{Path(archive.path()).stem}  Indexed cases: {archive.count()}'))
+    print(dim(f'{Path(archive.path()).stem} ({archive.count()} cases)'))
 
 
 def count_cases(path):

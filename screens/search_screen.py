@@ -76,6 +76,8 @@ def search_screen(initial_query=None):
         if low in ('b', 'back'):
             return
         if command == '':
+            if not results:
+                return
             archive.load()
             cases = archive.cases()
             if query:
@@ -91,7 +93,20 @@ def search_screen(initial_query=None):
             open_case(results, int(command), query)
             continue
 
-        query = command
+
+        if command.isdigit() and results:
+            open_case(results, int(command), query)
+            continue
+
+        q = command.strip()
+        n = 3
+        if len(q) < n:
+            clear_screen()
+            print(f'Type at least {n} characters.')
+            pause()
+            continue
+
+        query = q
         results = search.search(cases, query)
         page = 0
 

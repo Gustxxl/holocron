@@ -6,6 +6,8 @@ from core.settings import (
 )
 from core import archive
 from ui.interface import clear_screen, dim, pause, read_command, show_menu
+from pathlib import Path
+from ui.clean_path import clean_input_path
 
 
 def settings_screen():
@@ -61,10 +63,17 @@ def excalidraw_screen():
         if command == 'b':
             return
         else:
+            cleaned = clean_input_path(command)
+            if Path(cleaned).suffix.lower() != '.md' or not Path(cleaned).is_file():
+                clear_screen()
+                print(dim('Path must point to an existing .md file.'))
+                pause()
+                continue
             update_archive_path(command)
             archive.load()
             pause()
             return
+
 
 
 def ask_new_name():
