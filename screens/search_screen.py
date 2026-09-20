@@ -144,7 +144,7 @@ def show_case(case, query=""):
         print()
         print(highlight(body, query))
     print()
-    print(dim('  [b] back   [number] open   [q] quit'))
+    print(dim('  [↵] reload   [b] back   [number] open   [q] quit'))
     print()
 
 
