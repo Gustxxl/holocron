@@ -57,3 +57,9 @@ def show_menu(breadcrumb, options, footer='  [number] open section   [b] back   
     print()
     print(dim(footer))
     print()
+
+
+def error_haptic():
+    if user_os() == 'macOS':
+        with Holocron() as core:
+            core.error()

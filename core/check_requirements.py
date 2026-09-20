@@ -43,17 +43,20 @@ def ensure_environment():
     root = _project_root()
     venv_dir = root / ".venv"
 
-    # Already running inside the project's venv: just top up missing packages.
     if Path(sys.prefix).resolve() == venv_dir.resolve():
         _install_missing(root)
         return
 
-    # Not in the venv yet: create it if needed, then re-exec inside it.
     venv_python = _venv_python(venv_dir)
     if not venv_python.exists():
         print("Creating virtual environment (.venv)...")
         subprocess.check_call([sys.executable, "-m", "venv", str(venv_dir)])
 
+    if os.name == "nt":
+        completed = subprocess.run([str(venv_python), *sys.argv])
+        sys.exit(completed.returncode)
+
     os.execv(str(venv_python), [str(venv_python), *sys.argv])
+
 
 ensure_environment()

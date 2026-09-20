@@ -1,9 +1,7 @@
 import re
 import difflib
-from core.os_info import user_os
 from core import archive, search
-from ui.interface import clear_screen, dim, pause, read_command
-from ui.haptic import Holocron, emit
+from ui.interface import clear_screen, dim, pause, read_command, error_haptic
 
 
 _HL = "\033[1;38;2;116;167;254m"
@@ -61,11 +59,7 @@ def search_screen(initial_query=None):
             print()
             print(dim('  [type] search   [b] back'))
             print()
-            if user_os() == 'macOS':
-                with Holocron() as core:
-                    core.error()
-            else:
-                pass
+            error_haptic()
         elif results:
             page = show_list(results, page, query)
         else:
