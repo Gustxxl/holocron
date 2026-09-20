@@ -4,6 +4,7 @@ from core.settings import (
     archive_path,
     update_archive_path,
 )
+from core import archive
 from ui.interface import clear_screen, dim, pause, read_command, show_menu
 
 
@@ -43,7 +44,7 @@ def user_screen():
         if command == 'y':
             ask_new_name()
             pause()
-        elif command == 'b':
+        else:
             return
 
 

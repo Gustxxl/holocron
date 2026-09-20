@@ -2,7 +2,7 @@ import re
 import difflib
 from core import archive, search
 from ui.interface import clear_screen, dim, pause, read_command, error_haptic
-from core import archive
+import textwrap
 
 
 _HL = "\033[1;38;2;116;167;254m"
@@ -112,18 +112,30 @@ def open_case(results, number, query):
             number = int(command)
 
 
-
 def show_list(results, page, query):
     clear_screen()
     total = len(results)
     pages = max(1, (total + PAGE - 1) // PAGE)
     page = max(0, min(page, pages - 1))
     chunk = results[page * PAGE: page * PAGE + PAGE]
+    top = results[0][0] if results else 1.0
+
     print(dim(f'Search: "{query}"   ·   {total} found   ·   page {page + 1}/{pages}'))
     print()
+
+    width = 80
     for n, (score, case) in enumerate(chunk, page * PAGE + 1):
-        print(f'  {n:>3}) {highlight(first_line(case), query)}')
-    print()
+        pct = round(score / top * 100) if top else 0
+        prefix = f'  {n:>3}) {pct:>3}%  '
+        wrapped = textwrap.fill(
+            first_line(case),
+            width=width,
+            initial_indent=prefix,
+            subsequent_indent=' ' * len(prefix),
+        )
+        print(highlight(wrapped, query))
+        print()
+
     nav = '  [number] open   '
     nav += '[n] next   ' if page + 1 < pages else ''
     nav += '[p] prev   ' if page > 0 else ''
