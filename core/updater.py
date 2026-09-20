@@ -122,10 +122,9 @@ def _apply(src_root):
 
 def _restart():
     if os.name == 'nt':
-        print('Update complete. Please relaunch Holocron.')
-        sys.exit(0)
+        completed = subprocess.run([sys.executable, *sys.argv])
+        sys.exit(completed.returncode)
     os.execv(sys.executable, [sys.executable] + sys.argv)
-
 
 
 def _file_changed(a, b):
