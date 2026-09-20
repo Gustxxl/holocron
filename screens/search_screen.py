@@ -2,6 +2,7 @@ import re
 import difflib
 from core import archive, search
 from ui.interface import clear_screen, dim, pause, read_command, error_haptic
+from core import archive
 
 
 _HL = "\033[1;38;2;116;167;254m"
