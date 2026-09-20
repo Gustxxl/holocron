@@ -69,8 +69,14 @@ def search_screen(initial_query=None):
         command = read_command('search> ')
         low = command.lower()
 
-        if low in ('', 'b', 'back'):
+        if low in ('b', 'back'):
             return
+        if command == '':
+            archive.load()
+            cases = archive.cases()
+            if query:
+                results = search.search(cases, query)
+            continue
         if low == 'n' and results:
             page += 1
             continue

@@ -36,7 +36,11 @@ def main_screen():
             print(f"{user_os()} {os_version()} ({platform.machine()})")
             pause()
         elif command == 'update':
-            if update() is False:
+            try:
+                if update() is False:
+                    pause()
+            except Exception as e:
+                print(f'Update failed: {e}')
                 pause()
         elif command == '':
             clear_screen()
