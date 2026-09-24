@@ -216,6 +216,8 @@ def _is_dev():
 
 
 def update_available():
+    if _is_dev():
+        return None
     try:
         remote = remote_version()
     except Exception:
@@ -226,16 +228,23 @@ def update_available():
 
 
 _update_sha = None
+_update_thread = None
 
 
 def check_update_async():
+    global _update_thread
+
     def _run():
         global _update_sha
         _update_sha = update_available()
-    threading.Thread(target=_run, daemon=True).start()
+
+    _update_thread = threading.Thread(target=_run, daemon=True)
+    _update_thread.start()
 
 
-def pending_update():
+def pending_update(wait=0.0):
+    if wait and _update_thread is not None:
+        _update_thread.join(wait)
     return _update_sha
 
 
