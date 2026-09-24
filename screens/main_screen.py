@@ -12,6 +12,16 @@ import platform
 from screens.search_screen import search_screen
 from core.settings import archive_path
 from core import archive
+from core.updater import update_available
+import threading
+
+
+_update_sha = None
+
+
+def _check_update_async():
+    global _update_sha
+    _update_sha = update_available()
 
 
 APP_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +30,16 @@ LOGO_TEXT = "HOLOCRON"
 
 
 def main_screen():
+    threading.Thread(target=_check_update_async, daemon=True).start()
+
     while True:
         clear_screen()
         show_logo()
         show_today_date()
         greet()
         show_status()
+        if _update_sha:
+            print(dim(f'Update available — build {_update_sha[:7]}.'))
         print()
         raw = read_command('system> ')
         command = raw.lower()

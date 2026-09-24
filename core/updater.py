@@ -30,6 +30,9 @@ MIRRORS = [
 ]
 
 
+DEV_MARKER = os.path.join(APP_DIR, '.dev')
+
+
 def _candidates(url):
     yield url
     override = os.environ.get('HOLOCRON_MIRROR')
@@ -138,6 +141,9 @@ def _file_changed(a, b):
 
 
 def update(restart=True):
+    if _is_dev():
+        print('Dev mode: auto-update disabled.')
+        return False
     print('Checking the system...')
     try:
         remote = remote_version()
@@ -195,6 +201,27 @@ def update(restart=True):
         print('Restarting...')
         _restart()
     return True
+
+
+# рядом с APP_DIR / VERSION_FILE, на уровне модуля
+DEV_MARKER = os.path.join(APP_DIR, '.dev')
+
+
+def _is_dev():
+    env = os.environ.get('HOLOCRON_DEV', '').strip().lower()
+    if env not in ('', '0', 'false', 'no'):
+        return True
+    return os.path.exists(DEV_MARKER)
+
+
+def update_available():
+    try:
+        remote = remote_version()
+    except Exception:
+        return None
+    if current_version() == remote:
+        return None
+    return remote
 
 
 if __name__ == '__main__':

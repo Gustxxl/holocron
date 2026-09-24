@@ -13,3 +13,5 @@ env/
 data/
 .version
 __pycache__/
+
+.dev
