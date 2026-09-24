@@ -48,7 +48,7 @@ def main_screen():
             settings_screen()
         elif command == 'system':
             print(f"{user_os()} {os_version()} ({platform.machine()})")
-            pause()
+            pause('hi')
         elif command == 'update':
             try:
                 if update() is False:
