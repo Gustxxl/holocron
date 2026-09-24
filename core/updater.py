@@ -8,6 +8,7 @@ import sys
 import tarfile
 import tempfile
 import urllib.request
+import threading
 
 
 REPO = 'Gustxxl/holocron'
@@ -222,6 +223,20 @@ def update_available():
     if current_version() == remote:
         return None
     return remote
+
+
+_update_sha = None
+
+
+def check_update_async():
+    def _run():
+        global _update_sha
+        _update_sha = update_available()
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def pending_update():
+    return _update_sha
 
 
 if __name__ == '__main__':

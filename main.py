@@ -21,9 +21,11 @@ from core.settings import update_archive_path
 from ui.clean_path import clean_input_path
 from screens.main_screen import main_screen
 from ui.interface import clear_screen, disconnect
+from core import updater
 
 
 def start():
+    updater.check_update_async()
     if len(sys.argv) > 1:
         p = clean_input_path(sys.argv[1])
         if p and Path(p).exists():
