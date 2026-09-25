@@ -34,9 +34,11 @@ def start():
         clear_screen()
         print('Accessing the archives...')
         archive.load()
+        updater.pending_update(wait=5)
         main_screen()
     except (KeyboardInterrupt, EOFError):
         disconnect()
+
 
 
 if __name__ == '__main__':

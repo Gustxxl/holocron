@@ -27,7 +27,7 @@ def main_screen():
         show_today_date()
         greet()
         show_status()
-        new = pending_update(wait=2)
+        new = pending_update()
         if new:
             print(dim("Update available — type 'update'"))
         print()
