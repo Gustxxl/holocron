@@ -36,6 +36,7 @@ def highlight(text, query):
 
 
 PAGE = 8
+MIN_QUERY = 3
 
 
 def search_screen(initial_query=None):
@@ -47,6 +48,11 @@ def search_screen(initial_query=None):
         return
 
     query = (initial_query or "").strip()
+    if 0 < len(query) < MIN_QUERY:
+        clear_screen()
+        print(f'Type at least {MIN_QUERY} characters.')
+        pause()
+        return
     results = search.search(cases, query) if query else []
     page = 0
 
@@ -93,16 +99,10 @@ def search_screen(initial_query=None):
             open_case(results, int(command), query)
             continue
 
-
-        if command.isdigit() and results:
-            open_case(results, int(command), query)
-            continue
-
         q = command.strip()
-        n = 3
-        if len(q) < n:
+        if len(q) < MIN_QUERY:
             clear_screen()
-            print(f'Type at least {n} characters.')
+            print(f'Type at least {MIN_QUERY} characters.')
             pause()
             continue
 

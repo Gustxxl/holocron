@@ -15,9 +15,9 @@ REPO = 'Gustxxl/holocron'
 BRANCH = 'main'
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VERSION_FILE = os.path.join(APP_DIR, '.version')
+DEV_MARKER = os.path.join(APP_DIR, '.dev')
 
-PRESERVE = {'.version', 'data', '.git', 'venv', '.venv', '__pycache__'}
+PRESERVE = {'data', '.git', 'venv', '.venv', '__pycache__', '.dev'}
 
 API = f'https://api.github.com/repos/{REPO}/commits/{BRANCH}'
 TREE = f'https://api.github.com/repos/{REPO}/git/trees/{{sha}}?recursive=1'
@@ -29,9 +29,6 @@ MIRRORS = [
     'https://ghfast.top/',
     'https://gh.llkk.cc/',
 ]
-
-
-DEV_MARKER = os.path.join(APP_DIR, '.dev')
 
 
 def _candidates(url):
@@ -58,14 +55,14 @@ def _get(url, raw=False):
     raise last
 
 
-def current_version():
-    if os.path.exists(VERSION_FILE):
-        with open(VERSION_FILE) as f:
-            return f.read().strip()
-    return None
+def _is_dev():
+    env = os.environ.get('HOLOCRON_DEV', '').strip().lower()
+    if env not in ('', '0', 'false', 'no'):
+        return True
+    return os.path.exists(DEV_MARKER)
 
 
-def remote_version():
+def _latest_sha():
     return _get(API)['sha']
 
 
@@ -76,6 +73,11 @@ def _tree(sha):
     return [e for e in data['tree'] if e.get('type') == 'blob']
 
 
+def _remote_tree():
+    sha = _latest_sha()
+    return sha, _tree(sha)
+
+
 def _git_blob_sha(path):
     h = hashlib.sha1()
     h.update(b'blob ' + str(os.path.getsize(path)).encode() + b'\0')
@@ -83,6 +85,14 @@ def _git_blob_sha(path):
         for chunk in iter(lambda: f.read(65536), b''):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _is_current(blobs):
+    for entry in blobs:
+        target = os.path.join(APP_DIR, entry['path'])
+        if not os.path.isfile(target) or _git_blob_sha(target) != entry['sha']:
+            return False
+    return True
 
 
 def _verify(root, blobs):
@@ -147,19 +157,18 @@ def update(restart=True):
         return False
     print('Checking the system...')
     try:
-        remote = remote_version()
-        blobs = _tree(remote)
+        sha, blobs = _remote_tree()
     except Exception as e:
         print(f'System unreachable: {e}')
         return False
 
-    if current_version() == remote:
-        print(f'System is up to date — build {remote[:7]}.')
+    if _is_current(blobs):
+        print(f'System is up to date — build {sha[:7]}.')
         return False
 
     print('Update found. Retrieving...')
     try:
-        blob = _get(TARBALL.format(sha=remote), raw=True)
+        blob = _get(TARBALL.format(sha=sha), raw=True)
     except Exception as e:
         print(f'Retrieval failed: {e}')
         return False
@@ -193,10 +202,6 @@ def update(restart=True):
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
-    with open(VERSION_FILE, 'w') as f:
-        f.write(remote)
-
-
     print('System updated.')
     if restart:
         print('Restarting...')
@@ -204,27 +209,14 @@ def update(restart=True):
     return True
 
 
-# рядом с APP_DIR / VERSION_FILE, на уровне модуля
-DEV_MARKER = os.path.join(APP_DIR, '.dev')
-
-
-def _is_dev():
-    env = os.environ.get('HOLOCRON_DEV', '').strip().lower()
-    if env not in ('', '0', 'false', 'no'):
-        return True
-    return os.path.exists(DEV_MARKER)
-
-
 def update_available():
     if _is_dev():
         return None
     try:
-        remote = remote_version()
+        sha, blobs = _remote_tree()
     except Exception:
         return None
-    if current_version() == remote:
-        return None
-    return remote
+    return None if _is_current(blobs) else sha
 
 
 _update_sha = None

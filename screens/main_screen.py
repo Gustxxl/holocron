@@ -29,7 +29,7 @@ def main_screen():
         show_status()
         new = pending_update(wait=2)
         if new:
-            print(dim(f'Update available — build {new[:7]}.'))
+            print(dim("update available — type 'update'"))
         print()
         raw = read_command('system> ')
         command = raw.lower()
