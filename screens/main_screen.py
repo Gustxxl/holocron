@@ -69,7 +69,7 @@ def show_logo():
     pad = (width - block_width) // 2
     for line in lines:
         print(dim(" " * pad + line))
-    print()
+    print('test')
 
 
 def show_today_date():
