@@ -29,7 +29,7 @@ def main_screen():
         show_status()
         new = pending_update(wait=2)
         if new:
-            print(dim("update available — type 'update'"))
+            print(dim("Update available — type 'update'"))
         print()
         raw = read_command('system> ')
         command = raw.lower()
@@ -69,7 +69,7 @@ def show_logo():
     pad = (width - block_width) // 2
     for line in lines:
         print(dim(" " * pad + line))
-    print('test')
+    print()
 
 
 def show_today_date():
