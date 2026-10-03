@@ -137,7 +137,12 @@ def load_cases(path):
         r = rects.get(t.get("containerId"))
         x = round((r or t).get("x", 0))
         y = round((r or t).get("y", 0))
-        cases.append({"text": txt, "x": x, "y": y, "source": path.name})
+        cases.append({
+            "text": txt, "x": x, "y": y,
+            "source": path.name,
+            "filepath": str(path),
+            "element_id": t["id"],
+        })
     cases.sort(key=lambda c: (round(c["y"] / 40), c["x"]))
     return _reindex(cases)
 
@@ -159,3 +164,22 @@ def _reindex(cases):
     for i, c in enumerate(cases, 1):
         c["id"] = i
     return cases
+
+
+def update_text(filepath, element_id, new_text):
+    path = Path(filepath)
+    raw = path.read_text(encoding="utf-8")
+    scene = json.loads(raw)
+
+    found = False
+    for el in scene.get("elements", []):
+        if el.get("id") == element_id and el.get("type") == "text":
+            el["text"] = new_text
+            el["originalText"] = new_text
+            found = True
+            break
+
+    if not found:
+        raise ValueError("Element not found")
+
+    path.write_text(json.dumps(scene, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -30,3 +30,19 @@ def update_archive_path(new_path):
     save(cfg)
     clear_screen()
     print('Success')
+
+
+def excalidraw_path():
+    cfg = load()
+    path = (cfg.get('excalidraw_path') or '').strip()
+    if path in ('', '.'):
+        return ''
+    return path
+
+
+def update_excalidraw_path(new_path):
+    cfg = load()
+    cfg['excalidraw_path'] = clean_input_path(new_path)
+    save(cfg)
+    clear_screen()
+    print('Success')

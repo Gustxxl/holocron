@@ -13,7 +13,7 @@ if os.name != 'nt':
         pass
 
 
-from core import archive
+from core import archives
 import sys
 from pathlib import Path
 from time import sleep
@@ -33,7 +33,7 @@ def start():
     try:
         clear_screen()
         print('Accessing the archives...')
-        archive.load()
+        archives.load()
         updater.pending_update(wait=5)
         main_screen()
     except (KeyboardInterrupt, EOFError):

@@ -3,8 +3,10 @@ from core.settings import (
     update_operator_name,
     archive_path,
     update_archive_path,
+    excalidraw_path,
+    update_excalidraw_path,
 )
-from core import archive
+from core import archives
 from ui.interface import clear_screen, dim, pause, read_command, show_menu
 from pathlib import Path
 from ui.clean_path import clean_input_path
@@ -25,10 +27,12 @@ def settings_screen():
 def archive_screen():
     while True:
         show_menu('Settings > Archive',
-                  ['Excalidraw for Obsidian', 'Excalidraw       (Soon)', 'Vault            (Soon)'])
+                  ['Excalidraw for Obsidian', 'Excalidraw', 'Vault            (Soon)'])
         command = read_command('settings> ')
         if command == '1':
-            excalidraw_screen()
+            excalidraw_obsidian_screen()
+        elif command == '2':
+            excalidraw_plain_screen()
         elif command == 'b':
             return
 
@@ -50,10 +54,10 @@ def user_screen():
             return
 
 
-def excalidraw_screen():
+def excalidraw_obsidian_screen():
     while True:
         clear_screen()
-        print(dim('Settings > Archive > Excalidraw'))
+        print(dim('Settings > Archive > Excalidraw for Obsidian'))
         print()
         print(f'Current path: {archive_path() or "(not set)"}')
         print()
@@ -62,18 +66,54 @@ def excalidraw_screen():
         command = read_command('path> ')
         if command == 'b':
             return
+        cleaned = clean_input_path(command)
+        if Path(cleaned).suffix.lower() != '.md' or not Path(cleaned).is_file():
+            clear_screen()
+            print(dim('Path must point to an existing .md file.'))
+            pause()
+            continue
+        update_archive_path(command)
+        archives.load()
+        pause()
+        return
+
+
+def excalidraw_plain_screen():
+    while True:
+        clear_screen()
+        print(dim('Settings > Archive > Excalidraw'))
+        print()
+        p = excalidraw_path()
+        if p and not Path(p).exists():
+            print(f'Current path: {p}')
+            print(dim('  (path not found)'))
+        elif p:
+            print(f'Current path: {p}')
         else:
-            cleaned = clean_input_path(command)
-            if Path(cleaned).suffix.lower() != '.md' or not Path(cleaned).is_file():
-                clear_screen()
-                print(dim('Path must point to an existing .md file.'))
-                pause()
-                continue
-            update_archive_path(command)
-            archive.load()
+            print('Current path: (not set)')
+        print()
+        print(dim('  [enter path] set folder or .excalidraw file   [c] clear   [b] back'))
+        print()
+        command = read_command('path> ')
+        if command == 'b':
+            return
+        if command == 'c':
+            update_excalidraw_path('')
+            archives.load()
             pause()
             return
-
+        # ↓ вот этого не хватает
+        cleaned = clean_input_path(command)
+        cp = Path(cleaned)
+        if not (cp.is_dir() or (cp.is_file() and cp.suffix == '.excalidraw')):
+            clear_screen()
+            print(dim('Path must be a folder or an .excalidraw file.'))
+            pause()
+            continue
+        update_excalidraw_path(cleaned)
+        archives.load()
+        pause()
+        return
 
 
 def ask_new_name():

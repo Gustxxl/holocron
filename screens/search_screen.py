@@ -1,10 +1,13 @@
 import re
 import difflib
-from core import archive, search
-from ui.interface import clear_screen, dim, pause, read_command, error_haptic
+from core import archives, search
+from ui.interface import clear_screen, dim, pause, read_command, error_haptic, open_file
 import textwrap
 from screens.help_screen import render_help
 from core.commands import HELP_SECTIONS
+import shutil
+from core.editor import edit_text
+from core import excalidraw
 
 
 _HL = "\033[1;38;2;116;167;254m"
@@ -49,7 +52,7 @@ MIN_QUERY = 3
 
 
 def search_screen(initial_query=None):
-    cases = archive.cases()
+    cases = archives.cases()
     if not cases:
         clear_screen()
         print("No excalidraw scenes found.")
@@ -92,13 +95,21 @@ def search_screen(initial_query=None):
             render_help(HELP_SECTIONS)
             pause()
             continue
+        if low in ('s', 'settings'):
+            from screens.settings_screen import settings_screen
+            settings_screen()
+            archives.load()
+            cases = archives.cases()
+            if query:
+                results = search.search(cases, query)
+            continue
         if low in ('b', 'back'):
             return
         if command == '':
             if not results:
                 return
-            archive.load()
-            cases = archive.cases()
+            archives.load()
+            cases = archives.cases()
             if query:
                 results = search.search(cases, query)
             continue
@@ -129,6 +140,57 @@ def open_case(results, number, query):
         show_case(results[number - 1][1], query)
         command = read_command('case> ')
         low = command.lower()
+
+        if low in ('e', 'edit'):
+            case = results[number - 1][1]
+            fp = case.get("filepath")
+            eid = case.get("element_id")
+
+            if not fp or not eid:
+                print(dim("  Editing not available for this case"))
+                pause()
+                continue
+
+            if not fp.endswith('.excalidraw'):
+                print(dim("  Editing supported only for .excalidraw files"))
+                pause()
+                continue
+
+            original = case["text"]
+            edited = edit_text(original).strip()
+
+            if not edited:
+                print(dim("  Empty text — edit cancelled"))
+                pause()
+                continue
+
+            if edited == original:
+                print(dim("  No changes"))
+                pause()
+                continue
+
+            clear_screen()
+            print(dim("  Old:"))
+            print(f"  {original[:200]}")
+            print()
+            print(dim("  New:"))
+            print(f"  {edited[:200]}")
+            print()
+            confirm = read_command("  Save changes? [y/n]> ")
+            if confirm.lower() != 'y':
+                print(dim("  Cancelled"))
+                pause()
+                continue
+
+            try:
+                excalidraw.update_text(fp, eid, edited)
+                case["text"] = edited
+                print(dim("  Saved"))
+            except Exception as e:
+                print(f"  Error: {e}")
+            pause()
+            continue
+
         if low in ('h', 'help'):
             clear_screen()
             render_help(HELP_SECTIONS)
@@ -137,9 +199,10 @@ def open_case(results, number, query):
         if low in ('b', 'back'):
             return
         if command == '':
-            archive.load()
+            archive_mod = __import__('core.archives', fromlist=['archives'])
+            archive_mod.load()
             if query:
-                results = search.search(archive.cases(), query)
+                results = search.search(archive_mod.cases(), query)
             continue
         if command.isdigit():
             number = int(command)
@@ -153,10 +216,10 @@ def show_list(results, page, query):
     chunk = results[page * PAGE: page * PAGE + PAGE]
     top = results[0][0] if results else 1.0
 
-    print(dim(f'"{query}"   {total} results   {page + 1}/{pages}'))
+    print(dim(f'"{query}"   {total} results   page {page + 1}/{pages}'))
     print()
 
-    width = 80
+    width = shutil.get_terminal_size().columns
     for n, (score, case) in enumerate(chunk, page * PAGE + 1):
         # pct = round(score / top * 100) if top else 0
         prefix = f'  {n:>3})  '
@@ -189,7 +252,7 @@ def show_case(case, query=""):
         print()
         print(highlight(highlight_links(body), query))
     print()
-    print(dim('  [↵] reload   [b] back   [number] open   [h] help   [q] quit'))
+    print(dim('  [e] edit case   [↵] reload   [b] back   [number] open case   [h] help   [q] quit'))
     print()
 
 

@@ -2,6 +2,8 @@ from core.os_info import user_os
 from ui.haptic import Holocron, emit
 import sys
 import time
+import subprocess
+import platform
 
 
 def dim(text):
@@ -63,3 +65,13 @@ def error_haptic():
     if user_os() == 'macOS':
         with Holocron() as core:
             core.error()
+
+
+def open_file(filepath):
+    system = platform.system()
+    if system == 'Darwin':
+        subprocess.Popen(['open', filepath])
+    elif system == 'Windows':
+        subprocess.Popen(['start', '', filepath], shell=True)
+    else:
+        subprocess.Popen(['xdg-open', filepath])

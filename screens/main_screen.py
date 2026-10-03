@@ -11,7 +11,7 @@ from core.updater import update
 import platform
 from screens.search_screen import search_screen
 from core.settings import archive_path
-from core import archive
+from core import archives
 from core.updater import update, pending_update
 from core.commands import _INDEX
 
@@ -42,7 +42,7 @@ def main_screen():
             handler.run(raw)
             continue
 
-        if not archive.is_loaded():
+        if not archives.is_loaded():
             print(dim('No archive set — add a path in settings.'))
             pause()
             continue
@@ -77,9 +77,9 @@ def greet():
 
 
 def show_status():
-    if not archive.is_loaded():
+    if not archives.is_loaded():
         return
-    print(dim(f'{Path(archive.path()).stem} ({archive.count()} cases indexed)'))
+    print(dim(f'{Path(archives.path()).stem} ({archives.count()} cases indexed)'))
 
 
 def count_cases(path):
