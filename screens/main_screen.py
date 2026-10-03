@@ -13,6 +13,7 @@ from screens.search_screen import search_screen
 from core.settings import archive_path
 from core import archive
 from core.updater import update, pending_update
+from core.commands import _INDEX
 
 
 APP_DIR = Path(__file__).resolve().parent.parent
@@ -33,28 +34,19 @@ def main_screen():
         print()
         raw = read_command('system> ')
         command = raw.lower()
-        if command == 'settings':
-            clear_screen()
-            settings_screen()
-        elif command == 'system':
-            print(f"{user_os()} {os_version()} ({platform.machine()})")
-            pause()
-        elif command == 'update':
-            try:
-                if update() is False:
-                    pause()
-            except Exception as e:
-                print(f'Update failed: {e}')
-                pause()
-        elif command == '':
-            clear_screen()
+        if command == '':
             continue
-        else:
-            if not archive.is_loaded():
-                print(dim('No archive set — add a path in settings.'))
-                pause()
-                continue
-            search_screen(raw)
+
+        handler = _INDEX.get(command)
+        if handler:
+            handler.run(raw)
+            continue
+
+        if not archive.is_loaded():
+            print(dim('No archive set — add a path in settings.'))
+            pause()
+            continue
+        search_screen(raw)
 
 
 def show_logo():
@@ -87,7 +79,7 @@ def greet():
 def show_status():
     if not archive.is_loaded():
         return
-    print(dim(f'{Path(archive.path()).stem} ({archive.count()} cases)'))
+    print(dim(f'{Path(archive.path()).stem} ({archive.count()} cases indexed)'))
 
 
 def count_cases(path):

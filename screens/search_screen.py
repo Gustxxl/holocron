@@ -3,10 +3,19 @@ import difflib
 from core import archive, search
 from ui.interface import clear_screen, dim, pause, read_command, error_haptic
 import textwrap
+from screens.help_screen import render_help
+from core.commands import HELP_SECTIONS
 
 
 _HL = "\033[1;38;2;116;167;254m"
 _RESET = "\033[0m"
+
+
+_URL_RE = re.compile(r'https?://\S+')
+
+
+def highlight_links(text):
+    return _URL_RE.sub(lambda m: dim(m.group()), text)
 
 
 def _hl_match(qw, tw):
@@ -64,7 +73,7 @@ def search_screen(initial_query=None):
             if tips:
                 print(dim("Maybe: " + ", ".join(tips)))
             print()
-            print(dim('  [type] search   [b] back'))
+            print(dim('  [type] search   [b] back   [h] help'))
             print()
             error_haptic()
         elif results:
@@ -78,7 +87,11 @@ def search_screen(initial_query=None):
 
         command = read_command('search> ')
         low = command.lower()
-
+        if low in ('h', 'help'):
+            clear_screen()
+            render_help(HELP_SECTIONS)
+            pause()
+            continue
         if low in ('b', 'back'):
             return
         if command == '':
@@ -116,6 +129,11 @@ def open_case(results, number, query):
         show_case(results[number - 1][1], query)
         command = read_command('case> ')
         low = command.lower()
+        if low in ('h', 'help'):
+            clear_screen()
+            render_help(HELP_SECTIONS)
+            pause()
+            continue
         if low in ('b', 'back'):
             return
         if command == '':
@@ -135,13 +153,13 @@ def show_list(results, page, query):
     chunk = results[page * PAGE: page * PAGE + PAGE]
     top = results[0][0] if results else 1.0
 
-    print(dim(f'Search: "{query}"   ·   {total} found   ·   page {page + 1}/{pages}'))
+    print(dim(f'"{query}"   {total} results   {page + 1}/{pages}'))
     print()
 
     width = 80
     for n, (score, case) in enumerate(chunk, page * PAGE + 1):
-        pct = round(score / top * 100) if top else 0
-        prefix = f'  {n:>3}) {pct:>3}%  '
+        # pct = round(score / top * 100) if top else 0
+        prefix = f'  {n:>3})  '
         wrapped = textwrap.fill(
             first_line(case),
             width=width,
@@ -166,12 +184,12 @@ def show_case(case, query=""):
     title = next((ln.strip() for ln in lines if ln.strip()), "(untitled)")
     body = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
     print(dim(f'── {case.get("source", "")} ' + '─' * 20))
-    print(highlight(title, query))
+    print(highlight(highlight_links(title), query))
     if body:
         print()
-        print(highlight(body, query))
+        print(highlight(highlight_links(body), query))
     print()
-    print(dim('  [↵] reload   [b] back   [number] open   [q] quit'))
+    print(dim('  [↵] reload   [b] back   [number] open   [h] help   [q] quit'))
     print()
 
 

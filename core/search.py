@@ -113,5 +113,31 @@ def search(cases, query):
 
 
 def suggest(cases, q):
+    words = _norm_words(q)
+    if not words:
+        return []
+
     vocab = {w for c in cases for w in re.findall(r"\w{3,}", c["text"].lower())}
-    return difflib.get_close_matches(q.lower(), vocab, n=5, cutoff=0.6)
+
+    fixed = []
+    changed = False
+    any_known = False
+    for w in words:
+        matches = difflib.get_close_matches(w, vocab, n=1, cutoff=0.7)
+        if matches:
+            any_known = True
+            if matches[0] != w:
+                fixed.append(matches[0])
+                changed = True
+            else:
+                fixed.append(w)
+        else:
+            fixed.append(w)
+
+    if not changed or not any_known:
+        return []
+
+    candidate = " ".join(fixed)
+    if search(cases, candidate):
+        return [candidate]
+    return []
