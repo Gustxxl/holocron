@@ -51,16 +51,20 @@ def user_screen():
         clear_screen()
         print(dim('Settings > User'))
         print()
-        print(f'Current name: {operator_name()}')
+        name = operator_name() or '(not set)'
+        print(f'Name: {name}')
         print()
-        print(dim('  [y] change name   [b] back   [q] quit'))
+        print(dim('  [type] new name   [c] clear   [b] back'))
         print()
-        command = read_command('Change name? [y/n]> ')
-        if command == 'y':
-            ask_new_name()
-            pause()
-        else:
+        command = read_command('name> ')
+        if command == 'b':
             return
+        if command == 'c':
+            update_operator_name('')
+            continue
+        if command:
+            update_operator_name(command)
+            continue
 
 
 def excalidraw_obsidian_screen():
