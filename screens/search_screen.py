@@ -262,7 +262,7 @@ def show_list(results, page, query, page_size=PAGE):
     top = results[0][0] if results else 1.0
 
     if query:
-        header = f"'{query}'   {total} results"
+        header = f'Search: "{query}"   {total} results'
     else:
         header = f'{total} cases'
     if pages > 1:
