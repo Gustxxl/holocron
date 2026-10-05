@@ -2,6 +2,7 @@ import re
 import difflib
 from core import archives, search
 from ui.interface import clear_screen, dim, pause, read_command, error_haptic, open_file
+from ui.markdown import render_tables, table_cells
 import textwrap
 from screens.help_screen import render_help
 from core.commands import HELP_SECTIONS
@@ -292,21 +293,28 @@ def show_list(results, page, query, page_size=PAGE):
 
 def show_case(case, query=''):
     clear_screen()
-    lines = case['text'].strip().splitlines()
-    title = next((ln.strip() for ln in lines if ln.strip()), '(untitled)')
-    body = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ''
     name = case.get('source', '')
     for suffix in ('.excalidraw.md', '.excalidraw', '.md'):
         if name.endswith(suffix):
             name = name[:-len(suffix)]
             break
     archive = case.get('archive', '')
-    print(dim(f'── {name} ({archive}) ' + '─' * 20))
+
+    text = case['text'].strip()
+    lines = text.splitlines()
+    first = next((ln.strip() for ln in lines if ln.strip()), '')
+    if first.startswith('|'):
+        title, body = name, text
+    else:
+        title = first or '(untitled)'
+        body = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ''
+
+    print(dim(f'── {name} · {archive} ' + '─' * 20))
     print()
     print(highlight(highlight_links(title), query))
     if body:
         print()
-        print(highlight(highlight_links(body), query))
+        print(highlight(highlight_links(render_tables(body)), query))
     print()
     print(dim('  [e] edit   [b] back   [h] help'))
     print()
@@ -314,6 +322,10 @@ def show_case(case, query=''):
 
 def first_line(case):
     for ln in case['text'].splitlines():
-        if ln.strip():
-            return ln.strip()
+        ln = ln.strip()
+        if not ln:
+            continue
+        if ln.startswith('|'):
+            return '  '.join(c for c in table_cells(ln) if c)
+        return ln
     return '(empty)'
