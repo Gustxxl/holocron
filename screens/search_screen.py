@@ -166,7 +166,7 @@ def search_screen(initial_query=None):
 
 def open_case(results, number, query):
     while 1 <= number <= len(results):
-        show_case(results[number - 1][1], query)
+        show_case(results[number - 1][1], query, number, len(results))
         command = read_command('case> ')
         low = command.lower()
 
@@ -291,7 +291,7 @@ def show_list(results, page, query, page_size=PAGE):
     return page
 
 
-def show_case(case, query=''):
+def show_case(case, query='', number=None, total=None):
     clear_screen()
     name = case.get('source', '')
     for suffix in ('.excalidraw.md', '.excalidraw', '.md'):
@@ -309,7 +309,8 @@ def show_case(case, query=''):
         title = first or '(untitled)'
         body = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ''
 
-    print(dim(f'── {name} ({archive}) ' + '─' * 20))
+    pos = f'{number}/{total}  ' if number else ''
+    print(dim(f'── {pos}{name} ({archive}) ' + '─' * 20))
     print()
     print(highlight(highlight_links(title), query))
     if body:
