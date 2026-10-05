@@ -13,6 +13,9 @@ from core import excalidraw
 _HL = '\033[1;38;2;116;167;254m'
 _RESET = '\033[0m'
 
+PAGE = 8
+LIST_PAGE = 15
+MIN_QUERY = 3
 
 _URL_RE = re.compile(r'https?://\S+')
 
@@ -47,10 +50,6 @@ def highlight(text, query):
     return re.sub(r'\w+', repl, text, flags=re.UNICODE)
 
 
-PAGE = 8
-MIN_QUERY = 3
-
-
 def search_screen(initial_query=None):
     cases = archives.cases()
     if not cases:
@@ -61,13 +60,21 @@ def search_screen(initial_query=None):
         return
 
     query = (initial_query or '').strip()
-    if 0 < len(query) < MIN_QUERY:
+    list_mode = False
+
+    if query in ('l', 'list'):
+        results = [(0, c) for c in cases]
+        query = ''
+        list_mode = True
+        page = 0
+    elif 0 < len(query) < MIN_QUERY:
         clear_screen()
         print(f'Type at least {MIN_QUERY} characters.')
         pause()
         return
-    results = search.search(cases, query) if query else []
-    page = 0
+    else:
+        results = search.search(cases, query) if query else []
+        page = 0
 
     while True:
         if query and not results:
@@ -81,7 +88,8 @@ def search_screen(initial_query=None):
             print()
             error_haptic()
         elif results:
-            page = show_list(results, page, query)
+            ps = LIST_PAGE if list_mode else PAGE
+            page = show_list(results, page, query, ps)
         else:
             clear_screen()
             print(dim('Search the archive'))
@@ -122,10 +130,22 @@ def search_screen(initial_query=None):
             continue
         if command.isdigit() and results:
             new_query = open_case(results, int(command), query)
-            if new_query:
+            if new_query == 'l':
+                results = [(0, c) for c in cases]
+                query = ''
+                page = 0
+                list_mode = True
+            elif new_query:
                 query = new_query
                 results = search.search(cases, query)
                 page = 0
+                list_mode = False
+            continue
+        if low in ('l', 'list'):
+            results = [(0, c) for c in cases]
+            query = ''
+            page = 0
+            list_mode = True
             continue
 
         q = command.strip()
@@ -138,6 +158,7 @@ def search_screen(initial_query=None):
         query = q
         results = search.search(cases, query)
         page = 0
+        list_mode = False
 
 
 def open_case(results, number, query):
@@ -197,6 +218,8 @@ def open_case(results, number, query):
             pause()
             continue
 
+        if low in ('l', 'list'):
+            return 'l'
         if low in ('s', 'settings'):
             from screens.settings_screen import settings_screen
             settings_screen()
@@ -227,22 +250,25 @@ def open_case(results, number, query):
     return None
 
 
-def show_list(results, page, query):
+def show_list(results, page, query, page_size=PAGE):
     clear_screen()
     total = len(results)
-    pages = max(1, (total + PAGE - 1) // PAGE)
+    pages = max(1, (total + page_size - 1) // page_size)
     page = max(0, min(page, pages - 1))
-    chunk = results[page * PAGE: page * PAGE + PAGE]
+    chunk = results[page * page_size: page * page_size + page_size]
     top = results[0][0] if results else 1.0
 
-    header = f"'{query}'   {total} results"
+    if query:
+        header = f"'{query}'   {total} results"
+    else:
+        header = f'{total} cases'
     if pages > 1:
         header += f'   {page + 1}/{pages}'
     print(dim(header))
     print()
 
     width = shutil.get_terminal_size().columns
-    for n, (score, case) in enumerate(chunk, page * PAGE + 1):
+    for n, (score, case) in enumerate(chunk, page * page_size + 1):
         prefix = f'  {n:>3})  '
         wrapped = textwrap.fill(
             first_line(case),

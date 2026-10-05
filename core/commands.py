@@ -17,6 +17,7 @@ HELP_SECTIONS = [
         HelpEntry('[number]',        'open a case from the current list'),
         HelpEntry('#123',            'jump to case 123'),
         HelpEntry('n / p',           'next / previous page'),
+        HelpEntry('l / list',        'browse all cases'),
     ]),
     ('Commands', [
         HelpEntry('settings',       'operator name / archive file'),
@@ -38,7 +39,7 @@ def _cmd_settings(raw):
 
 
 def _cmd_system(raw):
-    print(f"{user_os()} {os_version()} ({platform.machine()})")
+    print(f'{user_os()} {os_version()} ({platform.machine()})')
     pause()
 
 
@@ -57,13 +58,18 @@ def _cmd_help(raw):
     pause()
 
 
+def _cmd_list(raw):
+    from screens.search_screen import search_screen
+    search_screen('l')
+
+
 COMMANDS = [
     Command('settings', 'settings', _cmd_settings),
     Command('system',   'system',   _cmd_system, ('sys',)),
     Command('update',   'update',   _cmd_update),
     Command('help',     'help',     _cmd_help, ('h',)),
+    Command('list',     'list',     _cmd_list, ('l',)),
 ]
-
 
 _INDEX = {}
 for _c in COMMANDS:

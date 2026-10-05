@@ -4,6 +4,7 @@ import sys
 import time
 import subprocess
 import platform
+import os
 
 
 def dim(text):
@@ -11,7 +12,10 @@ def dim(text):
 
 
 def clear_screen():
-    print('\033[H\033[2J', end='')
+    if os.name == 'nt':
+        os.system('cls')
+    else:
+        print('\033[H\033[2J\033[3J', end='')
 
 
 def pause():
