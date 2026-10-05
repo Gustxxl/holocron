@@ -48,10 +48,17 @@ def quit_app():
 
 
 def read_command(prompt='> '):
-    command = input(prompt).strip()
-    if command.lower() in ('q', 'quit', 'exit'):
+    line = input(prompt).strip()
+    if os.name != 'nt':
+        import select
+        while select.select([sys.stdin], [], [], 0.05)[0]:
+            extra = sys.stdin.readline().strip()
+            if extra:
+                line += ' ' + extra
+    if line.lower() in ('q', 'quit', 'exit'):
         quit_app()
-    return command
+    return line
+
 
 
 def show_menu(breadcrumb, options, footer='  [number] open section   [b] back   [q] quit'):

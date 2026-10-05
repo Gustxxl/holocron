@@ -46,3 +46,19 @@ def update_excalidraw_path(new_path):
     save(cfg)
     clear_screen()
     print('Success')
+
+
+def vault_path():
+    cfg = load()
+    path = (cfg.get('vault_path') or '').strip()
+    if path in ('', '.'):
+        return ''
+    return path
+
+
+def update_vault_path(new_path):
+    cfg = load()
+    cfg['vault_path'] = clean_input_path(new_path)
+    save(cfg)
+    clear_screen()
+    print('Success')

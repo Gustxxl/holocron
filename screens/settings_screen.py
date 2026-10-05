@@ -5,6 +5,8 @@ from core.settings import (
     update_archive_path,
     excalidraw_path,
     update_excalidraw_path,
+    vault_path,
+    update_vault_path,
 )
 from core import archives
 from ui.interface import clear_screen, dim, pause, read_command, show_menu
@@ -31,9 +33,10 @@ def archive_screen():
         print()
         p1 = archive_path()
         p2 = excalidraw_path()
+        p3 = vault_path()
         print(f'1) Excalidraw for Obsidian   {dim("✓") if p1 else dim("—")}')
         print(f'2) Excalidraw                {dim("✓") if p2 else dim("—")}')
-        print(f'3) Vault                     {dim("Soon")}')
+        print(f'3) Vault                     {dim("✓") if p3 else dim("—")}')
         print()
         print(dim('  [number] open section   [b] back   [q] quit'))
         print()
@@ -42,6 +45,8 @@ def archive_screen():
             excalidraw_obsidian_screen()
         elif command == '2':
             excalidraw_plain_screen()
+        elif command == '3':
+            vault_screen()
         elif command == 'b':
             return
 
@@ -131,3 +136,39 @@ def excalidraw_plain_screen():
 
 def ask_new_name():
     update_operator_name(input("New name: ").strip())
+
+
+def vault_screen():
+    while True:
+        clear_screen()
+        print(dim('Settings > Archive > Vault'))
+        print()
+        p = vault_path()
+        if p and not Path(p).exists():
+            print(f'Current path: {p}')
+            print(dim('  (path not found)'))
+        elif p:
+            print(f'Current path: {p}')
+        else:
+            print('Current path: (not set)')
+        print()
+        print(dim('  [enter path] set vault folder   [c] clear   [b] back'))
+        print()
+        command = read_command('path> ')
+        if command == 'b':
+            return
+        if command == 'c':
+            update_vault_path('')
+            archives.load()
+            pause()
+            return
+        cleaned = clean_input_path(command)
+        if not Path(cleaned).is_dir():
+            clear_screen()
+            print(dim('Path must be an existing folder.'))
+            pause()
+            continue
+        update_vault_path(cleaned)
+        archives.load()
+        pause()
+        return

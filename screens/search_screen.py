@@ -156,6 +156,8 @@ def search_screen(initial_query=None):
             continue
 
         query = q
+        archives.load()
+        cases = archives.cases()
         results = search.search(cases, query)
         page = 0
         list_mode = False
@@ -298,7 +300,8 @@ def show_case(case, query=''):
         if name.endswith(suffix):
             name = name[:-len(suffix)]
             break
-    print(dim(f'── {name} ' + '─' * 20))
+    archive = case.get('archive', '')
+    print(dim(f'── {name} ({archive}) ' + '─' * 20))
     print()
     print(highlight(highlight_links(title), query))
     if body:

@@ -1,7 +1,9 @@
 from .excalidraw_obsidian import ExcalidrawObsidian
 from .excalidraw_plain import ExcalidrawPlain
+from .vault import Vault
 
-_ARCHIVES = [ExcalidrawObsidian(), ExcalidrawPlain()]
+_ARCHIVES = [ExcalidrawObsidian(), ExcalidrawPlain(), Vault()]
+
 
 
 def load():
@@ -13,7 +15,7 @@ def cases():
     result = []
     for arch in _ARCHIVES:
         if arch.is_configured():
-            result.extend(arch.load_cases())
+            result.extend(arch.tagged_cases())
     return result
 
 
