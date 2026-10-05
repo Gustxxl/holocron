@@ -309,7 +309,7 @@ def show_case(case, query=''):
         title = first or '(untitled)'
         body = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ''
 
-    print(dim(f'── {name} · {archive} ' + '─' * 20))
+    print(dim(f'── {name} ({archive}) ' + '─' * 20))
     print()
     print(highlight(highlight_links(title), query))
     if body:
