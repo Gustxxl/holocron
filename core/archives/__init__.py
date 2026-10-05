@@ -29,3 +29,12 @@ def path():
         if arch._path:
             return arch._path
     return None
+
+
+def status():
+    info = []
+    for arch in _ARCHIVES:
+        if arch.is_configured():
+            cases = arch.load_cases()
+            info.append((arch.name, len(cases)))
+    return info

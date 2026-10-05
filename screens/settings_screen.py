@@ -26,8 +26,17 @@ def settings_screen():
 
 def archive_screen():
     while True:
-        show_menu('Settings > Archive',
-                  ['Excalidraw for Obsidian', 'Excalidraw', 'Vault            (Soon)'])
+        clear_screen()
+        print(dim('Settings > Archive'))
+        print()
+        p1 = archive_path()
+        p2 = excalidraw_path()
+        print(f'1) Excalidraw for Obsidian   {dim("✓") if p1 else dim("—")}')
+        print(f'2) Excalidraw                {dim("✓") if p2 else dim("—")}')
+        print(f'3) Vault                     {dim("Soon")}')
+        print()
+        print(dim('  [number] open section   [b] back   [q] quit'))
+        print()
         command = read_command('settings> ')
         if command == '1':
             excalidraw_obsidian_screen()

@@ -10,8 +10,8 @@ from core.editor import edit_text
 from core import excalidraw
 
 
-_HL = "\033[1;38;2;116;167;254m"
-_RESET = "\033[0m"
+_HL = '\033[1;38;2;116;167;254m'
+_RESET = '\033[0m'
 
 
 _URL_RE = re.compile(r'https?://\S+')
@@ -41,10 +41,10 @@ def highlight(text, query):
     def repl(m):
         word = m.group(0)
         if any(_hl_match(t, word.lower()) for t in terms):
-            return f"{_HL}{word}{_RESET}"
+            return f'{_HL}{word}{_RESET}'
         return word
 
-    return re.sub(r"\w+", repl, text, flags=re.UNICODE)
+    return re.sub(r'\w+', repl, text, flags=re.UNICODE)
 
 
 PAGE = 8
@@ -55,11 +55,12 @@ def search_screen(initial_query=None):
     cases = archives.cases()
     if not cases:
         clear_screen()
-        print("No excalidraw scenes found.")
+        print('No scenes found.')
+        print(dim('Add an archive path in settings.'))
         pause()
         return
 
-    query = (initial_query or "").strip()
+    query = (initial_query or '').strip()
     if 0 < len(query) < MIN_QUERY:
         clear_screen()
         print(f'Type at least {MIN_QUERY} characters.')
@@ -71,12 +72,12 @@ def search_screen(initial_query=None):
     while True:
         if query and not results:
             clear_screen()
-            print(f'Nothing found for "{query}".')
+            print(f"Nothing found for '{query}'.")
             tips = search.suggest(cases, query)
             if tips:
-                print(dim("Maybe: " + ", ".join(tips)))
+                print(dim('Maybe: ' + ', '.join(tips)))
             print()
-            print(dim('  [type] search   [b] back   [h] help'))
+            print(dim('  [b] back   [h] help'))
             print()
             error_haptic()
         elif results:
@@ -120,7 +121,11 @@ def search_screen(initial_query=None):
             page -= 1
             continue
         if command.isdigit() and results:
-            open_case(results, int(command), query)
+            new_query = open_case(results, int(command), query)
+            if new_query:
+                query = new_query
+                results = search.search(cases, query)
+                page = 0
             continue
 
         q = command.strip()
@@ -143,37 +148,37 @@ def open_case(results, number, query):
 
         if low in ('e', 'edit'):
             case = results[number - 1][1]
-            fp = case.get("filepath")
-            eid = case.get("element_id")
+            fp = case.get('filepath')
+            eid = case.get('element_id')
 
             if not fp or not eid:
-                print(dim("  Editing not available for this case"))
+                print(dim('  Editing not available for this case'))
                 pause()
                 continue
 
-            original = case["text"]
+            original = case['text']
             edited = edit_text(original).strip()
 
             if not edited:
-                print(dim("  Empty text — edit cancelled"))
+                print(dim('  Empty text — edit cancelled'))
                 pause()
                 continue
 
             if edited == original:
-                print(dim("  No changes"))
+                print(dim('  No changes'))
                 pause()
                 continue
 
             clear_screen()
-            print(dim("  Old:"))
-            print(f"  {original[:200]}")
+            print(dim('  Old:'))
+            print(f'  {original[:200]}')
             print()
-            print(dim("  New:"))
-            print(f"  {edited[:200]}")
+            print(dim('  New:'))
+            print(f'  {edited[:200]}')
             print()
-            confirm = read_command("  Save changes? [y/n]> ")
+            confirm = read_command('  Save changes? [y/n]> ')
             if confirm.lower() != 'y':
-                print(dim("  Cancelled"))
+                print(dim('  Cancelled'))
                 pause()
                 continue
 
@@ -182,20 +187,30 @@ def open_case(results, number, query):
                     excalidraw.update_text_obsidian(fp, eid, edited)
                 else:
                     excalidraw.update_text(fp, eid, edited)
-                case["text"] = edited
-                print(dim("  Saved"))
+                case['text'] = edited
+                print(dim('  Saved'))
+                archives.load()
+                if query:
+                    results = search.search(archives.cases(), query)
             except Exception as e:
-                print(f"  Error: {e}")
+                print(f'  Error: {e}')
             pause()
             continue
 
+        if low in ('s', 'settings'):
+            from screens.settings_screen import settings_screen
+            settings_screen()
+            archives.load()
+            if query:
+                results = search.search(archives.cases(), query)
+            continue
         if low in ('h', 'help'):
             clear_screen()
             render_help(HELP_SECTIONS)
             pause()
             continue
         if low in ('b', 'back'):
-            return
+            return None
         if command == '':
             archives.load()
             if query:
@@ -203,6 +218,13 @@ def open_case(results, number, query):
             continue
         if command.isdigit():
             number = int(command)
+            continue
+
+        q = command.strip()
+        if len(q) >= MIN_QUERY:
+            return q
+
+    return None
 
 
 def show_list(results, page, query):
@@ -213,7 +235,10 @@ def show_list(results, page, query):
     chunk = results[page * PAGE: page * PAGE + PAGE]
     top = results[0][0] if results else 1.0
 
-    print(dim(f'"{query}"   {total} results   page {page + 1}/{pages}'))
+    header = f"'{query}'   {total} results"
+    if pages > 1:
+        header += f'   {page + 1}/{pages}'
+    print(dim(header))
     print()
 
     width = shutil.get_terminal_size().columns
@@ -237,23 +262,29 @@ def show_list(results, page, query):
     return page
 
 
-def show_case(case, query=""):
+def show_case(case, query=''):
     clear_screen()
-    lines = case["text"].strip().splitlines()
-    title = next((ln.strip() for ln in lines if ln.strip()), "(untitled)")
-    body = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
-    print(dim(f'── {case.get("source", "")} ' + '─' * 20))
+    lines = case['text'].strip().splitlines()
+    title = next((ln.strip() for ln in lines if ln.strip()), '(untitled)')
+    body = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ''
+    name = case.get('source', '')
+    for suffix in ('.excalidraw.md', '.excalidraw', '.md'):
+        if name.endswith(suffix):
+            name = name[:-len(suffix)]
+            break
+    print(dim(f'── {name} ' + '─' * 20))
+    print()
     print(highlight(highlight_links(title), query))
     if body:
         print()
         print(highlight(highlight_links(body), query))
     print()
-    print(dim('  [e] edit case   [↵] reload   [b] back   [number] open case   [h] help   [q] quit'))
+    print(dim('  [e] edit   [b] back   [h] help'))
     print()
 
 
 def first_line(case):
-    for ln in case["text"].splitlines():
+    for ln in case['text'].splitlines():
         if ln.strip():
             return ln.strip()
-    return "(empty)"
+    return '(empty)'
