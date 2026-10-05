@@ -63,7 +63,7 @@ def search_screen(initial_query=None):
     list_mode = False
 
     if query in ('l', 'list'):
-        results = [(0, c) for c in cases]
+        results = [(0, c) for c in sorted(cases, key=lambda c: first_line(c).lower())]
         query = ''
         list_mode = True
         page = 0
@@ -142,7 +142,7 @@ def search_screen(initial_query=None):
                 list_mode = False
             continue
         if low in ('l', 'list'):
-            results = [(0, c) for c in cases]
+            results = [(0, c) for c in sorted(cases, key=lambda c: first_line(c).lower())]
             query = ''
             page = 0
             list_mode = True
