@@ -2,6 +2,9 @@ import re
 import json
 import unicodedata
 from pathlib import Path
+import lzstring
+
+_lz = lzstring.LZString()
 
 _KEY_B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
 
@@ -90,6 +93,10 @@ def decompress_from_base64(inp):
     return _decompress(n, 32, lambda i: (index.get(inp[i], 0) if i < n else 0))
 
 
+def compress_to_base64(inp):
+    return _lz.compressToBase64(inp)
+
+
 def strip_emoji(s: str) -> str:
     out = []
     for ch in s:
@@ -116,14 +123,21 @@ def clean(s: str) -> str:
 def load_cases(path):
     path = Path(path)
     md = path.read_text(encoding="utf-8")
+
+
     m = re.search(r"```compressed-json\s*\n(.*?)\n```", md, re.S)
-    if not m:
-        raise SceneError(f"compressed-json block not found: {path}")
-    raw = re.sub(r"\s+", "", m.group(1))
-    text = decompress_from_base64(raw)
-    if not text or "{" not in text:
-        raise SceneError(f"could not decompress scene: {path}")
-    scene = json.loads(clean(text[text.index("{"):]))
+    if m:
+        raw = re.sub(r"\s+", "", m.group(1))
+        text = decompress_from_base64(raw)
+        if not text or "{" not in text:
+            raise SceneError(f"could not decompress scene: {path}")
+        scene = json.loads(clean(text[text.index("{"):]))
+    else:
+        m = re.search(r"```json\s*\n(.*?)\n```", md, re.S)
+        if not m:
+            raise SceneError(f"no drawing data found: {path}")
+        scene = json.loads(clean(m.group(1)))
+
     elements = scene.get("elements", [])
     rects = {e["id"]: e for e in elements
              if e.get("type") == "rectangle" and not e.get("isDeleted")}
@@ -183,3 +197,66 @@ def update_text(filepath, element_id, new_text):
         raise ValueError("Element not found")
 
     path.write_text(json.dumps(scene, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def update_text_obsidian(filepath, element_id, new_text):
+    path = Path(filepath)
+    md = path.read_text(encoding="utf-8")
+
+
+    m_json = re.search(r"```json\s*\n(.*?)\n```", md, re.S)
+    m_comp = re.search(r"```compressed-json\s*\n(.*?)\n```", md, re.S)
+
+    if m_json:
+        scene = json.loads(clean(m_json.group(1)))
+        found = False
+        for el in scene.get("elements", []):
+            if el.get("id") == element_id and el.get("type") == "text":
+                el["text"] = new_text
+                el["rawText"] = new_text
+                el["originalText"] = new_text
+                found = True
+                break
+        if not found:
+            raise ValueError("Element not found")
+        new_drawing = json.dumps(scene, ensure_ascii=False, indent="\t")
+        md = md[:m_json.start(1)] + new_drawing + "\n" + md[m_json.end(1):]
+
+    elif m_comp:
+        raw = re.sub(r"\s+", "", m_comp.group(1))
+        text = decompress_from_base64(raw)
+        if not text or "{" not in text:
+            raise SceneError("could not decompress scene")
+        prefix = text[:text.index("{")]
+        scene = json.loads(clean(text[text.index("{"):]))
+        found = False
+        for el in scene.get("elements", []):
+            if el.get("id") == element_id and el.get("type") == "text":
+                el["text"] = new_text
+                el["rawText"] = new_text
+                el["originalText"] = new_text
+                found = True
+                break
+        if not found:
+            raise ValueError("Element not found")
+        new_json = prefix + json.dumps(scene, ensure_ascii=False, separators=(',', ':'))
+        compressed = compress_to_base64(new_json)
+        md = md[:m_comp.start(1)] + compressed + md[m_comp.end(1):]
+    else:
+        raise SceneError("No drawing data found")
+
+
+    te_pattern = re.compile(
+        r"(^|\n)" + re.escape(element_id) + r"\b",
+        re.MULTILINE
+    )
+
+    old_te = re.search(
+        r"(?:^|\n)(.*?\^" + re.escape(element_id) + r")\s*(?:\n|$)",
+        md, re.S
+    )
+    if old_te:
+        new_te_text = new_text.replace("\n", "\n") + " ^" + element_id
+        md = md[:old_te.start(1)] + new_te_text + md[old_te.end(1):]
+
+    path.write_text(md, encoding="utf-8")

@@ -151,11 +151,6 @@ def open_case(results, number, query):
                 pause()
                 continue
 
-            if not fp.endswith('.excalidraw'):
-                print(dim("  Editing supported only for .excalidraw files"))
-                pause()
-                continue
-
             original = case["text"]
             edited = edit_text(original).strip()
 
@@ -183,7 +178,10 @@ def open_case(results, number, query):
                 continue
 
             try:
-                excalidraw.update_text(fp, eid, edited)
+                if fp.endswith('.md'):
+                    excalidraw.update_text_obsidian(fp, eid, edited)
+                else:
+                    excalidraw.update_text(fp, eid, edited)
                 case["text"] = edited
                 print(dim("  Saved"))
             except Exception as e:
@@ -199,10 +197,9 @@ def open_case(results, number, query):
         if low in ('b', 'back'):
             return
         if command == '':
-            archive_mod = __import__('core.archives', fromlist=['archives'])
-            archive_mod.load()
+            archives.load()
             if query:
-                results = search.search(archive_mod.cases(), query)
+                results = search.search(archives.cases(), query)
             continue
         if command.isdigit():
             number = int(command)
@@ -221,7 +218,6 @@ def show_list(results, page, query):
 
     width = shutil.get_terminal_size().columns
     for n, (score, case) in enumerate(chunk, page * PAGE + 1):
-        # pct = round(score / top * 100) if top else 0
         prefix = f'  {n:>3})  '
         wrapped = textwrap.fill(
             first_line(case),
