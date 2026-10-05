@@ -317,13 +317,14 @@ def show_case(case, query='', number=None, total=None):
         title = first or '(untitled)'
         body = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ''
 
+    width = shutil.get_terminal_size().columns - 1
     pos = f'{number}/{total}  ' if number else ''
     print(dim(f'── {pos}{name} ({archive}) ' + '─' * 20))
     print()
-    print(highlight(highlight_links(title), query))
+    print(highlight(highlight_links(_wrap(title, width)), query))
     if body:
         print()
-        print(highlight(highlight_links(render_tables(body)), query))
+        print(highlight(highlight_links(_wrap(render_tables(body), width)), query))
     print()
     nav = '  [e] edit   '
     nav += '[n] next   ' if number and number < total else ''
@@ -342,3 +343,21 @@ def first_line(case):
             return '  '.join(c for c in table_cells(ln) if c)
         return ln
     return '(empty)'
+
+
+def _wrap(text, width):
+    out = []
+    for ln in text.splitlines():
+        if not ln.strip() or ln[0] in '┌│├└':
+            out.append(ln)
+            continue
+        indent = ln[:len(ln) - len(ln.lstrip())]
+        if ln.lstrip().startswith(('- ', '* ', '+ ')):
+            indent += '  '
+        out.append(textwrap.fill(
+            ln,
+            width=width,
+            subsequent_indent=indent,
+            break_long_words=False,
+        ))
+    return '\n'.join(out)
