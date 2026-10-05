@@ -242,6 +242,14 @@ def open_case(results, number, query):
             if query:
                 results = search.search(archives.cases(), query)
             continue
+        if low == 'n':
+            if number < len(results):
+                number += 1
+            continue
+        if low == 'p':
+            if number > 1:
+                number -= 1
+            continue
         if command.isdigit():
             number = int(command)
             continue
@@ -317,7 +325,11 @@ def show_case(case, query='', number=None, total=None):
         print()
         print(highlight(highlight_links(render_tables(body)), query))
     print()
-    print(dim('  [e] edit   [b] back   [h] help'))
+    nav = '  [e] edit   '
+    nav += '[n] next   ' if number and number < total else ''
+    nav += '[p] prev   ' if number and number > 1 else ''
+    nav += '[b] back   [h] help'
+    print(dim(nav))
     print()
 
 
