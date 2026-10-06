@@ -18,15 +18,25 @@ def clear_screen():
         print('\033[H\033[2J\033[3J', end='')
 
 
-def pause():
-    if user_os() == 'macOS':
-        print()
-        input(dim('Press return to continue...'))
+def haptic(sequence):
+    if user_os() != 'macOS':
+        return
+    try:
         with Holocron() as core:
-            core.success()
-    else:
-        print()
-        input(dim('Press Enter to continue...'))
+            core.invoke(sequence)
+    except (SystemExit, Exception):
+        pass
+
+
+def pause():
+    print()
+    key = 'return' if user_os() == 'macOS' else 'Enter'
+    input(dim(f'Press {key} to continue...'))
+    haptic('success')
+
+
+def error_haptic():
+    haptic('error')
 
 
 def disconnect():

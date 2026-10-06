@@ -9,7 +9,7 @@ _PUNCT = ".,;:!?()[]{}\"'«»—–…"
 
 
 def _normalize_search_text(text):
-    text = text.lower()
+    text = text.lower().replace('ё', 'е')
     text = re.sub(r"(?<=\d)(?=[а-яё])|(?<=[а-яё])(?=\d)", " ", text)
     return text
 
@@ -20,7 +20,7 @@ def _prep(case):
         case["_low"] = low
         case["_flat"] = re.sub(r"\s+", " ", low)
         case["_tokens"] = set(_WORD_RE.findall(low))
-        case["_title"] = "\n".join(case["text"].splitlines()[:2]).lower()
+        case["_title"] = _normalize_search_text("\n".join(case["text"].splitlines()[:2]))
         case["_prep_for"] = case["text"]
     return case
 

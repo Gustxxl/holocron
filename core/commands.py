@@ -15,20 +15,21 @@ HELP_SECTIONS = [
     ('Search', [
         HelpEntry('type word(s)',    'search the archive (approximate matching)'),
         HelpEntry('[number]',        'open a case from the current list'),
-        HelpEntry('#123',            'jump to case 123'),
-        HelpEntry('n / p',           'next / previous page'),
+        HelpEntry('n / p',           'next / previous page or case'),
         HelpEntry('l / list',        'browse all cases'),
+        HelpEntry('e',               'edit the open case'),
     ]),
     ('Commands', [
-        HelpEntry('settings',       'operator name / archive file'),
-        HelpEntry('system',         'show OS and version'),
-        HelpEntry('update',         'fetch and apply a pending update'),
-        HelpEntry('help / h',       'this help'),
+        HelpEntry('keeper / k',      'ask the archive in your own words'),
+        HelpEntry('settings / s',    'operator name / archives / Keeper'),
+        HelpEntry('system',          'show OS and version'),
+        HelpEntry('update',          'fetch and apply a pending update'),
+        HelpEntry('help / h',        'this help'),
     ]),
     ('Navigation', [
-        HelpEntry('b',              'back to previous screen'),
-        HelpEntry('Enter',          'refresh the current screen'),
-        HelpEntry('q',              'quit'),
+        HelpEntry('b',               'back to previous screen'),
+        HelpEntry('Enter',           'refresh the current screen'),
+        HelpEntry('q',               'quit'),
     ]),
 ]
 
@@ -63,12 +64,18 @@ def _cmd_list(raw):
     search_screen('l')
 
 
+def _cmd_keeper(raw):
+    from screens.keeper_screen import keeper_screen
+    keeper_screen()
+
+
 COMMANDS = [
-    Command('settings', 'settings', _cmd_settings),
+    Command('settings', 'settings', _cmd_settings, ('s',)),
     Command('system',   'system',   _cmd_system, ('sys',)),
     Command('update',   'update',   _cmd_update),
     Command('help',     'help',     _cmd_help, ('h',)),
     Command('list',     'list',     _cmd_list, ('l',)),
+    Command('keeper',   'keeper',   _cmd_keeper, ('k', 'keep')),
 ]
 
 _INDEX = {}

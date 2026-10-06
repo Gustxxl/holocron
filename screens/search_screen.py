@@ -1,14 +1,13 @@
 import re
 import difflib
-from core import archives, search
-from ui.interface import clear_screen, dim, pause, read_command, error_haptic, open_file
-from ui.markdown import render_tables, table_cells
-import textwrap
-from screens.help_screen import render_help
-from core.commands import HELP_SECTIONS
 import shutil
+import textwrap
+from core import archives, search, excalidraw
+from core.commands import HELP_SECTIONS
 from core.editor import edit_text
-from core import excalidraw
+from screens.help_screen import render_help
+from ui.interface import clear_screen, dim, pause, read_command, error_haptic
+from ui.markdown import render_tables, table_cells
 
 
 _HL = '\033[1;38;2;116;167;254m'
@@ -51,6 +50,20 @@ def highlight(text, query):
     return re.sub(r'\w+', repl, text, flags=re.UNICODE)
 
 
+def _all(cases):
+    return [(0, c) for c in sorted(cases, key=lambda c: first_line(c).lower())]
+
+
+def _run(cases, text):
+    if text.lower() in ('l', 'list'):
+        return _all(cases), '', True
+    return search.search(cases, text), text, False
+
+
+def _too_short(text):
+    return len(text) < MIN_QUERY and text.lower() not in ('l', 'list')
+
+
 def search_screen(initial_query=None):
     cases = archives.cases()
     if not cases:
@@ -61,21 +74,15 @@ def search_screen(initial_query=None):
         return
 
     query = (initial_query or '').strip()
-    list_mode = False
+    results, list_mode, page = [], False, 0
 
-    if query in ('l', 'list'):
-        results = [(0, c) for c in sorted(cases, key=lambda c: first_line(c).lower())]
-        query = ''
-        list_mode = True
-        page = 0
-    elif 0 < len(query) < MIN_QUERY:
+    if query and _too_short(query):
         clear_screen()
         print(f'Type at least {MIN_QUERY} characters.')
         pause()
         return
-    else:
-        results = search.search(cases, query) if query else []
-        page = 0
+    if query:
+        results, query, list_mode = _run(cases, query)
 
     while True:
         if query and not results:
@@ -131,40 +138,33 @@ def search_screen(initial_query=None):
             continue
         if command.isdigit() and results:
             new_query = open_case(results, int(command), query)
-            if new_query == 'l':
-                results = [(0, c) for c in cases]
-                query = ''
+            if new_query:
+                archives.load()
+                cases = archives.cases()
+                results, query, list_mode = _run(cases, new_query)
                 page = 0
-                list_mode = True
-            elif new_query:
-                query = new_query
-                results = search.search(cases, query)
-                page = 0
-                list_mode = False
-            continue
-        if low in ('l', 'list'):
-            results = [(0, c) for c in sorted(cases, key=lambda c: first_line(c).lower())]
-            query = ''
-            page = 0
-            list_mode = True
             continue
 
-        q = command.strip()
-        if len(q) < MIN_QUERY:
+        if _too_short(command):
             clear_screen()
             print(f'Type at least {MIN_QUERY} characters.')
             pause()
             continue
 
-        query = q
         archives.load()
         cases = archives.cases()
-        results = search.search(cases, query)
+        results, query, list_mode = _run(cases, command)
         page = 0
-        list_mode = False
 
 
-def open_case(results, number, query):
+def _refresh(results, query, rerun):
+    archives.load()
+    if rerun and query:
+        return search.search(archives.cases(), query)
+    return results
+
+
+def open_case(results, number, query, rerun=True):
     while 1 <= number <= len(results):
         show_case(results[number - 1][1], query, number, len(results))
         command = read_command('case> ')
@@ -213,9 +213,7 @@ def open_case(results, number, query):
                     excalidraw.update_text(fp, eid, edited)
                 case['text'] = edited
                 print(dim('  Saved'))
-                archives.load()
-                if query:
-                    results = search.search(archives.cases(), query)
+                results = _refresh(results, query, rerun)
             except Exception as e:
                 print(f'  Error: {e}')
             pause()
@@ -226,9 +224,7 @@ def open_case(results, number, query):
         if low in ('s', 'settings'):
             from screens.settings_screen import settings_screen
             settings_screen()
-            archives.load()
-            if query:
-                results = search.search(archives.cases(), query)
+            results = _refresh(results, query, rerun)
             continue
         if low in ('h', 'help'):
             clear_screen()
@@ -238,9 +234,7 @@ def open_case(results, number, query):
         if low in ('b', 'back'):
             return None
         if command == '':
-            archives.load()
-            if query:
-                results = search.search(archives.cases(), query)
+            results = _refresh(results, query, rerun)
             continue
         if low == 'n':
             if number < len(results):
@@ -261,15 +255,16 @@ def open_case(results, number, query):
     return None
 
 
-def show_list(results, page, query, page_size=PAGE):
+def show_list(results, page, query, page_size=PAGE, note=None):
     clear_screen()
     total = len(results)
     pages = max(1, (total + page_size - 1) // page_size)
     page = max(0, min(page, pages - 1))
     chunk = results[page * page_size: page * page_size + page_size]
-    top = results[0][0] if results else 1.0
 
-    if query:
+    if note:
+        header = note
+    elif query:
         header = f'Search: "{query}"   {total} results'
     else:
         header = f'{total} cases'
@@ -278,7 +273,7 @@ def show_list(results, page, query, page_size=PAGE):
     print(dim(header))
     print()
 
-    width = shutil.get_terminal_size().columns
+    width = shutil.get_terminal_size().columns - 1
     for n, (score, case) in enumerate(chunk, page * page_size + 1):
         prefix = f'  {n:>3})  '
         wrapped = textwrap.fill(
@@ -286,6 +281,7 @@ def show_list(results, page, query, page_size=PAGE):
             width=width,
             initial_indent=prefix,
             subsequent_indent=' ' * len(prefix),
+            break_long_words=False,
         )
         print(highlight(wrapped, query))
         print()
