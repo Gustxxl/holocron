@@ -75,7 +75,7 @@ def show_status():
 
 
 def show_duty():
-    print()
     line = duty_line()
     if line:
+        print()
         print(line)
