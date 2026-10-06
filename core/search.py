@@ -15,13 +15,16 @@ def _normalize_search_text(text):
 
 
 def _prep(case):
-    if case.get("_prep_for") != case["text"]:
-        low = _normalize_search_text(case["text"])
+    filename = case.get("filename", "")
+    key = (filename, case["text"])
+    if case.get("_prep_for") != key:
+        searchable = filename + "\n" + case["text"] if filename else case["text"]
+        low = _normalize_search_text(searchable)
         case["_low"] = low
         case["_flat"] = re.sub(r"\s+", " ", low)
         case["_tokens"] = set(_WORD_RE.findall(low))
-        case["_title"] = _normalize_search_text("\n".join(case["text"].splitlines()[:2]))
-        case["_prep_for"] = case["text"]
+        case["_title"] = _normalize_search_text("\n".join(searchable.splitlines()[:2]))
+        case["_prep_for"] = key
     return case
 
 
@@ -51,10 +54,10 @@ def _longest_phrase_run(words, flat, cap=8):
 
 
 def _word_score(qw, text_low, tokens):
+    if len(qw) <= 3:
+        return 1.0 if qw in tokens else 0.0
     if qw in text_low:
         return 1.0
-    if len(qw) <= 3:
-        return 0.0
     best = 0.0
     for tw in tokens:
         if abs(len(tw) - len(qw)) > 3:
@@ -90,13 +93,23 @@ def score_case(case, query):
     quality = sum(matched) / len(matched)
     base = quality * coverage
 
-    title_hits = sum(1 for qw in words if qw in title_low)
+    title_tokens = set(_WORD_RE.findall(title_low))
+    title_hits = sum(
+        1 for qw in words
+        if (qw in title_tokens if len(qw) <= 3 else qw in title_low)
+    )
     if title_hits:
         base += 0.4 * (title_hits / len(words))
 
     q_flat = re.sub(r"\s+", " ", _normalize_search_text(query)).strip()
+    title_flat = re.sub(r"\s+", " ", title_low)
     if q_flat and q_flat in case["_flat"]:
         base += 0.5
+        if q_flat in title_flat:
+            base += 1.0
+        filename = case.get("filename", "")
+        if filename and _normalize_search_text(filename).strip() == q_flat:
+            base += 1.0
     elif len(words) > 2:
         run = _longest_phrase_run(words, case["_flat"])
         if run > 1:

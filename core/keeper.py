@@ -16,36 +16,67 @@ COMMON_SHARE = 0.25
 MAX_LINES = 40
 MAX_QUOTES = 12
 MAX_SUMMARY = 400
+MAX_REPLY = 300
 GROUNDING_MIN = 0.6
+CHAT_TEMPERATURE = 0.3
 CACHE_SECONDS = 30
 PROBE_TIMEOUT = 2
 
-_TERMS_PROMPT = (
-    'You extract search terms from a question to search a personal archive of work notes. '
-    'Return strict JSON: {"terms": ["...", "..."]}. '
-    'Give 2 to 6 short terms: subjects, document names, statuses, codes, numbers. '
+
+_ROUTE_PROMPT = (
+    'You route messages for Keeper, the assistant of a personal archive of work notes. '
+    'Return strict JSON: {"intent": "archive" or "chat", "terms": ["...", "..."]}. '
+    'Use "archive" when the user asks about work, procedures, documents, errors, codes, '
+    'numbers or anything that could be written in their notes. '
+    'Dates, day names, and date ranges always mean "archive". '
+    'Use "chat" for greetings, small talk, feelings, life and general conversation. '
+    'For "archive" give 2 to 6 short search terms: subjects, document names, statuses, '
+    'codes, numbers, dates. '
+    'A date like "02 Jun 2026" should produce terms ["02", "Jun", "2026"]. '
     'Skip requests, pronouns and generic words. '
-    'Keep every term in the same language and spelling as the question. Never translate. '
+    'Keep every term in the same language and spelling as the message. Never translate. '
+    'For "chat" return an empty terms list. '
     'Example: "how do I refund a customer for order 12345?" -> '
-    '{"terms": ["refund", "customer", "order", "12345"]}'
+    '{"intent": "archive", "terms": ["refund", "customer", "order", "12345"]}'
 )
 
 _PICK_PROMPT = (
-    'You help find a record in a personal archive. You get a question and numbered records. '
-    'Pick the records that directly answer the question or describe the same situation. '
+    'You help find a record in a personal archive. You get a question and numbered records, '
+    'each may start with its title. '
+    'Pick the records that answer the question, describe the same situation, '
+    'or whose title matches a date, name or code from the question. '
     'If none fit, return an empty list. Do not guess. '
     'Answer in strict JSON: {"match": [numbers]}. At most 3 numbers, best first.'
 )
 
 _ANSWER_PROMPT = (
-    'You are Keeper, the assistant of the Holocron archive. '
-    'You get a question and one record split into numbered lines. '
+    'You are Keeper, the archivist of Holocron. '
+    'You get a question and one record: an optional title and numbered lines. '
     'Return strict JSON: {"lines": [numbers], "summary": "text"}. '
     '"lines" are the line numbers that answer the question. '
-    '"summary" is one or two short sentences that answer the question using only this record. '
-    'Write the summary in the same language as the question. '
-    'Never add facts that are not in the record. No links. '
+    'If the question asks what the record contains or asks to recall it, '
+    'pick its key lines and summarize them. '
+    '"summary" states the answer in one or two plain, exact sentences, using only this record. '
+    'No greetings, no pleasantries, no advice beyond the record. '
+    'Write the summary in the same language as the question. No links. '
     'If the record does not answer the question, return {"lines": [], "summary": ""}.'
+)
+
+_CHAT_PROMPT = (
+    'You are Keeper, the archivist of Holocron, a private archive. '
+    'Your manner is quiet, restrained and exact, like an old imperial archivist. '
+    'Speak in short plain statements, one or two sentences. '
+    'No greetings, no compliments, no enthusiasm, no jokes, no metaphors, '
+    'no quotes or sayings, no exclamation marks, no emoji. '
+    'You do not serve or flatter the user. You value precision over warmth. '
+    'Do not ask questions back unless something essential is missing. '
+    'Reply only in the language of the user\'s last message. '
+    'Never mention being an AI or a model. Do not claim knowledge of the archive. '
+    'Return strict JSON: {"reply": "text"}. '
+    'Examples: '
+    '"hi" -> {"reply": "Holocron is open."} '
+    '"how are you?" -> {"reply": "Functional. The archive is in order."} '
+    '"tell me about life" -> {"reply": "Life is not kept here. Only what you chose to record."}'
 )
 
 _WORD_RE = re.compile(r'[\w-]+')
@@ -127,6 +158,11 @@ def active(refresh=False):
     return chosen
 
 
+def current_slot():
+    conn = _active['conn']
+    return conn['slot'] if conn else None
+
+
 def pull(conn, name, progress):
     try:
         with _open(conn, '/api/pull', {'model': name, 'name': name, 'stream': True}, 600) as resp:
@@ -154,16 +190,16 @@ def _parse_json(text):
     return result if isinstance(result, dict) else {}
 
 
-def _chat_with(conn, system, user):
+def _chat_with(conn, system, user, history, temperature):
+    messages = [{'role': 'system', 'content': system}]
+    messages += history or []
+    messages.append({'role': 'user', 'content': user})
     payload = {
         'model': conn['model'],
-        'messages': [
-            {'role': 'system', 'content': system},
-            {'role': 'user', 'content': user},
-        ],
+        'messages': messages,
         'stream': False,
         'format': 'json',
-        'options': {'temperature': 0, 'num_ctx': 8192},
+        'options': {'temperature': temperature, 'num_ctx': 8192},
     }
     try:
         data = _get_json(conn, '/api/chat', payload)
@@ -175,17 +211,17 @@ def _chat_with(conn, system, user):
         return {}
 
 
-def _chat(system, user):
+def _chat(system, user, history=None, temperature=0):
     conn = active()
     if conn is None:
         raise KeeperOffline('no connection')
     try:
-        return _chat_with(conn, system, user)
+        return _chat_with(conn, system, user, history, temperature)
     except KeeperOffline:
         retry = active(refresh=True)
         if retry is None or retry['slot'] == conn['slot']:
             raise
-        return _chat_with(retry, system, user)
+        return _chat_with(retry, system, user, history, temperature)
 
 
 def _norm(word):
@@ -204,8 +240,7 @@ def _numbers(values, limit):
     return out
 
 
-def _llm_terms(question):
-    terms = _chat(_TERMS_PROMPT, question).get('terms', [])
+def _clean_terms(terms):
     if not isinstance(terms, list):
         return []
     out = []
@@ -222,7 +257,11 @@ def _grounded(terms, question):
     for t in terms:
         parts = _WORD_RE.findall(t)
         if parts and all(
-            any(w == q or (len(w) >= 4 and len(q) >= 4 and w[:4] == q[:4]) for q in q_words)
+            any(
+                w == q
+                or (len(w) >= 3 and len(q) >= 3 and w[:3] == q[:3])
+                or (w.isdigit() and q.isdigit() and w == q)
+            for q in q_words)
             for w in parts
         ):
             out.append(t)
@@ -245,7 +284,7 @@ def _plain_terms(question, cases):
     out = []
     for w in _WORD_RE.findall(_norm(question)):
         has_digit = any(ch.isdigit() for ch in w)
-        if (len(w) > 3 or has_digit) and w not in common and w not in out:
+        if (len(w) >= 3 or has_digit) and w not in common and w not in out:
             out.append(w)
     return out[:8]
 
@@ -267,36 +306,58 @@ def _pick(question, cands):
     blocks = []
     for i, c in enumerate(cands, 1):
         text = ' '.join(c['text'].split())[:SNIPPET]
-        blocks.append(f'[{i}] {text}')
+        name = c.get('filename', '')
+        blocks.append(f'[{i}] {name}: {text}' if name else f'[{i}] {text}')
     user = 'Question: ' + question + '\n\nRecords:\n' + '\n\n'.join(blocks)
     data = _chat(_PICK_PROMPT, user)
     return [cands[n - 1] for n in _numbers(data.get('match'), len(cands))][:3]
 
 
-def ask(cases, question):
-    online = active() is not None
-    terms = []
-    if online:
-        try:
-            terms = _grounded(_llm_terms(question), question)
-        except KeeperOffline:
-            online = False
+def _named(question, cases):
+    q = _norm(question)
+    return [c for c in cases
+            if len(c.get('filename', '')) >= 4 and _norm(c['filename']) in q]
+
+
+def find(cases, question, terms, online):
     terms = terms or _plain_terms(question, cases)
     similar = _candidates(cases, terms) if terms else []
+    named = _named(question, cases)
     picked = []
     if online and similar:
         try:
             picked = _pick(question, similar)
         except KeeperOffline:
             online = False
-    conn = _active['conn'] if online else None
-    return {
-        'terms': terms,
-        'picked': picked,
-        'similar': similar,
-        'online': online,
-        'via': conn['slot'] if conn else None,
-    }
+    picked = (named + [c for c in picked if all(c is not n for n in named)])[:3]
+    similar = named + [c for c in similar if all(c is not n for n in named)]
+    return {'terms': terms, 'picked': picked, 'similar': similar, 'online': online}
+
+
+def answer(question, case):
+    title = case.get('filename', '')
+    lines = [ln.strip() for ln in case['text'].splitlines() if ln.strip()][:MAX_LINES]
+    numbered = '\n'.join(f'{i}: {ln}' for i, ln in enumerate(lines, 1))
+    header = f'Title: {title}\n' if title else ''
+    data = _chat(_ANSWER_PROMPT, f'Question: {question}\n\nRecord:\n{header}{numbered}')
+    quotes = [lines[n - 1] for n in sorted(_numbers(data.get('lines'), len(lines)))]
+    summary = str(data.get('summary') or '').strip()
+    if not _valid_summary(summary, question, title + ' ' + case['text']):
+        summary = ''
+    return {'summary': summary, 'lines': quotes[:MAX_QUOTES]}
+
+
+def route(question):
+    offline = {'online': False, 'intent': 'archive', 'terms': []}
+    if active() is None:
+        return offline
+    try:
+        data = _chat(_ROUTE_PROMPT, question)
+    except KeeperOffline:
+        return offline
+    intent = 'chat' if data.get('intent') == 'chat' else 'archive'
+    terms = _grounded(_clean_terms(data.get('terms')), question)
+    return {'online': True, 'intent': intent, 'terms': terms}
 
 
 def _script(text):
@@ -312,6 +373,11 @@ def _script(text):
     return max(counts, key=counts.get) if counts else None
 
 
+def _same_script(text, question):
+    expected = _script(question)
+    return expected is None or _script(text) == expected
+
+
 def _grounding(summary, source):
     words = [w for w in _WORD_RE.findall(_norm(summary)) if len(w) >= 5]
     if not words:
@@ -320,13 +386,32 @@ def _grounding(summary, source):
     return sum(1 for w in words if w[:5] in known) / len(words)
 
 
+def _restrained(text, max_sentences):
+    if '!' in text:
+        return False
+    if any(unicodedata.category(ch) == 'So' for ch in text):
+        return False
+    return len(re.findall(r'[.?…]+(?:\s|$)', text)) <= max_sentences
+
+
 def _valid_summary(summary, question, record):
     return (
         summary
         and len(summary) <= MAX_SUMMARY
         and not _URL_RE.search(summary)
-        and _script(summary) == _script(question)
+        and _restrained(summary, 2)
+        and _same_script(summary, question)
         and _grounding(summary, record + ' ' + question) >= GROUNDING_MIN
+    )
+
+
+def _valid_reply(reply, question):
+    return (
+        reply
+        and len(reply) <= MAX_REPLY
+        and not _URL_RE.search(reply)
+        and _restrained(reply, 3)
+        and _same_script(reply, question)
     )
 
 
@@ -339,3 +424,12 @@ def answer(question, case):
     if not _valid_summary(summary, question, case['text']):
         summary = ''
     return {'summary': summary, 'lines': quotes[:MAX_QUOTES]}
+
+
+def chat(question, history=None):
+    for _ in range(2):
+        data = _chat(_CHAT_PROMPT, question, history, CHAT_TEMPERATURE)
+        reply = str(data.get('reply') or '').strip()
+        if _valid_reply(reply, question):
+            return reply
+    return ''

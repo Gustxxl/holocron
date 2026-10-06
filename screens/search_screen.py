@@ -307,7 +307,9 @@ def show_case(case, query='', number=None, total=None):
     text = case['text'].strip()
     lines = text.splitlines()
     first = next((ln.strip() for ln in lines if ln.strip()), '')
-    if first.startswith('|'):
+    if case.get('filename'):
+        title, body, name = case['filename'], text, ''
+    elif first.startswith('|'):
         title, body = name, text
     else:
         title = first or '(untitled)'
@@ -315,7 +317,8 @@ def show_case(case, query='', number=None, total=None):
 
     width = shutil.get_terminal_size().columns - 1
     pos = f'{number}/{total}  ' if number else ''
-    print(dim(f'── {pos}{name} ({archive}) ' + '─' * 20))
+    label = f'{name} ({archive})' if name else f'({archive})'
+    print(dim(f'── {pos}{label} ' + '─' * 20))
     print()
     print(highlight(highlight_links(_wrap(title, width)), query))
     if body:
@@ -331,6 +334,8 @@ def show_case(case, query='', number=None, total=None):
 
 
 def first_line(case):
+    if case.get('filename'):
+        return case['filename']
     for ln in case['text'].splitlines():
         ln = ln.strip()
         if not ln:

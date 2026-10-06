@@ -1,3 +1,4 @@
+import json
 import shutil
 import sys
 import textwrap
@@ -10,11 +11,29 @@ from ui.interface import clear_screen, dim, pause, read_command, haptic
 
 MIN_QUESTION = 3
 MAX_SOURCES = 5
+HISTORY_TURNS = 4
+
+LINES = {
+    'ready': 'Awaiting your query...',
+    'not_connected': 'No model connected. Search by words only. Settings > Archive > Keeper.',
+    'unset': 'No model and no archive. Configure in settings > Archive.',
+    'silent': 'No response.',
+    'empty': 'Nothing in the archive on this.',
+    'answer': 'From the archive:',
+    'similar': 'No exact match. Closest records:',
+    'plain': 'Search by words:',
+    'to_local': 'Server unavailable. Running on this computer.',
+    'to_server': 'Server restored.',
+    'to_none': 'No model reachable. Searching by words.',
+    'thinking': 'Considering',
+    'searching': 'Searching the archive',
+    'reading': 'Reading the record',
+}
 
 _SWITCH_NOTES = {
-    'local': 'The server is off, answering from this computer.',
-    'server': 'Back on the server.',
-    None: "I can't reach a model right now, searching by words.",
+    'local': LINES['to_local'],
+    'server': LINES['to_server'],
+    None: LINES['to_none'],
 }
 
 
@@ -63,7 +82,7 @@ class _Thinking:
     def __exit__(self, *exc):
         self._stop.set()
         self._thread.join()
-        sys.stdout.write('\r\033[2K\033[?25h')
+        sys.stdout.write('\r\033[2K\033[1A\033[?25h')
         sys.stdout.flush()
 
     def _run(self):
@@ -76,47 +95,83 @@ class _Thinking:
             self._stop.wait(0.4)
 
 
-def _ask(question, thinking):
-    thinking.label = 'Looking through the archive'
+def _history(turns):
+    out = []
+    for t in [t for t in turns if t['kind'] == 'chat' and t['reply']][-HISTORY_TURNS:]:
+        out.append({'role': 'user', 'content': t['question']})
+        out.append({'role': 'assistant', 'content': json.dumps({'reply': t['reply']}, ensure_ascii=False)})
+    return out
+
+
+def _ask(question, history, thinking):
+    thinking.label = LINES['thinking']
     archives.load()
-    r = keeper.ask(archives.cases(), question)
+    cases = archives.cases()
+    route = keeper.route(question)
     state = {
-        'question': question, 'kind': 'empty', 'summary': '', 'lines': [],
-        'sources': [], 'terms': ' '.join(r['terms']), 'online': r['online'],
-        'via': r['via'], 'start': 0,
+        'question': question, 'kind': 'empty', 'summary': '', 'lines': [], 'reply': '',
+        'sources': [], 'terms': ' '.join(route['terms']), 'online': route['online'],
+        'via': None, 'start': 0,
     }
-    if r['picked']:
-        thinking.label = 'Reading the record'
+
+    if not cases and not route['online']:
+        state['kind'] = 'unset'
+        return state
+
+    talk = not cases or (route['intent'] == 'chat' and not route['terms'])
+    if not talk:
+        thinking.label = LINES['searching']
+        r = keeper.find(cases, question, route['terms'], route['online'])
+        state.update(terms=' '.join(r['terms']), online=r['online'])
+        if r['picked']:
+            thinking.label = LINES['reading']
+            try:
+                ans = keeper.answer(question, r['picked'][0])
+            except keeper.KeeperOffline:
+                ans = {'summary': '', 'lines': []}
+            rest = [c for c in r['similar'] if all(c is not p for p in r['picked'])]
+            state['sources'] = (r['picked'] + rest)[:MAX_SOURCES]
+            if ans['summary'] or ans['lines']:
+                state.update(kind='answer', summary=ans['summary'], lines=ans['lines'])
+            else:
+                state['kind'] = 'similar'
+        elif route['intent'] == 'chat' and r['online']:
+            talk = True
+        elif r['similar']:
+            state.update(kind='similar', sources=r['similar'][:MAX_SOURCES])
+
+    if talk and state['online']:
+        thinking.label = LINES['thinking']
         try:
-            ans = keeper.answer(question, r['picked'][0])
+            reply = keeper.chat(question, history)
         except keeper.KeeperOffline:
-            ans = {'summary': '', 'lines': []}
-        rest = [c for c in r['similar'] if all(c is not p for p in r['picked'])]
-        state['sources'] = (r['picked'] + rest)[:MAX_SOURCES]
-        if ans['summary'] or ans['lines']:
-            state.update(kind='answer', summary=ans['summary'], lines=ans['lines'])
-        else:
-            state['kind'] = 'similar'
-    elif r['similar']:
-        state.update(kind='similar', sources=r['similar'][:MAX_SOURCES])
+            reply = ''
+            state['online'] = False
+        state.update(kind='chat', reply=reply, sources=[], terms='')
+
+    state['via'] = keeper.current_slot() if state['online'] else None
     return state
 
 
 def _print_answer(state):
     print()
     kind = state['kind']
-    if kind == 'empty':
-        _say("I couldn't find anything about this in the archive.")
+    if kind == 'unset':
+        _say(LINES['unset'])
+    elif kind == 'chat':
+        _say(state['reply'] or LINES['silent'])
+    elif kind == 'empty':
+        _say(LINES['empty'])
     elif kind == 'answer':
-        _say(state['summary'] or 'Here is what the archive says:')
+        _say(state['summary'] or LINES['answer'])
         if state['lines']:
             print()
             for ln in state['lines']:
                 _quote(ln, state['terms'])
     elif state['online']:
-        _say("I don't have an exact answer. These records look closest:")
+        _say(LINES['similar'])
     else:
-        _say('Here is a plain search:')
+        _say(LINES['plain'])
 
     sources = state['sources']
     if sources:
@@ -141,10 +196,9 @@ def _redraw(turns):
     print()
     conn = keeper.active(refresh=True)
     if conn is None:
-        _say("I'm not connected yet, so I can only search by words. "
-             'Set me up in settings > Archive > Keeper.')
-    else:
-        _say('Ask me anything about your archive.')
+        _say(LINES['not_connected'])
+    elif not turns:
+        _say(LINES['ready'])
         note = _switch_note(conn['slot'])
         if conn['slot'] == 'local' and note:
             print(dim('  ' + note))
@@ -203,9 +257,10 @@ def keeper_screen():
         if len(command) < MIN_QUESTION:
             continue
 
+        print()
         with _Thinking() as thinking:
-            state = _ask(command, thinking)
-        if state['via'] != via:
+            state = _ask(command, _history(turns), thinking)
+        if state['kind'] != 'unset' and state['via'] != via:
             note = _switch_note(state['via'])
             if note:
                 print()
@@ -218,7 +273,7 @@ def keeper_screen():
 
         if state['kind'] == 'answer':
             haptic('confirm')
-        elif state['kind'] == 'empty':
+        elif state['kind'] in ('empty', 'unset'):
             haptic('warning')
         else:
             haptic('tap')

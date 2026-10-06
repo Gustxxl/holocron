@@ -65,6 +65,23 @@ class TestScoreCase:
         assert score_case(c, 'cax') == 0
 
 
+    def test_filename_matches(self):
+        c = {'text': '## Summary of the day\neverything is ok', 'filename': '02 Jun 2026'}
+        assert score_case(c, '02 jun') > 0
+        assert 'filename' not in c['text']
+
+
+    def test_short_word_is_whole_token(self):
+        assert score_case(_case('план на 2026'), '02') == 0
+        assert score_case(_case('02 июня'), '02') > 0
+
+
+    def test_exact_title_wins_over_length(self):
+        target = {'text': 'заметка\n' + 'длинный текст ' * 300, 'filename': '02 Jun 2026'}
+        other = {'text': 'коротко', 'filename': '18 Jun 2026'}
+        assert score_case(target, '02 Jun 2026') > score_case(other, '02 Jun 2026')
+
+
 class TestSearch:
     def test_returns_sorted(self):
         cases = [_case('alpha beta'), _case('beta gamma'), _case('alpha beta gamma')]

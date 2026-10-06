@@ -35,6 +35,7 @@ class Vault(Archive):
                         'source': f.name,
                         'filepath': str(f),
                         'element_id': f.stem,
+                        'filename': f.stem,
                         'x': 0,
                         'y': 0,
                     })
