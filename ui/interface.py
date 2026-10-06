@@ -6,6 +6,12 @@ import subprocess
 import platform
 import os
 
+if os.name != 'nt':
+    try:
+        import readline
+    except ImportError:
+        pass
+
 
 def dim(text):
     return f"\033[2m{text}\033[0m"
@@ -73,17 +79,68 @@ def quit_app():
     sys.exit(0)
 
 
+def _join(text):
+    return ' '.join(ln.strip() for ln in text.splitlines() if ln.strip())
+
+
+def _drain_tty():
+    import select
+    import termios
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    raw = termios.tcgetattr(fd)
+    raw[3] &= ~(termios.ICANON | termios.ECHO)
+    termios.tcsetattr(fd, termios.TCSANOW, raw)
+    data = b''
+    try:
+        while select.select([fd], [], [], 0.05)[0]:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            data += chunk
+    finally:
+        termios.tcsetattr(fd, termios.TCSANOW, old)
+    return _join(data.decode('utf-8', 'replace'))
+
+
+def _drain_pipe():
+    import select
+    lines = []
+    while select.select([sys.stdin], [], [], 0.05)[0]:
+        line = sys.stdin.readline()
+        if not line:
+            break
+        lines.append(line)
+    return _join(''.join(lines))
+
+
+def _drain_console():
+    import msvcrt
+    chars = []
+    deadline = time.monotonic() + 0.05
+    while time.monotonic() < deadline:
+        if msvcrt.kbhit():
+            chars.append(msvcrt.getwch())
+            deadline = time.monotonic() + 0.05
+        else:
+            time.sleep(0.005)
+    return _join(''.join(chars).replace('\r', '\n'))
+
+
+def _drain():
+    if os.name == 'nt':
+        return _drain_console() if sys.stdin.isatty() else ''
+    return _drain_tty() if sys.stdin.isatty() else _drain_pipe()
+
+
 def read_command(prompt='> '):
     try:
         line = input(prompt).strip()
     except EOFError:
         quit_app()
-    if os.name != 'nt':
-        import select
-        while select.select([sys.stdin], [], [], 0.05)[0]:
-            extra = sys.stdin.readline().strip()
-            if extra:
-                line += ' ' + extra
+    extra = _drain()
+    if extra:
+        line = f'{line} {extra}'.strip()
     if line.lower() in ('q', 'quit', 'exit'):
         quit_app()
     return line
