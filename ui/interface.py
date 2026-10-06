@@ -58,7 +58,10 @@ def quit_app():
 
 
 def read_command(prompt='> '):
-    line = input(prompt).strip()
+    try:
+        line = input(prompt).strip()
+    except EOFError:
+        quit_app()
     if os.name != 'nt':
         import select
         while select.select([sys.stdin], [], [], 0.05)[0]:
