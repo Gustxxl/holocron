@@ -17,7 +17,7 @@ LINES = {
     'ready': 'Awaiting your query...',
     'not_connected': 'No model connected. Search by words only. Settings > Archive > Keeper.',
     'unset': 'No model and no archive. Configure in settings > Archive.',
-    'silent': 'No response.',
+    'silent': 'Nothing found.',
     'empty': 'Nothing in the archive on this.',
     'answer': 'From the archive:',
     'similar': 'No exact match. Closest records:',
