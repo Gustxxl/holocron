@@ -1,13 +1,20 @@
+import re
 from datetime import datetime, timedelta
 from core import schedule
+from core.commands import HELP_SECTIONS
+from core.dates import monday, parse_date
+from screens.help_screen import render_help
 from screens.schedule_settings_screen import schedule_settings
-from ui.format import day_label, duration, time_range
-from ui.interface import bold, clear_screen, dim, is_back, read_command, red
+from ui.format import day_label, duration, plural, time_range, week_span
+from ui.interface import bold, clear_screen, dim, error, is_back, pause, read_command, red
 
-DAYS_VIEW = 14
 BAR_WIDTH = 10
 BAR_FILL = '▓'
 BAR_EMPTY = '░'
+LABEL = 6
+MAX_OFFSET = 520
+
+_JUMP_RE = re.compile(r'[+-]\d+')
 
 
 def _bar(fraction):
@@ -37,49 +44,81 @@ def duty_line(now=None, sched=None):
     return None
 
 
-def _upcoming(sched, now):
+def _hours(delta):
+    h, m = divmod(int(delta.total_seconds() // 60), 60)
+    return f'{h}h{m:02d}' if m else f'{h}h'
+
+
+def _relative(offset):
+    if offset == 0:
+        return 'this week'
+    if offset == 1:
+        return 'next week'
+    if offset == -1:
+        return 'last week'
+    return f'in {offset} weeks' if offset > 0 else f'{-offset} weeks ago'
+
+
+def _week(sched, first, now):
     today = now.date()
-    lines, shown, last_week = [], set(), None
-    for i in range(DAYS_VIEW):
-        d = today + timedelta(days=i)
-        label = day_label(d, today).ljust(10)
-        away = sched.vacation_on(d)
-        if away:
-            if away not in shown:
-                shown.add(away)
-                lines.append(dim(f'{label}   vacation through {day_label(away[1], today)}'))
+    lines, count, total = [], 0, timedelta()
+    for i in range(7):
+        d = first + timedelta(days=i)
+        label = ('today' if d == today else f'{d:%a %d}').ljust(LABEL)
+        head = dim(label) if d < today else label
+        if sched.vacation_on(d):
+            lines.append(f'{head}   ' + dim('vacation'))
             continue
-        week = sched.week_of(d)
-        for sh in sched.shifts_on(d):
+        found = sched.shifts_on(d)
+        if not found:
+            lines.append(f'{head}   ' + dim('—'))
+            continue
+        for sh in found:
+            count += 1
+            total += sh.end - sh.start
             line = f'{label}   {time_range(sh.start, sh.end)}'
-            if week != last_week:
-                line += dim(f'      week {week + 1}')
-                last_week = week
             if sh.end <= now:
                 line = dim(line)
             elif sh.start <= now:
                 line = bold(line)
             lines.append(line)
-    return lines or [dim(f'No shifts in the next {DAYS_VIEW} days.')]
+            label = ' ' * LABEL
+    summary = f'{plural(count, "shift")} · {_hours(total)}' if count else 'No shifts.'
+    return lines, summary
+
+
+def _show_week(sched, now, offset):
+    first = monday(now.date()) + timedelta(weeks=offset)
+    head = week_span(first)
+    if len(sched.weeks) > 1:
+        head = f'Week {sched.week_of(first) + 1} of {len(sched.weeks)}   {head}'
+    print(head + dim(f'   {_relative(offset)}'))
+    print()
+    lines, summary = _week(sched, first, now)
+    for ln in lines:
+        print(ln)
+    print()
+    print(dim(summary))
+
+
+def _clamp(offset):
+    return max(-MAX_OFFSET, min(MAX_OFFSET, offset))
 
 
 def schedule_screen():
+    offset = 0
     while True:
         sched = schedule.load()
         now = datetime.now()
         clear_screen()
-        title = 'Schedule'
-        if sched.ready:
-            title += f' · week {sched.week_of(now.date()) + 1} of {len(sched.weeks)}'
-        print(dim(title))
+        print(dim('Schedule'))
         print()
         if sched.ready:
             line = duty_line(now, sched)
             if line:
                 print(line)
                 print()
-            for ln in _upcoming(sched, now):
-                print(ln)
+            _show_week(sched, now, offset)
         elif not sched.weeks:
             print('No schedule yet.')
         elif not sched.enabled:
@@ -87,10 +126,37 @@ def schedule_screen():
         else:
             print('Schedule is incomplete: ' + ', '.join(sched.problems()) + '.')
         print()
-        print(dim('  [s] settings   [b] back'))
+        nav = '  '
+        if sched.ready:
+            nav += '[n] next   [p] prev   '
+            nav += '[t] this week   ' if offset else ''
+        nav += '[b] back   [h] help'
+        print(dim(nav))
         print()
         command = read_command('schedule> ').lower()
         if is_back(command):
             return
+        if command in ('h', 'help'):
+            clear_screen()
+            render_help(HELP_SECTIONS)
+            pause()
+            continue
         if command in ('s', 'settings'):
             schedule_settings()
+            continue
+        if not command or not sched.ready:
+            continue
+        if command == 'n':
+            offset = _clamp(offset + 1)
+        elif command == 'p':
+            offset = _clamp(offset - 1)
+        elif command == 't':
+            offset = 0
+        elif _JUMP_RE.fullmatch(command):
+            offset = _clamp(offset + int(command))
+        else:
+            d = parse_date(command)
+            if not d:
+                error('Date not recognized. Example: 14-11')
+                continue
+            offset = _clamp((monday(d) - monday(now.date())).days // 7)

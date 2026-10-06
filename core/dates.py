@@ -6,6 +6,7 @@ DAYS = ('Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su')
 _TIME_RE = re.compile(r'^(\d{1,2})(?::?(\d{2}))?$')
 _PERIOD_RE = re.compile(r'^\s*([\d:]+)\s*[-–—]\s*([\d:]+)\s*$')
 _DATE_FORMATS = ('%Y-%m-%d', '%d-%m-%Y', '%d.%m.%Y', '%d/%m/%Y')
+_SHORT_FORMATS = ('%d-%m', '%d.%m', '%d/%m')
 
 
 def parse_time(text):
@@ -45,6 +46,11 @@ def parse_date(text, today=None):
     for fmt in _DATE_FORMATS:
         try:
             return datetime.strptime(t, fmt).date()
+        except ValueError:
+            continue
+    for fmt in _SHORT_FORMATS:
+        try:
+            return datetime.strptime(f'{t}{fmt[2]}{today.year}', f'{fmt}{fmt[2]}%Y').date()
         except ValueError:
             continue
     return None

@@ -65,7 +65,7 @@ def _cmd_schedule(raw):
 
 COMMANDS = [
     Command('keeper',   _cmd_keeper,   ('k', 'keep'), 'ask the archive in your own words'),
-    Command('schedule', _cmd_schedule, ('sch',),      'shift schedule for the next weeks'),
+    Command('schedule', _cmd_schedule, ('sch',),      'shift schedule, week by week'),
     Command('settings', _cmd_settings, ('s',),        'operator name / archives / schedule / Keeper'),
     Command('system',   _cmd_system,   ('sys',),      'show OS and version'),
     Command('update',   _cmd_update,   (),            'fetch and apply a pending update'),
@@ -80,6 +80,12 @@ HELP_SECTIONS = [
         HelpEntry('n / p',        'next / previous page or case'),
         HelpEntry('l / list',     'browse all cases'),
         HelpEntry('e',            'edit the open case'),
+    ]),
+    ('Schedule', [
+        HelpEntry('n / p',        'next / previous week'),
+        HelpEntry('t',            'back to this week'),
+        HelpEntry('+N / -N',      'jump N weeks ahead / back'),
+        HelpEntry('type a date',  'open the week of that date, e.g. 14-11'),
     ]),
     ('Commands', [HelpEntry(c.label, c.help) for c in COMMANDS if c.help]),
     ('Navigation', [
