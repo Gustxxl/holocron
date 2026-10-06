@@ -28,6 +28,7 @@ LINES = {
     'thinking': 'Considering',
     'searching': 'Searching the archive',
     'reading': 'Reading the record',
+    'searched': 'Searched:',
 }
 
 _SWITCH_NOTES = {
@@ -44,6 +45,11 @@ def _width():
 def _say(text):
     print(textwrap.fill(text, width=_width(), initial_indent='  ',
                         subsequent_indent='  ', break_long_words=False))
+
+
+def _aside(text):
+    print(dim(textwrap.fill(text, width=_width(), initial_indent='  ',
+                            subsequent_indent='  ', break_long_words=False)))
 
 
 def _quote(line, terms):
@@ -68,8 +74,8 @@ def _switch_note(via):
 
 
 class _Thinking:
-    def __init__(self):
-        self.label = ''
+    def __init__(self, label=''):
+        self.label = label
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
 
@@ -109,9 +115,9 @@ def _ask(question, history, thinking):
     cases = archives.cases()
     route = keeper.route(question)
     state = {
-        'question': question, 'kind': 'empty', 'summary': '', 'lines': [], 'reply': '',
-        'sources': [], 'terms': ' '.join(route['terms']), 'online': route['online'],
-        'via': None, 'start': 0,
+        'question': question, 'kind': 'empty', 'summary': '', 'lines': [], 'note': '',
+        'reply': '', 'sources': [], 'terms': ' '.join(route['terms']),
+        'online': route['online'], 'via': None, 'start': 0,
     }
 
     if not cases and not route['online']:
@@ -128,11 +134,12 @@ def _ask(question, history, thinking):
             try:
                 ans = keeper.answer(question, r['picked'][0])
             except keeper.KeeperOffline:
-                ans = {'summary': '', 'lines': []}
+                ans = {'summary': '', 'lines': [], 'note': ''}
             rest = [c for c in r['similar'] if all(c is not p for p in r['picked'])]
             state['sources'] = (r['picked'] + rest)[:MAX_SOURCES]
             if ans['summary'] or ans['lines']:
-                state.update(kind='answer', summary=ans['summary'], lines=ans['lines'])
+                state.update(kind='answer', summary=ans['summary'],
+                             lines=ans['lines'], note=ans['note'])
             else:
                 state['kind'] = 'similar'
         elif route['intent'] == 'chat' and r['online']:
@@ -168,10 +175,16 @@ def _print_answer(state):
             print()
             for ln in state['lines']:
                 _quote(ln, state['terms'])
+        if state['note']:
+            print()
+            _aside(state['note'])
     elif state['online']:
         _say(LINES['similar'])
     else:
         _say(LINES['plain'])
+
+    if kind in ('empty', 'similar') and state['terms']:
+        _aside(f"{LINES['searched']} {', '.join(state['terms'].split())}")
 
     sources = state['sources']
     if sources:
@@ -258,7 +271,7 @@ def keeper_screen():
             continue
 
         print()
-        with _Thinking() as thinking:
+        with _Thinking(LINES['thinking']) as thinking:
             state = _ask(command, _history(turns), thinking)
         if state['kind'] != 'unset' and state['via'] != via:
             note = _switch_note(state['via'])

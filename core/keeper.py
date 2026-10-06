@@ -17,7 +17,8 @@ MAX_LINES = 40
 MAX_QUOTES = 12
 MAX_SUMMARY = 400
 MAX_REPLY = 300
-GROUNDING_MIN = 0.6
+MAX_NOTE = 250
+GROUNDING_MIN = 0.5
 CHAT_TEMPERATURE = 0.3
 CACHE_SECONDS = 30
 PROBE_TIMEOUT = 2
@@ -52,14 +53,17 @@ _PICK_PROMPT = (
 _ANSWER_PROMPT = (
     'You are Keeper, the archivist of Holocron. '
     'You get a question and one record: an optional title and numbered lines. '
-    'Return strict JSON: {"lines": [numbers], "summary": "text"}. '
+    'Return strict JSON: {"lines": [numbers], "summary": "text", "note": "text"}. '
     '"lines" are the line numbers that answer the question. '
     'If the question asks what the record contains or asks to recall it, '
-    'pick its key lines and summarize them. '
+    'pick its key lines. '
     '"summary" states the answer in one or two plain, exact sentences, using only this record. '
-    'No greetings, no pleasantries, no advice beyond the record. '
-    'Write the summary in the same language as the question. No links. '
-    'If the record does not answer the question, return {"lines": [], "summary": ""}.'
+    '"note" is one or two sentences of your own judgement: what this means for the question, '
+    'a caution, a likely cause, or the next step. It may go beyond the record, '
+    'but never invent numbers, dates, names, codes or links. Leave it empty if there is nothing worth adding. '
+    'Tone: quiet, restrained, exact. No greetings, no pleasantries, no exclamation marks. '
+    'Write in the same language as the question. '
+    'If the record does not answer the question, return {"lines": [], "summary": "", "note": ""}.'
 )
 
 _CHAT_PROMPT = (
@@ -415,15 +419,37 @@ def _valid_reply(reply, question):
     )
 
 
+def _foreign_numbers(text, source):
+    known = set(re.findall(r'\d+', source))
+    return [n for n in re.findall(r'\d+', text) if n not in known]
+
+
+def _valid_note(note, question, record):
+    return (
+        note
+        and len(note) <= MAX_NOTE
+        and not _URL_RE.search(note)
+        and _restrained(note, 2)
+        and _same_script(note, question)
+        and not _foreign_numbers(note, record + ' ' + question)
+    )
+
+
 def answer(question, case):
+    title = case.get('filename', '')
     lines = [ln.strip() for ln in case['text'].splitlines() if ln.strip()][:MAX_LINES]
     numbered = '\n'.join(f'{i}: {ln}' for i, ln in enumerate(lines, 1))
-    data = _chat(_ANSWER_PROMPT, f'Question: {question}\n\nRecord:\n{numbered}')
+    header = f'Title: {title}\n' if title else ''
+    data = _chat(_ANSWER_PROMPT, f'Question: {question}\n\nRecord:\n{header}{numbered}')
     quotes = [lines[n - 1] for n in sorted(_numbers(data.get('lines'), len(lines)))]
+    source = title + ' ' + case['text']
     summary = str(data.get('summary') or '').strip()
-    if not _valid_summary(summary, question, case['text']):
+    if not _valid_summary(summary, question, source):
         summary = ''
-    return {'summary': summary, 'lines': quotes[:MAX_QUOTES]}
+    note = str(data.get('note') or '').strip()
+    if not _valid_note(note, question, source):
+        note = ''
+    return {'summary': summary, 'lines': quotes[:MAX_QUOTES], 'note': note}
 
 
 def chat(question, history=None):
