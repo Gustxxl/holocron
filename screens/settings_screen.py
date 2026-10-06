@@ -13,22 +13,24 @@ from core.settings import (
     update_keeper_model,
 )
 from core import archives, keeper
-from ui.interface import clear_screen, dim, pause, read_command, show_menu
+from screens.schedule_settings_screen import schedule_settings
+from ui.interface import clear_screen, dim, error, pause, read_command, show_menu
 from pathlib import Path
 from ui.clean_path import clean_input_path
 import platform
 import sys
-import getpass
 
 
 def settings_screen():
     while True:
-        show_menu('Settings', ['User', 'Archive', '...'])
+        show_menu('Settings', ['User', 'Archive', 'Schedule'])
         command = read_command('settings> ')
         if command == '1':
             user_screen()
         elif command == '2':
             archive_screen()
+        elif command == '3':
+            schedule_settings()
         elif command == 'b':
             return
 
@@ -80,7 +82,16 @@ def user_screen():
             continue
         if command:
             update_operator_name(command)
-            continue
+
+
+def _print_path(p):
+    if p and not Path(p).exists():
+        print(f'Current path: {p}')
+        print(dim('  (path not found)'))
+    elif p:
+        print(f'Current path: {p}')
+    else:
+        print('Current path: (not set)')
 
 
 def excalidraw_obsidian_screen():
@@ -88,7 +99,7 @@ def excalidraw_obsidian_screen():
         clear_screen()
         print(dim('Settings > Archive > Excalidraw for Obsidian'))
         print()
-        print(f'Current path: {archive_path() or "(not set)"}')
+        _print_path(archive_path())
         print()
         print(dim('  [enter path] set path   [b] back   [q] quit'))
         print()
@@ -97,11 +108,9 @@ def excalidraw_obsidian_screen():
             return
         cleaned = clean_input_path(command)
         if Path(cleaned).suffix.lower() != '.md' or not Path(cleaned).is_file():
-            clear_screen()
-            print(dim('Path must point to an existing .md file.'))
-            pause()
+            error('Path must point to an existing .md file.')
             continue
-        update_archive_path(command)
+        update_archive_path(cleaned)
         archives.load()
         pause()
         return
@@ -112,14 +121,7 @@ def excalidraw_plain_screen():
         clear_screen()
         print(dim('Settings > Archive > Excalidraw'))
         print()
-        p = excalidraw_path()
-        if p and not Path(p).exists():
-            print(f'Current path: {p}')
-            print(dim('  (path not found)'))
-        elif p:
-            print(f'Current path: {p}')
-        else:
-            print('Current path: (not set)')
+        _print_path(excalidraw_path())
         print()
         print(dim('  [enter path] set folder or .excalidraw file   [c] clear   [b] back'))
         print()
@@ -131,22 +133,14 @@ def excalidraw_plain_screen():
             archives.load()
             pause()
             return
-        # ↓ вот этого не хватает
-        cleaned = clean_input_path(command)
-        cp = Path(cleaned)
+        cp = Path(clean_input_path(command))
         if not (cp.is_dir() or (cp.is_file() and cp.suffix == '.excalidraw')):
-            clear_screen()
-            print(dim('Path must be a folder or an .excalidraw file.'))
-            pause()
+            error('Path must be a folder or an .excalidraw file.')
             continue
-        update_excalidraw_path(cleaned)
+        update_excalidraw_path(str(cp))
         archives.load()
         pause()
         return
-
-
-def ask_new_name():
-    update_operator_name(input("New name: ").strip())
 
 
 def vault_screen():
@@ -154,14 +148,7 @@ def vault_screen():
         clear_screen()
         print(dim('Settings > Archive > Vault'))
         print()
-        p = vault_path()
-        if p and not Path(p).exists():
-            print(f'Current path: {p}')
-            print(dim('  (path not found)'))
-        elif p:
-            print(f'Current path: {p}')
-        else:
-            print('Current path: (not set)')
+        _print_path(vault_path())
         print()
         print(dim('  [enter path] set vault folder   [c] clear   [b] back'))
         print()
@@ -175,9 +162,7 @@ def vault_screen():
             return
         cleaned = clean_input_path(command)
         if not Path(cleaned).is_dir():
-            clear_screen()
-            print(dim('Path must be an existing folder.'))
-            pause()
+            error('Path must be an existing folder.')
             continue
         update_vault_path(cleaned)
         archives.load()
@@ -225,13 +210,15 @@ def _keeper_download(conn):
         update_keeper_model(conn['slot'], keeper.RECOMMENDED)
         print('\n')
         print('Done.')
+        pause()
     except keeper.KeeperOffline as e:
         print('\n')
         print(f'Download failed: {e}')
+        pause(feedback='error')
     except KeyboardInterrupt:
         print('\n')
         print('Cancelled.')
-    pause()
+        pause(feedback=None)
 
 
 def _keeper_models_screen(slot):

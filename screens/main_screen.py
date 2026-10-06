@@ -1,20 +1,14 @@
-from datetime import date, datetime, timedelta
+from datetime import date
 from pathlib import Path
 import shutil
-from core.config import load
-from core.os_info import user_os, os_version
-import sys
-import time
-from screens.settings_screen import operator_name, settings_screen
-from ui.interface import dim, clear_screen, pause, read_command
-from core.updater import update
-import platform
-from screens.search_screen import search_screen
-from core.settings import archive_path
-from core import archives
-from core.updater import update, pending_update
-from core.commands import _INDEX
 
+from core import archives
+from core.commands import _INDEX
+from core.settings import operator_name
+from core.updater import pending_update
+from screens.schedule_screen import duty_line
+from screens.search_screen import search_screen
+from ui.interface import clear_screen, dim, pause, read_command
 
 APP_DIR = Path(__file__).resolve().parent.parent
 LOGO = APP_DIR / "ui" / "logo.txt"
@@ -28,8 +22,8 @@ def main_screen():
         show_today_date()
         greet()
         show_status()
-        new = pending_update()
-        if new:
+        show_duty()
+        if pending_update():
             print(dim("Update available — type 'update'"))
         print()
         raw = read_command('system> ')
@@ -70,21 +64,18 @@ def show_today_date():
 
 def greet():
     operator = operator_name()
-    if operator == "":
-        return
-    else:
+    if operator:
         print(f"Welcome back, {operator}")
 
 
 def show_status():
     total = archives.count()
-    if not total:
-        return
-    print(dim(f'{total} cases indexed'))
+    if total:
+        print(dim(f'{total} cases indexed'))
 
 
-def count_cases(path):
-    try:
-        return len(excalidraw.load_path(path))
-    except (OSError, excalidraw.SceneError):
-        return 0
+def show_duty():
+    print()
+    line = duty_line()
+    if line:
+        print(line)

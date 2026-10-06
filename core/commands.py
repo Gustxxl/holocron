@@ -1,41 +1,30 @@
-from collections import namedtuple
 import platform
-from ui.interface import clear_screen, pause
-from core.os_info import user_os, os_version
+from typing import Callable, NamedTuple
+
+from core.os_info import os_version, user_os
 from core.updater import update
-from screens.settings_screen import settings_screen
 from screens.help_screen import render_help
+from screens.settings_screen import settings_screen
+from ui.interface import clear_screen, pause
 
-Command = namedtuple('Command', 'name help run aliases')
-Command.__new__.__defaults__ = ((),)
 
-HelpEntry = namedtuple('HelpEntry', 'name help')
+class Command(NamedTuple):
+    name: str
+    run: Callable
+    aliases: tuple = ()
+    help: str = ''
 
-HELP_SECTIONS = [
-    ('Search', [
-        HelpEntry('type word(s)',    'search the archive (approximate matching)'),
-        HelpEntry('[number]',        'open a case from the current list'),
-        HelpEntry('n / p',           'next / previous page or case'),
-        HelpEntry('l / list',        'browse all cases'),
-        HelpEntry('e',               'edit the open case'),
-    ]),
-    ('Commands', [
-        HelpEntry('keeper / k',      'ask the archive in your own words'),
-        HelpEntry('settings / s',    'operator name / archives / Keeper'),
-        HelpEntry('system',          'show OS and version'),
-        HelpEntry('update',          'fetch and apply a pending update'),
-        HelpEntry('help / h',        'this help'),
-    ]),
-    ('Navigation', [
-        HelpEntry('b',               'back to previous screen'),
-        HelpEntry('Enter',           'refresh the current screen'),
-        HelpEntry('q',               'quit'),
-    ]),
-]
+    @property
+    def label(self):
+        return f'{self.name} / {self.aliases[0]}' if self.aliases else self.name
+
+
+class HelpEntry(NamedTuple):
+    name: str
+    help: str
 
 
 def _cmd_settings(raw):
-    clear_screen()
     settings_screen()
 
 
@@ -50,13 +39,13 @@ def _cmd_update(raw):
             pause()
     except Exception as e:
         print(f'Update failed: {e}')
-        pause()
+        pause(feedback='error')
 
 
 def _cmd_help(raw):
     clear_screen()
     render_help(HELP_SECTIONS)
-    pause()
+    pause(feedback=None)
 
 
 def _cmd_list(raw):
@@ -69,16 +58,35 @@ def _cmd_keeper(raw):
     keeper_screen()
 
 
+def _cmd_schedule(raw):
+    from screens.schedule_screen import schedule_screen
+    schedule_screen()
+
+
 COMMANDS = [
-    Command('settings', 'settings', _cmd_settings, ('s',)),
-    Command('system',   'system',   _cmd_system, ('sys',)),
-    Command('update',   'update',   _cmd_update),
-    Command('help',     'help',     _cmd_help, ('h',)),
-    Command('list',     'list',     _cmd_list, ('l',)),
-    Command('keeper',   'keeper',   _cmd_keeper, ('k', 'keep')),
+    Command('keeper',   _cmd_keeper,   ('k', 'keep'), 'ask the archive in your own words'),
+    Command('schedule', _cmd_schedule, ('sch',),      'shift schedule for the next weeks'),
+    Command('settings', _cmd_settings, ('s',),        'operator name / archives / schedule / Keeper'),
+    Command('system',   _cmd_system,   ('sys',),      'show OS and version'),
+    Command('update',   _cmd_update,   (),            'fetch and apply a pending update'),
+    Command('list',     _cmd_list,     ('l',)),
+    Command('help',     _cmd_help,     ('h',),        'this help'),
 ]
 
-_INDEX = {}
-for _c in COMMANDS:
-    for _name in (_c.name, *_c.aliases):
-        _INDEX[_name] = _c
+HELP_SECTIONS = [
+    ('Search', [
+        HelpEntry('type word(s)', 'search the archive (approximate matching)'),
+        HelpEntry('[number]',     'open a case from the current list'),
+        HelpEntry('n / p',        'next / previous page or case'),
+        HelpEntry('l / list',     'browse all cases'),
+        HelpEntry('e',            'edit the open case'),
+    ]),
+    ('Commands', [HelpEntry(c.label, c.help) for c in COMMANDS if c.help]),
+    ('Navigation', [
+        HelpEntry('b',     'back to previous screen'),
+        HelpEntry('Enter', 'refresh the current screen'),
+        HelpEntry('q',     'quit'),
+    ]),
+]
+
+_INDEX = {name: c for c in COMMANDS for name in (c.name, *c.aliases)}

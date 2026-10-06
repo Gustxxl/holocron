@@ -3,6 +3,10 @@ from core.settings import vault_path
 from .base import Archive
 
 
+def save_note(filepath, text):
+    Path(filepath).write_text(text.rstrip('\n') + '\n', encoding='utf-8')
+
+
 class Vault(Archive):
     name = 'Vault'
     key = 'vault'

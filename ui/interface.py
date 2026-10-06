@@ -1,5 +1,5 @@
 from core.os_info import user_os
-from ui.haptic import Holocron, emit
+from ui.haptic import Holocron
 import sys
 import time
 import subprocess
@@ -9,6 +9,14 @@ import os
 
 def dim(text):
     return f"\033[2m{text}\033[0m"
+
+
+def red(text):
+    return f"\033[38;5;131m{text}\033[0m"
+
+
+def bold(text):
+    return f"\033[1m{text}\033[0m"
 
 
 def clear_screen():
@@ -28,15 +36,23 @@ def haptic(sequence):
         pass
 
 
-def pause():
+def error_haptic():
+    haptic('error')
+
+
+def pause(feedback='success'):
     print()
     key = 'return' if user_os() == 'macOS' else 'Enter'
     input(dim(f'Press {key} to continue...'))
-    haptic('success')
+    if feedback:
+        haptic(feedback)
 
 
-def error_haptic():
-    haptic('error')
+def error(text):
+    clear_screen()
+    print(dim(text))
+    error_haptic()
+    pause(feedback=None)
 
 
 def disconnect():
@@ -73,6 +89,13 @@ def read_command(prompt='> '):
     return line
 
 
+def is_back(command):
+    return command.strip().lower() in ('b', 'back')
+
+
+def confirm(question):
+    return read_command(f'{question} [y/N] ').lower() == 'y'
+
 
 def show_menu(breadcrumb, options, footer='  [number] open section   [b] back   [q] quit'):
     clear_screen()
@@ -83,12 +106,6 @@ def show_menu(breadcrumb, options, footer='  [number] open section   [b] back   
     print()
     print(dim(footer))
     print()
-
-
-def error_haptic():
-    if user_os() == 'macOS':
-        with Holocron() as core:
-            core.error()
 
 
 def open_file(filepath):

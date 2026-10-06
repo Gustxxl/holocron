@@ -3,11 +3,13 @@ import difflib
 import shutil
 import textwrap
 from core import archives, search, excalidraw
+from core.archives.vault import Vault, save_note
 from core.commands import HELP_SECTIONS
 from core.editor import edit_text
 from screens.help_screen import render_help
 from ui.interface import clear_screen, dim, pause, read_command, error_haptic
 from ui.markdown import render_tables, table_cells
+from ui.note import render_note
 
 
 _HL = '\033[1;38;2;116;167;254m'
@@ -207,7 +209,9 @@ def open_case(results, number, query, rerun=True):
                 continue
 
             try:
-                if fp.endswith('.md'):
+                if case.get('archive') == Vault.name:
+                    save_note(fp, edited)
+                elif fp.endswith('.md'):
                     excalidraw.update_text_obsidian(fp, eid, edited)
                 else:
                     excalidraw.update_text(fp, eid, edited)
@@ -322,8 +326,12 @@ def show_case(case, query='', number=None, total=None):
     print()
     print(highlight(highlight_links(_wrap(title, width)), query))
     if body:
+        if case.get('filename'):
+            rendered = render_note(body, width)
+        else:
+            rendered = _wrap(render_tables(body), width)
         print()
-        print(highlight(highlight_links(_wrap(render_tables(body), width)), query))
+        print(highlight(highlight_links(rendered), query))
     print()
     nav = '  [e] edit   '
     nav += '[n] next   ' if number and number < total else ''

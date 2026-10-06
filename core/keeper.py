@@ -13,15 +13,19 @@ RECOMMENDED = 'qwen2.5:7b'
 TOP_K = 8
 SNIPPET = 600
 COMMON_SHARE = 0.25
-MAX_LINES = 40
-MAX_QUOTES = 12
-MAX_SUMMARY = 400
+MAX_LINES = 150
+MAX_RECORD = 8000
 MAX_REPLY = 300
 MAX_NOTE = 250
 GROUNDING_MIN = 0.5
 CHAT_TEMPERATURE = 0.3
 CACHE_SECONDS = 30
 PROBE_TIMEOUT = 2
+
+SCOPES = {
+    'part': {'sentences': 2, 'chars': 400, 'quotes': 12},
+    'whole': {'sentences': 5, 'chars': 1000, 'quotes': 6},
+}
 
 
 _ROUTE_PROMPT = (
@@ -31,6 +35,7 @@ _ROUTE_PROMPT = (
     'numbers or anything that could be written in their notes. '
     'Dates, day names, and date ranges always mean "archive". '
     'Use "chat" for greetings, small talk, feelings, life and general conversation. '
+    'A greeting together with a request is "archive". '
     'For "archive" give 2 to 6 short search terms: subjects, document names, statuses, '
     'codes, numbers, dates. '
     'A date like "02 Jun 2026" should produce terms ["02", "Jun", "2026"]. '
@@ -53,17 +58,24 @@ _PICK_PROMPT = (
 _ANSWER_PROMPT = (
     'You are Keeper, the archivist of Holocron. '
     'You get a question and one record: an optional title and numbered lines. '
-    'Return strict JSON: {"lines": [numbers], "summary": "text", "note": "text"}. '
-    '"lines" are the line numbers that answer the question. '
-    'If the question asks what the record contains or asks to recall it, '
-    'pick its key lines. '
-    '"summary" states the answer in one or two plain, exact sentences, using only this record. '
+    'Return strict JSON: {"scope": "whole" or "part", "lines": [numbers], '
+    '"summary": "text", "note": "text"}. '
+    '"scope" is "whole" when the question asks what the record contains, '
+    'asks to tell about it, retell or recall it. '
+    '"scope" is "part" when the question asks for a specific fact, step, number or detail. '
+    'For "part": "lines" are the line numbers that answer the question, '
+    'and "summary" states the answer in one or two plain, exact sentences. '
+    'For "whole": read the entire record to the last line, not only its beginning. '
+    '"summary" covers all its main points in their order, in three to five plain sentences. '
+    '"lines" are up to 6 key lines taken from different parts of the record. '
+    '"summary" uses only this record. '
     '"note" is one or two sentences of your own judgement: what this means for the question, '
     'a caution, a likely cause, or the next step. It may go beyond the record, '
     'but never invent numbers, dates, names, codes or links. Leave it empty if there is nothing worth adding. '
     'Tone: quiet, restrained, exact. No greetings, no pleasantries, no exclamation marks. '
     'Write in the same language as the question. '
-    'If the record does not answer the question, return {"lines": [], "summary": "", "note": ""}.'
+    'If the record does not answer the question, '
+    'return {"scope": "part", "lines": [], "summary": "", "note": ""}.'
 )
 
 _CHAT_PROMPT = (
@@ -232,6 +244,10 @@ def _norm(word):
     return word.strip().lower().replace('ё', 'е')
 
 
+def _flat(text):
+    return ' '.join(_WORD_RE.findall(_norm(text)))
+
+
 def _numbers(values, limit):
     out = []
     for n in values if isinstance(values, list) else []:
@@ -338,19 +354,6 @@ def find(cases, question, terms, online):
     return {'terms': terms, 'picked': picked, 'similar': similar, 'online': online}
 
 
-def answer(question, case):
-    title = case.get('filename', '')
-    lines = [ln.strip() for ln in case['text'].splitlines() if ln.strip()][:MAX_LINES]
-    numbered = '\n'.join(f'{i}: {ln}' for i, ln in enumerate(lines, 1))
-    header = f'Title: {title}\n' if title else ''
-    data = _chat(_ANSWER_PROMPT, f'Question: {question}\n\nRecord:\n{header}{numbered}')
-    quotes = [lines[n - 1] for n in sorted(_numbers(data.get('lines'), len(lines)))]
-    summary = str(data.get('summary') or '').strip()
-    if not _valid_summary(summary, question, title + ' ' + case['text']):
-        summary = ''
-    return {'summary': summary, 'lines': quotes[:MAX_QUOTES]}
-
-
 def route(question):
     offline = {'online': False, 'intent': 'archive', 'terms': []}
     if active() is None:
@@ -398,12 +401,13 @@ def _restrained(text, max_sentences):
     return len(re.findall(r'[.?…]+(?:\s|$)', text)) <= max_sentences
 
 
-def _valid_summary(summary, question, record):
+def _valid_summary(summary, question, record, scope):
+    limits = SCOPES[scope]
     return (
         summary
-        and len(summary) <= MAX_SUMMARY
+        and len(summary) <= limits['chars']
         and not _URL_RE.search(summary)
-        and _restrained(summary, 2)
+        and _restrained(summary, limits['sentences'])
         and _same_script(summary, question)
         and _grounding(summary, record + ' ' + question) >= GROUNDING_MIN
     )
@@ -435,21 +439,38 @@ def _valid_note(note, question, record):
     )
 
 
+def _record_lines(text):
+    out, size = [], 0
+    for ln in text.splitlines():
+        ln = ln.strip()
+        if not ln:
+            continue
+        room = MAX_RECORD - size
+        if room <= 0 or len(out) >= MAX_LINES:
+            break
+        out.append(ln[:room])
+        size += len(out[-1])
+    return out
+
+
 def answer(question, case):
     title = case.get('filename', '')
-    lines = [ln.strip() for ln in case['text'].splitlines() if ln.strip()][:MAX_LINES]
+    lines = _record_lines(case['text'])
     numbered = '\n'.join(f'{i}: {ln}' for i, ln in enumerate(lines, 1))
     header = f'Title: {title}\n' if title else ''
     data = _chat(_ANSWER_PROMPT, f'Question: {question}\n\nRecord:\n{header}{numbered}')
+    scope = 'whole' if data.get('scope') == 'whole' else 'part'
     quotes = [lines[n - 1] for n in sorted(_numbers(data.get('lines'), len(lines)))]
     source = title + ' ' + case['text']
     summary = str(data.get('summary') or '').strip()
-    if not _valid_summary(summary, question, source):
+    if not _valid_summary(summary, question, source, scope):
         summary = ''
+    flat = _flat(summary)
+    quotes = [q for q in quotes if _flat(q) != flat]
     note = str(data.get('note') or '').strip()
     if not _valid_note(note, question, source):
         note = ''
-    return {'summary': summary, 'lines': quotes[:MAX_QUOTES], 'note': note}
+    return {'summary': summary, 'lines': quotes[:SCOPES[scope]['quotes']], 'note': note}
 
 
 def chat(question, history=None):

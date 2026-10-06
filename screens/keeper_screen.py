@@ -12,12 +12,13 @@ from ui.interface import clear_screen, dim, pause, read_command, haptic
 MIN_QUESTION = 3
 MAX_SOURCES = 5
 HISTORY_TURNS = 4
+GREETING_ROW = 3
 
 LINES = {
     'ready': 'Awaiting your query...',
     'not_connected': 'No model connected. Search by words only. Settings > Archive > Keeper.',
     'unset': 'No model and no archive. Configure in settings > Archive.',
-    'silent': 'Nothing found.',
+    'silent': 'No reply.',
     'empty': 'Nothing in the archive on this.',
     'answer': 'From the archive:',
     'similar': 'No exact match. Closest records:',
@@ -73,6 +74,11 @@ def _switch_note(via):
     return _SWITCH_NOTES[via]
 
 
+def _drop_greeting(rows):
+    sys.stdout.write(f'\0337\033[{GREETING_ROW};1H\033[{rows}M\0338\033[{rows}A')
+    sys.stdout.flush()
+
+
 class _Thinking:
     def __init__(self, label=''):
         self.label = label
@@ -124,7 +130,7 @@ def _ask(question, history, thinking):
         state['kind'] = 'unset'
         return state
 
-    talk = not cases or (route['intent'] == 'chat' and not route['terms'])
+    talk = not cases
     if not talk:
         thinking.label = LINES['searching']
         r = keeper.find(cases, question, route['terms'], route['online'])
@@ -203,25 +209,31 @@ def _print_answer(state):
     print()
 
 
-def _redraw(turns):
+def _redraw(turns, pending=None):
     clear_screen()
     print(dim('Keeper'))
     print()
-    conn = keeper.active(refresh=True)
+    conn = keeper.active(refresh=pending is None)
+    rows = 0
     if conn is None:
         _say(LINES['not_connected'])
-    elif not turns:
+        print()
+    elif not turns and pending is None:
         _say(LINES['ready'])
+        rows = 2
         note = _switch_note(conn['slot'])
         if conn['slot'] == 'local' and note:
             print(dim('  ' + note))
-    print()
+            rows += 1
+        print()
     print(dim('  [number] open record   [b] back   [h] help'))
     print()
     for turn in turns:
-        print(dim(f"Keeper> {turn['question']}"))
+        print(f"Keeper> {turn['question']}")
         _print_answer(turn)
-    return conn['slot'] if conn else None
+    if pending:
+        print(f'Keeper> {pending}')
+    return (conn['slot'] if conn else None), rows
 
 
 def _owner(turns, number):
@@ -234,7 +246,7 @@ def _owner(turns, number):
 def keeper_screen():
     turns = []
     records = []
-    via = _redraw(turns)
+    via, greeting = _redraw(turns)
 
     while True:
         command = read_command('Keeper> ')
@@ -245,15 +257,15 @@ def keeper_screen():
             clear_screen()
             render_help(HELP_SECTIONS)
             pause()
-            via = _redraw(turns)
+            via, greeting = _redraw(turns)
             continue
         if low in ('s', 'settings'):
             from screens.settings_screen import settings_screen
             settings_screen()
-            via = _redraw(turns)
+            via, greeting = _redraw(turns)
             continue
         if command == '':
-            via = _redraw(turns)
+            via, greeting = _redraw(turns)
             continue
         if command.isdigit():
             number = int(command)
@@ -262,13 +274,16 @@ def keeper_screen():
                 continue
             results = [(0, c) for c in records]
             new = open_case(results, number, turn['terms'], rerun=False)
-            via = _redraw(turns)
-            if not new or new == 'l':
+            if not new or new == 'l' or len(new) < MIN_QUESTION:
+                via, greeting = _redraw(turns)
                 continue
             command = new
-            print(f'Keeper> {command}')
-        if len(command) < MIN_QUESTION:
+            _redraw(turns, command)
+        elif len(command) < MIN_QUESTION:
             continue
+        elif greeting:
+            _drop_greeting(greeting)
+        greeting = 0
 
         print()
         with _Thinking(LINES['thinking']) as thinking:
