@@ -7,6 +7,7 @@ from core.dates import merge_ranges, monday, parse_time, period_on
 
 OFF = '-'
 MAX_WEEKS = 52
+EPOCH = date(2001, 1, 1)
 
 _CODES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
@@ -160,11 +161,15 @@ def _clean_vacations(raw):
 def load():
     raw = config.load().get('schedule') or {}
     weeks = raw.get('weeks') if isinstance(raw.get('weeks'), list) else []
+    weeks = tuple(_clean_week(w) for w in weeks if isinstance(w, str))
+    start = _clean_start(raw.get('start'))
+    if start is None and len(weeks) == 1:
+        start = EPOCH
     return Schedule(
         enabled=bool(raw.get('enabled')),
         shifts=_clean_shifts(raw.get('shifts')),
-        weeks=tuple(_clean_week(w) for w in weeks if isinstance(w, str)),
-        start=_clean_start(raw.get('start')),
+        weeks=weeks,
+        start=start,
         vacations=_clean_vacations(raw.get('vacations')),
     )
 
