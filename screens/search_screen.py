@@ -8,7 +8,7 @@ from core.commands import HELP_SECTIONS
 from core.editor import edit_text
 from screens.help_screen import render_help
 from ui.interface import clear_screen, dim, pause, read_command, error_haptic
-from ui.markdown import render_tables, table_cells
+from ui.markdown import links, render_tables, table_cells
 from ui.note import render_note
 
 
@@ -324,12 +324,12 @@ def show_case(case, query='', number=None, total=None):
     label = f'{name} ({archive})' if name else f'({archive})'
     print(dim(f'── {pos}{label} ' + '─' * 20))
     print()
-    print(highlight(highlight_links(_wrap(title, width)), query))
+    print(highlight(highlight_links(_wrap(links(title), width)), query))
     if body:
         if case.get('filename'):
             rendered = render_note(body, width)
         else:
-            rendered = _wrap(render_tables(body), width)
+            rendered = render_tables(_wrap(links(body), width), width)
         print()
         print(highlight(highlight_links(rendered), query))
     print()
@@ -349,15 +349,15 @@ def first_line(case):
         if not ln:
             continue
         if ln.startswith('|'):
-            return '  '.join(c for c in table_cells(ln) if c)
-        return ln
+            return '  '.join(c for c in table_cells(links(ln)) if c)
+        return links(ln)
     return '(empty)'
 
 
 def _wrap(text, width):
     out = []
     for ln in text.splitlines():
-        if not ln.strip() or ln[0] in '┌│├└':
+        if not ln.strip() or ln.lstrip().startswith('|'):
             out.append(ln)
             continue
         indent = ln[:len(ln) - len(ln.lstrip())]

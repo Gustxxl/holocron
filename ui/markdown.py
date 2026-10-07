@@ -5,6 +5,23 @@ from ui.interface import bold, dim
 
 _SEP_RE = re.compile(r'^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$')
 _MD_RE = re.compile(r'\*\*|__|`')
+_WIKI_URL_RE = re.compile(r'\[\[(https?://[^\]|]+?)(?:\|([^\]]+))?\]\]')
+_MD_URL_RE = re.compile(r'(?<!!)\[([^\]]*)\]\((https?://[^)\s]+)[^)]*\)')
+_ANGLE_URL_RE = re.compile(r'<(https?://[^>\s]+)>')
+_DUP_RE = re.compile(r'(https?://[^\s<>\[\]()|"\']+?)/?(\s*)\1/?(?![^\s<>\[\]()|"\'])')
+
+
+def _labeled(url, label):
+    if not label or label.rstrip('/') == url.rstrip('/'):
+        return url
+    return f'{label} {url}'
+
+
+def links(text):
+    text = _WIKI_URL_RE.sub(lambda m: _labeled(m.group(1), m.group(2)), text)
+    text = _MD_URL_RE.sub(lambda m: _labeled(m.group(2), m.group(1)), text)
+    text = _ANGLE_URL_RE.sub(r'\1', text)
+    return _DUP_RE.sub(r'\1', text)
 
 
 def table_cells(line):

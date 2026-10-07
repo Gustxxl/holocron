@@ -1,7 +1,7 @@
 import re
 import textwrap
 from ui.interface import bold, dim
-from ui.markdown import render_tables
+from ui.markdown import links, render_tables
 
 _B_ON, _B_OFF = '\x01', '\x02'
 
@@ -15,7 +15,6 @@ _BULLET_RE = re.compile(r'^(\s*)[-*+]\s+(.*)$')
 _ORDERED_RE = re.compile(r'^(\s*)(\d+[.)])\s+(.*)$')
 _QUOTE_RE = re.compile(r'^\s*>\s?(.*)$')
 _CALLOUT_RE = re.compile(r'^\[!(\w+)\][-+]?\s*(.*)$')
-_AUTOLINK_RE = re.compile(r'<(https?://[^>\s]+)>')
 _BR_RE = re.compile(r'<br\s*/?>', re.I)
 _TAG_RE = re.compile(r'</?[a-zA-Z][^>]*>')
 _EMBED_RE = re.compile(r'!\[\[([^\]|#]+)[^\]]*\]\]')
@@ -35,20 +34,13 @@ def _wiki(m):
     return re.sub(r'#\^?', ' › ', m.group(1)).strip(' ›')
 
 
-def _link(m):
-    label, url = m.groups()
-    if label and url.startswith(('http://', 'https://')) and label != url:
-        return f'{label} {url}'
-    return label
-
-
 def _inline(text):
-    text = _AUTOLINK_RE.sub(r'\1', text)
+    text = links(text)
     text = _TAG_RE.sub('', _BR_RE.sub(' ', text))
     text = _EMBED_RE.sub(lambda m: m.group(1), text)
     text = _WIKI_RE.sub(_wiki, text)
-    text = _IMAGE_RE.sub(lambda m: m.group(1) or m.group(2), text)
-    text = _LINK_RE.sub(_link, text)
+    text = _IMAGE_RE.sub(lambda m: m.group(1) or m.group(2).rsplit('/', 1)[-1], text)
+    text = _LINK_RE.sub(r'\1', text)
     text = _CODE_RE.sub(r'\1', text)
     text = _BOLD_RE.sub(lambda m: _B_ON + m.group(2) + _B_OFF, text)
     text = _MARK_RE.sub(r'\2', text)
