@@ -1,7 +1,7 @@
 import re
 import textwrap
 from ui.interface import bold, dim
-from ui.markdown import render_tables, table_cells
+from ui.markdown import render_tables
 
 _B_ON, _B_OFF = '\x01', '\x02'
 
@@ -15,7 +15,6 @@ _BULLET_RE = re.compile(r'^(\s*)[-*+]\s+(.*)$')
 _ORDERED_RE = re.compile(r'^(\s*)(\d+[.)])\s+(.*)$')
 _QUOTE_RE = re.compile(r'^\s*>\s?(.*)$')
 _CALLOUT_RE = re.compile(r'^\[!(\w+)\][-+]?\s*(.*)$')
-_ALIGN_RE = re.compile(r':?-+:?')
 _AUTOLINK_RE = re.compile(r'<(https?://[^>\s]+)>')
 _BR_RE = re.compile(r'<br\s*/?>', re.I)
 _TAG_RE = re.compile(r'</?[a-zA-Z][^>]*>')
@@ -66,41 +65,6 @@ def _fill(text, width, first, rest):
                          break_long_words=False, break_on_hyphens=False)
 
 
-def _cards(head, body, width):
-    out = []
-    labels = head[1:]
-    label_w = min(max((len(h) for h in labels), default=0), width // 3)
-    for row in body:
-        out.append(bold(row[0] or '—'))
-        for name, value in zip(labels, row[1:]):
-            if not value:
-                continue
-            name = name.ljust(label_w)
-            pad = ' ' * (len(name) + 4)
-            lines = textwrap.wrap(value, width=max(width - len(pad), 10),
-                                  break_long_words=False, break_on_hyphens=False)
-            out.append(f'  {dim(name)}  {lines[0]}')
-            out.extend(pad + ln for ln in lines[1:])
-        out.append('')
-    return out
-
-
-def _table(lines, width):
-    rows = [[c.strip() for c in table_cells(ln)] for ln in lines]
-    rows = [r for r in rows if any(r) and not all(_ALIGN_RE.fullmatch(c) for c in r if c)]
-    if not rows:
-        return []
-    cols = max(len(r) for r in rows)
-    rows = [r + [''] * (cols - len(r)) for r in rows]
-    widths = [max(len(r[i]) for r in rows) for i in range(cols)]
-    if sum(widths) + 3 * cols + 1 <= width:
-        md = [rows[0], ['---'] * cols] + rows[1:]
-        return render_tables('\n'.join('| ' + ' | '.join(r) + ' |' for r in md)).splitlines()
-    if len(rows) == 1:
-        return [_fill('  '.join(c for c in rows[0] if c), width, '', '')]
-    return _cards(rows[0], rows[1:], width)
-
-
 def _line(ln, width):
     if not ln.strip():
         return ''
@@ -147,7 +111,7 @@ def render_note(text, width):
             table.append(_plain(ln))
             continue
         if table:
-            out.extend(_table(table, width))
+            out.extend(render_tables('\n'.join(table), width).splitlines())
             table = []
         m = _FENCE_RE.match(ln)
         if m:
