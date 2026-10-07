@@ -11,11 +11,12 @@ Dependencies install automatically on first launch.
 ## Install
 
 ```zsh
-cd path/to/holocron
+git clone https://github.com/Gustxxl/holocron.git
+cd holocron
 python3 install.py
 ```
 
-Tip: type `cd `, drag the Holocron folder into the terminal and press Return.
+No Git? Download the ZIP from the repository page (Code → Download ZIP), unzip it and run `python install.py` inside the folder.
 
 Then open a new terminal and run:
 
