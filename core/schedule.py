@@ -1,3 +1,5 @@
+import base64
+import json
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import NamedTuple, Optional
@@ -8,6 +10,7 @@ from core.dates import merge_ranges, monday, parse_time, period_on
 OFF = '-'
 MAX_WEEKS = 52
 EPOCH = date(2001, 1, 1)
+SHARE_PREFIX = 'HC1:'
 
 _CODES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
@@ -232,3 +235,41 @@ def set_current_week(n, today=None):
 
 def reset():
     _update(enabled=False, shifts={}, weeks=[], start='')
+
+
+def share_code(sched):
+    data = {'s': sched.shifts, 'w': list(sched.weeks)}
+    if sched.start and len(sched.weeks) > 1:
+        data['t'] = sched.start.isoformat()
+    raw = json.dumps(data, separators=(',', ':')).encode('utf-8')
+    return SHARE_PREFIX + base64.urlsafe_b64encode(raw).decode('ascii').rstrip('=')
+
+
+def read_code(text):
+    text = ''.join(text.split())
+    if text[:len(SHARE_PREFIX)].upper() != SHARE_PREFIX:
+        return None
+    body = text[len(SHARE_PREFIX):]
+    try:
+        data = json.loads(base64.urlsafe_b64decode(body + '=' * (-len(body) % 4)))
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    weeks = data.get('w') if isinstance(data.get('w'), list) else []
+    sched = Schedule(
+        shifts=_clean_shifts(data.get('s')),
+        weeks=tuple(_clean_week(w) for w in weeks if isinstance(w, str)),
+        start=_clean_start(data.get('t')),
+    )
+    if not sched.weeks or len(sched.weeks) > MAX_WEEKS or sched.unknown_codes():
+        return None
+    if not all(_valid_week(w) for w in sched.weeks):
+        return None
+    return sched
+
+
+def import_schedule(sched):
+    _update(shifts=sched.shifts, weeks=list(sched.weeks),
+            start=sched.start.isoformat() if sched.start else '')
+    set_enabled(not load().problems())

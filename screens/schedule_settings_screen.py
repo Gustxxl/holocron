@@ -3,7 +3,7 @@ from datetime import date
 from core import schedule
 from core.dates import DAYS, monday, parse_date, parse_periods
 from ui.format import date_span, day_runs, days_summary, periods, plural, week_span
-from ui.interface import clear_screen, confirm, dim, error, is_back, read_command
+from ui.interface import clear_screen, confirm, copy_text, dim, error, is_back, pause, read_command
 
 
 def _value(text):
@@ -35,6 +35,13 @@ def _pick_days(text):
             return []
         picked.update(range(first - 1, last))
     return sorted(picked)
+
+
+def _print_weeks(weeks, current=None):
+    width = len(str(len(weeks)))
+    for i, days in enumerate(weeks, 1):
+        mark = dim('  ✓') if i - 1 == current else ''
+        print(f'{i:>{width}}) Week {i:<{width}}   {_value(days_summary(days))}{mark}')
 
 
 def _hours_screen(index, picked):
@@ -97,9 +104,7 @@ def _weeks_screen():
         print(dim('Settings > Schedule > Weeks'))
         print()
         if weeks:
-            width = len(str(len(weeks)))
-            for i, days in enumerate(weeks, 1):
-                print(f'{i:>{width}}) Week {i:<{width}}   {_value(days_summary(days))}')
+            _print_weeks(weeks)
         else:
             print('No weeks yet.')
         print()
@@ -128,17 +133,13 @@ def _current_week_screen():
     while True:
         sched = schedule.load()
         weeks = sched.week_days()
-        current = _current_week(sched)
         clear_screen()
         print(dim('Settings > Schedule > Current week'))
         print()
         print(f'This week: {week_span(monday(date.today()))}')
         print()
         if weeks:
-            width = len(str(len(weeks)))
-            for i, days in enumerate(weeks, 1):
-                mark = dim('  ✓') if i - 1 == current else ''
-                print(f'{i:>{width}}) Week {i:<{width}}   {_value(days_summary(days))}{mark}')
+            _print_weeks(weeks, _current_week(sched))
         else:
             print('No weeks yet.')
         print()
@@ -205,6 +206,55 @@ def _vacations_screen():
                 schedule.save_vacations(vacations[:i] + vacations[i + 1:])
 
 
+def _share_screen(sched):
+    if not sched.weeks:
+        error('Nothing to share yet. Add weeks first.')
+        return
+    code = schedule.share_code(sched)
+    clear_screen()
+    print(dim('Settings > Schedule > Share'))
+    print()
+    print(code)
+    print()
+    if copy_text(code):
+        print(dim('Copied. Send it to someone with Holocron: Settings > Schedule > Import.'))
+    else:
+        print(dim('Copy the code and send it to someone with Holocron: Settings > Schedule > Import.'))
+    pause()
+
+
+def _import_screen():
+    while True:
+        clear_screen()
+        print(dim('Settings > Schedule > Import'))
+        print()
+        print('Paste a schedule code.')
+        print()
+        print(dim('  [paste] code   [b] back'))
+        print()
+        raw = read_command('code> ')
+        if not raw or is_back(raw):
+            return
+        sched = schedule.read_code(raw)
+        if not sched:
+            error('Code not recognized. Ask for a new one.')
+            continue
+        clear_screen()
+        print(dim('Settings > Schedule > Import'))
+        print()
+        _print_weeks(sched.week_days())
+        if len(sched.weeks) > 1:
+            print()
+            current = _current_week(sched)
+            print(f'Current week: {_value(f"{current + 1} of {len(sched.weeks)}" if current is not None else "")}')
+        print()
+        print(dim('Your vacations stay as they are.'))
+        print()
+        if confirm('Replace your schedule?'):
+            schedule.import_schedule(sched)
+        return
+
+
 def _toggle(sched):
     if sched.enabled:
         schedule.set_enabled(False)
@@ -228,6 +278,8 @@ def schedule_settings():
         print(f'2) Current week   {_value(f"{current + 1} of {n}" if current is not None else "")}')
         print(f'3) Vacations      {_value(_vacations_value(sched))}')
         print(f'4) Enabled        {dim("on" if sched.enabled else "off")}')
+        print('5) Share')
+        print('6) Import')
         print()
         print(dim('  [number] open section   [b] back'))
         print()
@@ -242,3 +294,7 @@ def schedule_settings():
             _vacations_screen()
         elif command == '4':
             _toggle(sched)
+        elif command == '5':
+            _share_screen(sched)
+        elif command == '6':
+            _import_screen()

@@ -173,3 +173,21 @@ def open_file(filepath):
         subprocess.Popen(['start', '', filepath], shell=True)
     else:
         subprocess.Popen(['xdg-open', filepath])
+
+
+def copy_text(text):
+    system = platform.system()
+    if system == 'Darwin':
+        commands = [['pbcopy']]
+    elif system == 'Windows':
+        commands = [['clip']]
+    else:
+        commands = [['wl-copy'], ['xclip', '-selection', 'clipboard'], ['xsel', '--clipboard', '--input']]
+    for cmd in commands:
+        try:
+            subprocess.run(cmd, input=text.encode('utf-8'), check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except (OSError, subprocess.CalledProcessError):
+            continue
+    return False
