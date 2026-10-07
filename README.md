@@ -9,7 +9,7 @@ Holocron is an independent, unofficial project inspired by the Star Wars univers
 
 ```zsh
 cd path/to/holocron
-python install.py
+python3 install.py
 ```
 
 Tip: type `cd `, drag the Holocron folder into the terminal and press Return.
