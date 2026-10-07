@@ -2,8 +2,11 @@ Holocron is an independent, unofficial project inspired by the Star Wars univers
 
 ## Requirements
 
-- macOS 14+ (Sonoma or newer)
-- Python 3 (dependencies install on first launch)
+- macOS 14+, Windows 10+ or Linux
+- [Python 3.12+](https://www.python.org/downloads/)
+- [Ollama](https://ollama.com/download) — optional, for Keeper
+
+Dependencies install automatically on first launch.
 
 ## Install
 
