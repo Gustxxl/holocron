@@ -1,14 +1,18 @@
 # Holocron
 
-Search and edit the text on your Excalidraw boards — and the rest of your notes — from the terminal.
+Search and edit the text on your Excalidraw boards and notes from the terminal.
 
-Excalidraw boards fill up with labels, boxes and sticky notes, and there's no quick way to get to that text without opening the drawing. Holocron reads it straight from the files: every word on every board is searchable and editable in a second, without launching Obsidian or Excalidraw.
+I kept every error I ran into at work on one Excalidraw board: the message, the cause, the fix. On monitoring shifts I need it at hand all the time, so it stayed open in Obsidian. A board that size keeps the GPU busy and noticeably drains a MacBook's battery. Its search also only found the exact wording, so if I didn't remember how I'd phrased something, I didn't find it.
 
-- **Search everything** — every text block on a board is its own result, alongside your regular notes. Type a few words, typos are fine.
-- **Edit in place** — fix text on a drawing, open a note in your editor or tick off a task with `x 3`. Changes go straight to the file.
-- **Ask your notes** — Keeper answers questions by quoting the notes themselves. The model runs on your computer or your own server, so your notes stay private.
-- **Know your hours** — a regular 9–5 or a rotating shift cycle. See if you're on the clock and what's next.
-- **Pin what you use** — favorites open with a single key.
+Holocron reads the same file from the terminal. Nothing renders, nothing runs in the background, and I get the right block in a second.
+
+So drop everything on a board and don't worry about order or wording. Skip a word, use a different word form or misspell it, and the right block still comes up, ready to read or edit.
+
+- **Search everything.** Every text block on a board is its own result, alongside your regular notes.
+- **Edit in place.** Fix text on a drawing, open a note in your editor or tick off a task with `x 3`. Changes go straight to the file.
+- **Ask your notes.** Keeper answers questions by quoting the notes themselves. The model runs on your computer or your own server, so your notes stay private.
+- **Know your hours.** A regular 9–5 or a rotating shift cycle. See if you're on the clock and what's next.
+- **Pin what you use.** Favorites open with a single key.
 
 <img width="2388" height="2022" alt="CleanShot 2026-10-10 kpVgcpSX@2x" src="https://github.com/user-attachments/assets/11a8a3c2-0327-4de3-89ff-41bdb1dbcd33" />
 
