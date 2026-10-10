@@ -11,8 +11,7 @@ It works with your vault folder directly — nothing to import, nothing to sync.
 - **Know your hours** — a regular 9–5 or a rotating shift cycle. See if you're on the clock and what's next.
 - **Pin what you use** — favorites open with a single key.
 
-![Uploading CleanShot 2026-10-10 kpVgcpSX@2x.png…]()
-
+<img width="2388" height="2022" alt="CleanShot 2026-10-10 kpVgcpSX@2x" src="https://github.com/user-attachments/assets/11a8a3c2-0327-4de3-89ff-41bdb1dbcd33" />
 
 
 ## Get started
