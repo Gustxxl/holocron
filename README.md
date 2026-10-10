@@ -1,4 +1,4 @@
-<img width="2376" height="2006" alt="CleanShot 2026-10-10 h0GElfdF@2x" src="https://github.com/user-attachments/assets/0da9649f-84c6-41f4-9540-b1919040bbba" /># Holocron
+# Holocron
 
 Your Obsidian notes, one command away.
 
