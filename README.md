@@ -1,4 +1,4 @@
-# Holocron
+<img width="2376" height="2006" alt="CleanShot 2026-10-10 h0GElfdF@2x" src="https://github.com/user-attachments/assets/0da9649f-84c6-41f4-9540-b1919040bbba" /># Holocron
 
 Your Obsidian notes, one command away.
 
@@ -10,6 +10,9 @@ It works with your vault folder directly — nothing to import, nothing to sync.
 - **Edit in place** — open a note in your editor or tick off a task with `x 3`. Changes go straight to the file.
 - **Know your hours** — a regular 9–5 or a rotating shift cycle. See if you're on the clock and what's next.
 - **Pin what you use** — favorites open with a single key.
+
+<img width="2376" height="2006" alt="CleanShot 2026-10-10 h0GElfdF@2x" src="https://github.com/user-attachments/assets/60092f5c-649a-43e3-a643-e9ebd16b9d8e" />
+
 
 ## Get started
 
