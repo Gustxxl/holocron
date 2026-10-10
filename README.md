@@ -35,5 +35,3 @@ To remove the command:
 ```zsh
 python3 install.py --remove
 ```
-
-test commit
