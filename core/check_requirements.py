@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import subprocess
 from pathlib import Path
@@ -14,6 +15,24 @@ def _venv_python(venv_dir):
         return venv_dir / "Scripts" / "python.exe"
     return venv_dir / "bin" / "python"
 
+def _normalize(name):
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+def _marker_ok(marker):
+    if not marker:
+        return True
+    try:
+        from packaging.markers import Marker
+    except ImportError:
+        try:
+            from pip._vendor.packaging.markers import Marker
+        except ImportError:
+            return True
+    try:
+        return Marker(marker).evaluate()
+    except Exception:
+        return True
+
 def _install_missing(root):
     try:
         from importlib.metadata import distributions
@@ -24,15 +43,17 @@ def _install_missing(root):
     if not req.exists():
         return
 
-    installed = {d.metadata["Name"].lower() for d in distributions()}
+    installed = {_normalize(d.metadata["Name"]) for d in distributions() if d.metadata["Name"]}
     missing = []
     for line in req.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        pkg = line.split("==")[0].split(">=")[0].split("<=")[0]
-        pkg = pkg.split(">")[0].split("<")[0].split("[")[0].split(";")[0].strip()
-        if pkg and pkg.lower() not in installed:
+        spec, _, marker = line.partition(";")
+        if not _marker_ok(marker.strip()):
+            continue
+        pkg = re.split(r"[<>=!~\[\s]", spec.strip(), maxsplit=1)[0]
+        if pkg and _normalize(pkg) not in installed:
             missing.append(line)
 
     if missing:
@@ -57,6 +78,3 @@ def ensure_environment():
         sys.exit(completed.returncode)
 
     os.execv(str(venv_python), [str(venv_python), *sys.argv])
-
-
-ensure_environment()
