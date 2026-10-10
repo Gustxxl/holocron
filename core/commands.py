@@ -63,9 +63,15 @@ def _cmd_schedule(raw):
     schedule_screen()
 
 
+def _cmd_favorites(raw):
+    from screens.favorites_screen import favorites_screen
+    favorites_screen()
+
+
 COMMANDS = [
     Command('keeper',   _cmd_keeper,   ('k', 'keep'), 'ask the archive in your own words'),
     Command('schedule', _cmd_schedule, ('sch',),      'shift schedule, week by week'),
+    Command('favorites', _cmd_favorites, ('f', 'fav'), 'pinned records'),
     Command('settings', _cmd_settings, ('s',),        'operator name / archives / schedule / Keeper'),
     Command('system',   _cmd_system,   ('sys',),      'show OS and version'),
     Command('update',   _cmd_update,   (),            'fetch and apply a pending update'),
@@ -80,6 +86,8 @@ HELP_SECTIONS = [
         HelpEntry('n / p',        'next / previous page or case'),
         HelpEntry('l / list',     'browse all cases'),
         HelpEntry('e',            'edit the open case'),
+        HelpEntry('f',            'pin / unpin the open case'),
+        HelpEntry('x number',     'check / uncheck a task in the open note'),
     ]),
     ('Schedule', [
         HelpEntry('n / p',        'next / previous week'),

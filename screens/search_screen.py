@@ -2,12 +2,12 @@ import re
 import difflib
 import shutil
 import textwrap
-from core import archives, search, excalidraw
+from core import archives, search, excalidraw, favorites, checklist
 from core.archives.vault import Vault, save_note
 from core.commands import HELP_SECTIONS
 from core.editor import edit_text
 from screens.help_screen import render_help
-from ui.interface import clear_screen, dim, pause, read_command, error_haptic
+from ui.interface import clear_screen, dim, pause, read_command, error_haptic, haptic
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
 from ui.note import render_note
 
@@ -20,6 +20,7 @@ LIST_PAGE = 15
 MIN_QUERY = 3
 
 _URL_RE = re.compile(r'https?://\S+')
+_CHECK_RE = re.compile(r'x\s*(\d+)')
 
 
 def highlight_links(text):
@@ -35,7 +36,7 @@ def _hl_match(qw, tw):
         return True
     if abs(len(tw) - len(qw)) > 3:
         return False
-    return difflib.SequenceMatcher(None, qw, tw).ratio() >= search.MATCH_MIN
+    return difflib. SequenceMatcher(None, qw, tw).ratio() >= search.MATCH_MIN
 
 
 def highlight(text, query):
@@ -161,23 +162,33 @@ def search_screen(initial_query=None):
 
 def _refresh(results, query, rerun):
     archives.load()
+    cases = archives.cases()
     if rerun and query:
-        return search.search(archives.cases(), query)
-    return results
+        return search.search(cases, query)
+    fresh = {(c.get('filepath'), c.get('element_id')): c for c in cases}
+    return [(s, fresh.get((c.get('filepath'), c.get('element_id')), c)) for s, c in results]
+
+
+def _save(case, text):
+    fp, eid = case.get('filepath'), case.get('element_id')
+    if case.get('archive') == Vault.name:
+        save_note(fp, text)
+    elif fp.endswith('.md'):
+        excalidraw.update_text_obsidian(fp, eid, text)
+    else:
+        excalidraw.update_text(fp, eid, text)
+    case['text'] = text
 
 
 def open_case(results, number, query, rerun=True):
     while 1 <= number <= len(results):
-        show_case(results[number - 1][1], query, number, len(results))
+        case = results[number - 1][1]
+        show_case(case, query, number, len(results))
         command = read_command('case> ')
         low = command.lower()
 
         if low in ('e', 'edit'):
-            case = results[number - 1][1]
-            fp = case.get('filepath')
-            eid = case.get('element_id')
-
-            if not fp or not eid:
+            if not case.get('filepath') or not case.get('element_id'):
                 print(dim('  Editing not available for this case'))
                 pause()
                 continue
@@ -209,18 +220,30 @@ def open_case(results, number, query, rerun=True):
                 continue
 
             try:
-                if case.get('archive') == Vault.name:
-                    save_note(fp, edited)
-                elif fp.endswith('.md'):
-                    excalidraw.update_text_obsidian(fp, eid, edited)
-                else:
-                    excalidraw.update_text(fp, eid, edited)
-                case['text'] = edited
+                _save(case, edited)
                 print(dim('  Saved'))
                 results = _refresh(results, query, rerun)
             except Exception as e:
                 print(f'  Error: {e}')
             pause()
+            continue
+
+        if low in ('f', 'fav'):
+            if case.get('filepath'):
+                favorites.toggle(case)
+                haptic('toggle')
+            continue
+        m = _CHECK_RE.fullmatch(low)
+        if m and case.get('filename'):
+            text = checklist.toggle(case['text'], int(m.group(1)))
+            if text is None:
+                continue
+            try:
+                _save(case, text)
+                haptic('toggle')
+            except Exception as e:
+                print(f'  Error: {e}')
+                pause(feedback='error')
             continue
 
         if low in ('l', 'list'):
@@ -307,6 +330,7 @@ def show_case(case, query='', number=None, total=None):
             name = name[:-len(suffix)]
             break
     archive = case.get('archive', '')
+    pinned = favorites.is_pinned(case)
 
     text = case['text'].strip()
     lines = text.splitlines()
@@ -322,7 +346,8 @@ def show_case(case, query='', number=None, total=None):
     width = shutil.get_terminal_size().columns - 1
     pos = f'{number}/{total}  ' if number else ''
     label = f'{name} ({archive})' if name else f'({archive})'
-    print(dim(f'── {pos}{label} ' + '─' * 20))
+    mark = ' · pinned' if pinned else ''
+    print(dim(f'── {pos}{label}{mark} ' + '─' * 20))
     print()
     print(highlight(highlight_links(_wrap(links(title), width)), query))
     if body:
@@ -334,6 +359,10 @@ def show_case(case, query='', number=None, total=None):
         print(paint_code(highlight(highlight_links(rendered), query)))
     print()
     nav = '  [e] edit   '
+    if case.get('filename') and checklist.count(case['text']):
+        nav += '[x number] check   '
+    if case.get('filepath'):
+        nav += '[f] unpin   ' if pinned else '[f] pin   '
     nav += '[n] next   ' if number and number < total else ''
     nav += '[p] prev   ' if number and number > 1 else ''
     nav += '[b] back   [h] help'

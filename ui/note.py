@@ -56,6 +56,17 @@ def _fill(text, width, first, rest):
                          break_long_words=False, break_on_hyphens=False)
 
 
+def _task(m, width, n, digits):
+    indent, state, body = m.groups()
+    done = state.lower() == 'x'
+    num = str(n).rjust(digits)
+    first = f'{indent}{num} {"✓" if done else "○"} '
+    line = _fill(_inline(body), width, first, indent + ' ' * (digits + 3))
+    if done:
+        return dim(line)
+    return indent + dim(num) + line[len(indent) + len(num):]
+
+
 def _line(ln, width):
     if not ln.strip():
         return ''
@@ -70,12 +81,6 @@ def _line(ln, width):
         if callout:
             return '│ ' + bold(_plain(callout.group(2)) or callout.group(1).capitalize())
         return _fill(_inline(m.group(1)), width, '│ ', '│ ')
-    m = _TASK_RE.match(ln)
-    if m:
-        indent, state, body = m.groups()
-        done = state.lower() == 'x'
-        line = _fill(_inline(body), width, indent + ('✓ ' if done else '○ '), indent + '  ')
-        return dim(line) if done else line
     m = _BULLET_RE.match(ln)
     if m:
         indent, body = m.groups()
@@ -90,14 +95,26 @@ def _line(ln, width):
 
 def render_note(text, width):
     text = code_blocks(_COMMENT_RE.sub('', _FRONT_RE.sub('', text.replace('\r\n', '\n'))))
-    out, table = [], []
-    for ln in text.splitlines() + ['']:
+    lines = text.splitlines()
+    total = sum(1 for ln in lines if not is_code(ln) and _TASK_RE.match(ln.expandtabs(2)))
+    digits = len(str(total))
+    out, table, n = [], [], 0
+    for ln in lines + ['']:
         if not is_code(ln) and ln.lstrip().startswith('|'):
             table.append(_plain(ln.expandtabs(2)))
             continue
         if table:
             out.extend(render_tables('\n'.join(table), width).splitlines())
             table = []
-        out.append(ln if is_code(ln) else _line(ln.expandtabs(2), width))
+        if is_code(ln):
+            out.append(ln)
+            continue
+        ln = ln.expandtabs(2)
+        m = _TASK_RE.match(ln)
+        if m:
+            n += 1
+            out.append(_task(m, width, n, digits))
+            continue
+        out.append(_line(ln, width))
     text = re.sub(r'\n{3,}', '\n\n', '\n'.join(out)).strip('\n')
     return text.replace(_B_ON, '\033[1m').replace(_B_OFF, '\033[22m')
