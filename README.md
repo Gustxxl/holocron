@@ -2,7 +2,7 @@
 
 Search and edit the text on your Excalidraw boards and notes from the terminal.
 
-I kept every error I ran into at work on one Excalidraw board: the message, the cause, the fix. On monitoring shifts I need it at hand all the time, so it stayed open in Obsidian. A board that size keeps the GPU busy and noticeably drains a MacBook's battery. Its search also only found the exact wording, so if I didn't remember how I'd phrased something, I didn't find it.
+I kept every error I ran into at work on one Excalidraw board: the message, the cause, the fix. On monitoring shifts I need it at hand all the time, so it stayed open in Obsidian. A board that size keeps the GPU busy and noticeably drains a laptop's battery. Its search also only found the exact wording, so if I didn't remember how I'd phrased something, I didn't find it.
 
 Holocron reads the same file from the terminal. Nothing renders, nothing runs in the background, and I get the right block in a second.
 
