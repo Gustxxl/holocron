@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import urllib.parse
 import urllib.request
 import threading
 
@@ -21,6 +22,7 @@ PRESERVE = {'data', '.git', 'venv', '.venv', '__pycache__', '.dev'}
 
 API = f'https://api.github.com/repos/{REPO}/commits/{BRANCH}'
 TREE = f'https://api.github.com/repos/{REPO}/git/trees/{{sha}}?recursive=1'
+API_TARBALL = f'https://api.github.com/repos/{REPO}/tarball/{{sha}}'
 TARBALL = f'https://github.com/{REPO}/archive/{{sha}}.tar.gz'
 
 MIRRORS = [
@@ -31,30 +33,34 @@ MIRRORS = [
 ]
 
 
-def _candidates(url, mirrors):
-    yield url
-    if not mirrors:
-        return
+def _mirrored(url):
     override = os.environ.get('HOLOCRON_MIRROR')
     prefixes = [p.strip() for p in override.split(',') if p.strip()] if override else MIRRORS
-    for p in prefixes:
-        yield p.rstrip('/') + '/' + url
+    return [p.rstrip('/') + '/' + url for p in prefixes]
 
 
-def _get(url, raw=False, mirrors=False):
-    last = None
-    for candidate in _candidates(url, mirrors):
+def _get(urls, raw=False):
+    errors = []
+    for candidate in urls:
         try:
-            req = urllib.request.Request(candidate, headers={
-                'Accept': 'application/vnd.github+json',
+            req = urllib.request. Request(candidate, headers={
+                'Accept': '*/*' if raw else 'application/vnd.github+json',
                 'User-Agent': 'holocron',
             })
             with urllib.request.urlopen(req, timeout=15) as r:
                 return r.read() if raw else json.load(r)
         except Exception as e:
-            last = e
-            continue
-    raise last
+            errors.append(f'{urllib.parse.urlsplit(candidate).netloc}: {e}')
+    raise RuntimeError('; '.join(errors))
+
+
+def _api(url):
+    return _get([url])
+
+
+def _download(sha):
+    archive = TARBALL.format(sha=sha)
+    return _get([API_TARBALL.format(sha=sha), archive, *_mirrored(archive)], raw=True)
 
 
 def _is_dev():
@@ -65,7 +71,7 @@ def _is_dev():
 
 
 def _latest_sha():
-    return _get(API)['sha']
+    return _api(API)['sha']
 
 
 def _check_path(path):
@@ -76,7 +82,7 @@ def _check_path(path):
 
 
 def _tree(sha):
-    data = _get(TREE.format(sha=sha))
+    data = _api(TREE.format(sha=sha))
     if data.get('truncated'):
         raise RuntimeError('tree listing truncated; integrity cannot be verified')
     blobs = []
@@ -193,7 +199,7 @@ def update(restart=True):
 
     print('Update found. Retrieving...')
     try:
-        blob = _get(TARBALL.format(sha=sha), raw=True, mirrors=True)
+        blob = _download(sha)
     except Exception as e:
         print(f'Retrieval failed: {e}')
         return False
@@ -257,7 +263,7 @@ def check_update_async():
         global _update_sha
         _update_sha = update_available()
 
-    _update_thread = threading. Thread(target=_run, daemon=True)
+    _update_thread = threading.Thread(target=_run, daemon=True)
     _update_thread.start()
 
 
