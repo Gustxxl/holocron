@@ -9,6 +9,40 @@ _WIKI_URL_RE = re.compile(r'\[\[(https?://[^\]|]+?)(?:\|([^\]]+))?\]\]')
 _MD_URL_RE = re.compile(r'(?<!!)\[([^\]]*)\]\((https?://[^)\s]+)[^)]*\)')
 _ANGLE_URL_RE = re.compile(r'<(https?://[^>\s]+)>')
 _DUP_RE = re.compile(r'(https?://[^\s<>\[\]()|"\']+?)/?(\s*)\1/?(?![^\s<>\[\]()|"\'])')
+_CODE = '\x05'
+_CODE_BG = '\033[48;5;236m'
+_FENCE_RE = re.compile(r'^\s*(```|~~~)')
+
+
+def code_blocks(text):
+    out, fence = [], None
+    for ln in text.splitlines():
+        if fence:
+            if ln.strip().startswith(fence):
+                fence = None
+            else:
+                out.append(_CODE + ln)
+            continue
+        m = _FENCE_RE.match(ln)
+        if m:
+            fence = m.group(1)
+            continue
+        out.append(ln)
+    return '\n'.join(out)
+
+
+def is_code(line):
+    return line.startswith(_CODE)
+
+
+def paint_code(text):
+    out = []
+    for ln in text.split('\n'):
+        if is_code(ln):
+            body = ln[1:].replace('\033[0m', '\033[0m' + _CODE_BG)
+            ln = f'{_CODE_BG}{body}\033[K\033[0m'
+        out.append(ln)
+    return '\n'.join(out)
 
 
 def _labeled(url, label):

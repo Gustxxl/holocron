@@ -1,13 +1,12 @@
 import re
 import textwrap
 from ui.interface import bold, dim
-from ui.markdown import links, render_tables
+from ui.markdown import code_blocks, is_code, links, render_tables
 
 _B_ON, _B_OFF = '\x01', '\x02'
 
 _FRONT_RE = re.compile(r'\A---\n.*?\n---[ \t]*(?:\n|\Z)', re.S)
 _COMMENT_RE = re.compile(r'%%.*?%%', re.S)
-_FENCE_RE = re.compile(r'^\s*(```|~~~)')
 _HEADING_RE = re.compile(r'^\s{0,3}#{1,6}\s+(.*?)(?:\s+#+)?\s*$')
 _RULE_RE = re.compile(r'^\s{0,3}([-*_])(?:\s*\1){2,}\s*$')
 _TASK_RE = re.compile(r'^(\s*)[-*+]\s+\[(.)\]\s+(.*)$')
@@ -90,25 +89,15 @@ def _line(ln, width):
 
 
 def render_note(text, width):
-    text = _COMMENT_RE.sub('', _FRONT_RE.sub('', text.replace('\r\n', '\n'))).expandtabs(2)
-    out, table, fence = [], [], None
+    text = code_blocks(_COMMENT_RE.sub('', _FRONT_RE.sub('', text.replace('\r\n', '\n'))))
+    out, table = [], []
     for ln in text.splitlines() + ['']:
-        if fence:
-            if ln.strip().startswith(fence):
-                fence = None
-            else:
-                out.append(dim('  ' + ln))
-            continue
-        if ln.lstrip().startswith('|'):
-            table.append(_plain(ln))
+        if not is_code(ln) and ln.lstrip().startswith('|'):
+            table.append(_plain(ln.expandtabs(2)))
             continue
         if table:
             out.extend(render_tables('\n'.join(table), width).splitlines())
             table = []
-        m = _FENCE_RE.match(ln)
-        if m:
-            fence = m.group(1)
-            continue
-        out.append(_line(ln, width))
+        out.append(ln if is_code(ln) else _line(ln.expandtabs(2), width))
     text = re.sub(r'\n{3,}', '\n\n', '\n'.join(out)).strip('\n')
     return text.replace(_B_ON, '\033[1m').replace(_B_OFF, '\033[22m')

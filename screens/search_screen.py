@@ -8,7 +8,7 @@ from core.commands import HELP_SECTIONS
 from core.editor import edit_text
 from screens.help_screen import render_help
 from ui.interface import clear_screen, dim, pause, read_command, error_haptic
-from ui.markdown import links, render_tables, table_cells
+from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
 from ui.note import render_note
 
 
@@ -329,9 +329,9 @@ def show_case(case, query='', number=None, total=None):
         if case.get('filename'):
             rendered = render_note(body, width)
         else:
-            rendered = render_tables(_wrap(links(body), width), width)
+            rendered = render_tables(_wrap(code_blocks(links(body)), width), width)
         print()
-        print(highlight(highlight_links(rendered), query))
+        print(paint_code(highlight(highlight_links(rendered), query)))
     print()
     nav = '  [e] edit   '
     nav += '[n] next   ' if number and number < total else ''
@@ -357,7 +357,7 @@ def first_line(case):
 def _wrap(text, width):
     out = []
     for ln in text.splitlines():
-        if not ln.strip() or ln.lstrip().startswith('|'):
+        if not ln.strip() or is_code(ln) or ln.lstrip().startswith('|'):
             out.append(ln)
             continue
         indent = ln[:len(ln) - len(ln.lstrip())]
