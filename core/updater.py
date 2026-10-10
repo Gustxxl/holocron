@@ -31,17 +31,19 @@ MIRRORS = [
 ]
 
 
-def _candidates(url):
+def _candidates(url, mirrors):
     yield url
+    if not mirrors:
+        return
     override = os.environ.get('HOLOCRON_MIRROR')
     prefixes = [p.strip() for p in override.split(',') if p.strip()] if override else MIRRORS
     for p in prefixes:
         yield p.rstrip('/') + '/' + url
 
 
-def _get(url, raw=False):
+def _get(url, raw=False, mirrors=False):
     last = None
-    for candidate in _candidates(url):
+    for candidate in _candidates(url, mirrors):
         try:
             req = urllib.request.Request(candidate, headers={
                 'Accept': 'application/vnd.github+json',
@@ -66,11 +68,25 @@ def _latest_sha():
     return _get(API)['sha']
 
 
+def _check_path(path):
+    parts = path.split('/')
+    if path.startswith('/') or '\\' in path or any(p in ('', '.', '..') for p in parts):
+        raise RuntimeError(f'unsafe path in tree: {path}')
+    return parts
+
+
 def _tree(sha):
     data = _get(TREE.format(sha=sha))
     if data.get('truncated'):
         raise RuntimeError('tree listing truncated; integrity cannot be verified')
-    return [e for e in data['tree'] if e.get('type') == 'blob']
+    blobs = []
+    for e in data['tree']:
+        if e.get('type') != 'blob':
+            continue
+        if _check_path(e['path'])[0] in PRESERVE:
+            continue
+        blobs.append(e)
+    return blobs
 
 
 def _remote_tree():
@@ -96,12 +112,21 @@ def _is_current(blobs):
 
 
 def _verify(root, blobs):
+    expected = set()
     for entry in blobs:
+        expected.add(entry['path'])
         target = os.path.join(root, entry['path'])
         if not os.path.isfile(target):
             raise RuntimeError(f"missing file in payload: {entry['path']}")
         if _git_blob_sha(target) != entry['sha']:
             raise RuntimeError(f"integrity mismatch: {entry['path']}")
+    for dirpath, _, filenames in os.walk(root):
+        for name in filenames:
+            rel = os.path.relpath(os.path.join(dirpath, name), root).replace(os.sep, '/')
+            if rel.split('/')[0] in PRESERVE:
+                continue
+            if rel not in expected:
+                raise RuntimeError(f'unexpected file in payload: {rel}')
 
 
 def _apply(src_root):
@@ -168,18 +193,20 @@ def update(restart=True):
 
     print('Update found. Retrieving...')
     try:
-        blob = _get(TARBALL.format(sha=sha), raw=True)
+        blob = _get(TARBALL.format(sha=sha), raw=True, mirrors=True)
     except Exception as e:
         print(f'Retrieval failed: {e}')
         return False
 
     tmp = tempfile.mkdtemp(prefix='holocron_')
     try:
-        with tarfile.open(fileobj=io.BytesIO(blob)) as tar:
-            tar.extractall(tmp, filter='data')
-        root = os.path.join(tmp, os.listdir(tmp)[0])
-
         try:
+            with tarfile.open(fileobj=io.BytesIO(blob)) as tar:
+                tar.extractall(tmp, filter='data')
+            entries = os.listdir(tmp)
+            if len(entries) != 1 or not os.path.isdir(os.path.join(tmp, entries[0])):
+                raise RuntimeError('unexpected archive layout')
+            root = os.path.join(tmp, entries[0])
             _verify(root, blobs)
         except Exception as e:
             print(f'Integrity check failed, update aborted: {e}')
@@ -230,7 +257,7 @@ def check_update_async():
         global _update_sha
         _update_sha = update_available()
 
-    _update_thread = threading.Thread(target=_run, daemon=True)
+    _update_thread = threading. Thread(target=_run, daemon=True)
     _update_thread.start()
 
 
