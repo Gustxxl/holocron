@@ -15,6 +15,7 @@ RING_SPEED = 1.3
 STRIPES = 6.0
 SWIRL = 0.15
 RAMP = ' .·:-=+*x#%@'
+MIN_W, MIN_H = 40, 12
 TIMING = {'cruise': 0.6, 'charge': 1.8, 'entry': 1.2, 'exit': 0.7}
 NEXT = {'cruise': 'charge', 'charge': 'entry', 'entry': 'tunnel'}
 
@@ -167,6 +168,17 @@ def _bloom(s, radius, power):
             s.put(s.cy + dy, s.cx + dx, ch, s.attrs[3 if v > 0.6 else 2 if v > 0.38 else 1 if v > 0.22 else 0])
 
 
+def _too_small(s):
+    s.scr.erase()
+    msg = 'Make the window larger.'[:max(0, s.w - 1)]
+    try:
+        s.scr.addstr(s.h // 2, max(0, (s.w - len(msg)) // 2), msg, curses.A_DIM)
+    except curses.error:
+        pass
+    s.scr.refresh()
+    time.sleep(1.0 / FPS)
+
+
 def _state(phase, p, t, start):
     if phase == 'cruise':
         return 0.06, 0.006, 0.0, 0.0
@@ -198,7 +210,13 @@ def _run(scr):
         key = scr.getch()
         if (s.h, s.w) != scr.getmaxyx():
             s.resize()
-        elif key not in (-1, curses.KEY_RESIZE) and phase != 'exit':
+        if s.w < MIN_W or s.h < MIN_H:
+            if key not in (-1, curses.KEY_RESIZE):
+                return
+            _too_small(s)
+            last = time.monotonic()
+            continue
+        if key not in (-1, curses.KEY_RESIZE) and phase != 'exit':
             phase, t, start = 'exit', 0.0, state[:3]
             haptic('click')
         now = time.monotonic()

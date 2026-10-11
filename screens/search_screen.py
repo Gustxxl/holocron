@@ -12,7 +12,8 @@ from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, 
 from ui.note import render_note
 
 
-_HL = '\033[1;38;2;116;167;254m'
+_HL = '\033[38;2;116;167;254m'
+_MARK = '\033[38;2;20;20;20;48;2;116;167;254m'
 _RESET = '\033[0m'
 
 PAGE = 8
@@ -36,7 +37,15 @@ def _hl_match(qw, tw):
         return True
     if abs(len(tw) - len(qw)) > 3:
         return False
-    return difflib. SequenceMatcher(None, qw, tw).ratio() >= search.MATCH_MIN
+    return difflib.SequenceMatcher(None, qw, tw).ratio() >= search.MATCH_MIN
+
+
+def _phrase_re(query):
+    parts = [re.escape(p) for p in query.lower().split()]
+    if not parts:
+        return None
+    pattern = r'[ \t]+'.join(parts).replace('е', '[её]').replace('ё', '[её]')
+    return re.compile(rf'(?<!\w){pattern}(?!\w)', re.IGNORECASE)
 
 
 def highlight(text, query):
@@ -50,7 +59,19 @@ def highlight(text, query):
             return f'{_HL}{word}{_RESET}'
         return word
 
-    return re.sub(r'\w+', repl, text, flags=re.UNICODE)
+    def soft(part):
+        return re.sub(r'\w+', repl, part, flags=re.UNICODE)
+
+    phrase = _phrase_re(query)
+    if not phrase:
+        return soft(text)
+    out, pos = [], 0
+    for m in phrase.finditer(text):
+        out.append(soft(text[pos:m.start()]))
+        out.append(f'{_MARK}{m.group(0)}{_RESET}')
+        pos = m.end()
+    out.append(soft(text[pos:]))
+    return ''.join(out)
 
 
 def _all(cases):
@@ -347,7 +368,8 @@ def show_case(case, query='', number=None, total=None):
     pos = f'{number}/{total}  ' if number else ''
     label = f'{name} ({archive})' if name else f'({archive})'
     mark = ' · pinned' if pinned else ''
-    print(dim(f'── {pos}{label}{mark} ' + '─' * 20))
+    asked = f'  "{query}"' if query else ''
+    print(dim(f'── {pos}{label}{mark}{asked} ' + '─' * 20))
     print()
     print(highlight(highlight_links(_wrap(links(title), width)), query))
     if body:
