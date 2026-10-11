@@ -1,11 +1,14 @@
+import importlib.util
 import platform
 from typing import Callable, NamedTuple
-
 from core.os_info import os_version, user_os
 from core.updater import update
 from screens.help_screen import render_help
 from screens.settings_screen import settings_screen
 from ui.interface import clear_screen, pause
+
+
+HAS_CURSES = importlib.util.find_spec('_curses') is not None
 
 
 class Command(NamedTuple):
@@ -68,15 +71,22 @@ def _cmd_favorites(raw):
     favorites_screen()
 
 
+def _cmd_hyperspace(raw):
+    from ui.hyperspace import hyperspace
+    hyperspace()
+
+
 COMMANDS = [
-    Command('keeper',   _cmd_keeper,   ('k', 'keep'), 'ask the archive in your own words'),
-    Command('schedule', _cmd_schedule, ('sch',),      'shift schedule, week by week'),
-    Command('favorites', _cmd_favorites, ('f', 'fav'), 'pinned records'),
-    Command('settings', _cmd_settings, ('s',),        'operator name / archives / schedule / Keeper'),
-    Command('system',   _cmd_system,   ('sys',),      'show OS and version'),
-    Command('update',   _cmd_update,   (),            'fetch and apply a pending update'),
-    Command('list',     _cmd_list,     ('l',)),
-    Command('help',     _cmd_help,     ('h',),        'this help'),
+    Command('keeper',    _cmd_keeper,    ('k', 'keep'), 'ask the archive in your own words'),
+    Command('schedule',  _cmd_schedule,  ('sch',),      'shift schedule, week by week'),
+    Command('favorites', _cmd_favorites, ('f', 'fav'),  'pinned records'),
+    Command('settings',  _cmd_settings,  ('s',),        'operator name / archives / schedule / Keeper'),
+    Command('system',    _cmd_system,    ('sys',),      'show OS and version'),
+    Command('update',    _cmd_update,    (),            'fetch and apply a pending update'),
+    *([Command('hyperspace', _cmd_hyperspace, ('hy',), 'go to hyperspace (any key to return)')]
+      if HAS_CURSES else []),
+    Command('list',      _cmd_list,      ('l',)),
+    Command('help',      _cmd_help,      ('h',),        'this help'),
 ]
 
 HELP_SECTIONS = [
