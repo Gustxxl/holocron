@@ -2,10 +2,10 @@ import argparse
 import ctypes
 import sys
 import time
-from core.os_info import user_os
+from core import system
 
 
-IS_MACOS = user_os() == 'macOS'
+IS_MACOS = system.IS_MACOS
 
 if IS_MACOS:
     mt = ctypes.CDLL(

@@ -1,14 +1,14 @@
-import importlib.util
 import platform
 from typing import Callable, NamedTuple
-from core.os_info import os_version, user_os
+from core import editor, system
 from core.updater import update
 from screens.help_screen import render_help
 from screens.settings_screen import settings_screen
 from ui.interface import clear_screen, pause
 
 
-HAS_CURSES = importlib.util.find_spec('_curses') is not None
+HAS_CURSES = system.CURSES
+HAS_EDITOR = editor.available()
 
 
 class Command(NamedTuple):
@@ -32,7 +32,7 @@ def _cmd_settings(raw):
 
 
 def _cmd_system(raw):
-    print(f'{user_os()} {os_version()} ({platform.machine()})')
+    print(f'{system.OS} {system.version()} ({platform.machine()})')
     pause()
 
 
@@ -95,7 +95,7 @@ HELP_SECTIONS = [
         HelpEntry('[number]',     'open a case from the current list'),
         HelpEntry('n / p',        'next / previous page or case'),
         HelpEntry('l / list',     'browse all cases'),
-        HelpEntry('e',            'edit the open case'),
+        *([HelpEntry('e',        'edit the open case')] if HAS_EDITOR else []),
         HelpEntry('f',            'pin / unpin the open case'),
         HelpEntry('x number',     'check / uncheck a task in the open note'),
     ]),

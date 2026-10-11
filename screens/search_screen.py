@@ -2,10 +2,9 @@ import re
 import difflib
 import shutil
 import textwrap
-from core import archives, search, excalidraw, favorites, checklist
+from core import archives, search, excalidraw, favorites, checklist, editor
 from core.archives.vault import Vault, save_note
 from core.commands import HELP_SECTIONS
-from core.editor import edit_text
 from screens.help_screen import render_help
 from ui.interface import clear_screen, dim, pause, read_command, error_haptic, haptic
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
@@ -208,14 +207,19 @@ def open_case(results, number, query, rerun=True):
         command = read_command('case> ')
         low = command.lower()
 
-        if low in ('e', 'edit'):
+        if low in ('e', 'edit') and editor.available():
             if not case.get('filepath') or not case.get('element_id'):
                 print(dim('  Editing not available for this case'))
                 pause()
                 continue
 
             original = case['text']
-            edited = edit_text(original).strip()
+            edited = editor.edit_text(original)
+            if edited is None:
+                print(dim('  Could not open the editor'))
+                pause(feedback='error')
+                continue
+            edited = edited.strip()
 
             if not edited:
                 print(dim('  Empty text — edit cancelled'))
@@ -380,7 +384,7 @@ def show_case(case, query='', number=None, total=None):
         print()
         print(paint_code(highlight(highlight_links(rendered), query)))
     print()
-    nav = '  [e] edit   '
+    nav = '  [e] edit   ' if editor.available() else '  '
     if case.get('filename') and checklist.count(case['text']):
         nav += '[x number] check   '
     if case.get('filepath'):

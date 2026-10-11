@@ -1,12 +1,10 @@
-from core.os_info import user_os
+from core import system
 from ui.haptic import Holocron
 import sys
 import time
-import subprocess
-import platform
 import os
 
-if os.name != 'nt':
+if not system.IS_WINDOWS:
     try:
         import readline
     except ImportError:
@@ -26,14 +24,14 @@ def bold(text):
 
 
 def clear_screen():
-    if os.name == 'nt':
+    if system.IS_WINDOWS:
         os.system('cls')
     else:
         print('\033[H\033[2J\033[3J', end='')
 
 
 def haptic(sequence):
-    if user_os() != 'macOS':
+    if not system.IS_MACOS:
         return
     try:
         with Holocron() as core:
@@ -48,7 +46,7 @@ def error_haptic():
 
 def pause(feedback='success'):
     print()
-    key = 'return' if user_os() == 'macOS' else 'Enter'
+    key = 'return' if system.IS_MACOS else 'Enter'
     input(dim(f'Press {key} to continue...'))
     if feedback:
         haptic(feedback)
@@ -128,7 +126,7 @@ def _drain_console():
 
 
 def _drain():
-    if os.name == 'nt':
+    if system.IS_WINDOWS:
         return _drain_console() if sys.stdin.isatty() else ''
     return _drain_tty() if sys.stdin.isatty() else _drain_pipe()
 
@@ -163,31 +161,3 @@ def show_menu(breadcrumb, options, footer='  [number] open section   [b] back   
     print()
     print(dim(footer))
     print()
-
-
-def open_file(filepath):
-    system = platform.system()
-    if system == 'Darwin':
-        subprocess.Popen(['open', filepath])
-    elif system == 'Windows':
-        subprocess.Popen(['start', '', filepath], shell=True)
-    else:
-        subprocess.Popen(['xdg-open', filepath])
-
-
-def copy_text(text):
-    system = platform.system()
-    if system == 'Darwin':
-        commands = [['pbcopy']]
-    elif system == 'Windows':
-        commands = [['clip']]
-    else:
-        commands = [['wl-copy'], ['xclip', '-selection', 'clipboard'], ['xsel', '--clipboard', '--input']]
-    for cmd in commands:
-        try:
-            subprocess.run(cmd, input=text.encode('utf-8'), check=True,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return True
-        except (OSError, subprocess.CalledProcessError):
-            continue
-    return False

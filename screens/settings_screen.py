@@ -17,7 +17,7 @@ from screens.schedule_settings_screen import schedule_settings
 from ui.interface import clear_screen, dim, error, pause, read_command, show_menu
 from pathlib import Path
 from ui.clean_path import clean_input_path
-import platform
+from core import system
 import sys
 
 
@@ -184,7 +184,7 @@ _KEEPER_NAMES = {'server': 'Server', 'local': 'This computer'}
 
 
 def _keeper_install_hint():
-    if platform.system() == 'Linux':
+    if system.OS == 'Linux':
         return 'Install: curl -fsSL https://ollama.com/install.sh | sh'
     return 'Download: https://ollama.com/download'
 

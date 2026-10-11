@@ -1,9 +1,9 @@
 from datetime import date
-
 from core import schedule
 from core.dates import DAYS, monday, parse_date, parse_periods
 from ui.format import date_span, day_runs, days_summary, periods, plural, week_span
-from ui.interface import clear_screen, confirm, copy_text, dim, error, is_back, pause, read_command
+from core.system import copy_text
+from ui.interface import clear_screen, confirm, dim, error, is_back, pause, read_command
 
 
 def _value(text):
