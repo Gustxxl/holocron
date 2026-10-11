@@ -17,15 +17,9 @@ LOGO_TEXT = "HOLOCRON"
 
 def main_screen():
     while True:
+        frame = '\n'.join(_frame())
         clear_screen()
-        show_logo()
-        show_today_date()
-        greet()
-        show_status()
-        show_duty()
-        if pending_update():
-            print(dim("Update available — type 'update'"))
-        print()
+        print(frame)
         raw = read_command('system> ')
         command = raw.lower()
         if command == '':
@@ -43,39 +37,28 @@ def main_screen():
         search_screen(raw)
 
 
-def show_logo():
-    text = LOGO.read_text(encoding="utf-8")
-    width = shutil.get_terminal_size().columns
-    lines = text.splitlines()
-    block_width = max((len(line) for line in lines), default=0)
-    print()
-    if block_width > width:
-        print(dim(LOGO_TEXT.center(width)))
-        return
-    pad = (width - block_width) // 2
-    for line in lines:
-        print(dim(" " * pad + line))
-    print()
-
-
-def show_today_date():
-    print(dim(date.today().strftime("%a %b %d %Y")))
-
-
-def greet():
+def _frame():
+    lines = [*_logo(), dim(date.today().strftime("%a %b %d %Y"))]
     operator = operator_name()
     if operator:
-        print(f"Welcome back, {operator}")
-
-
-def show_status():
+        lines.append(f"Welcome back, {operator}")
     total = archives.count()
     if total:
-        print(dim(f'{total} cases indexed'))
+        lines.append(dim(f'{total} cases indexed'))
+    duty = duty_line()
+    if duty:
+        lines += ['', duty]
+    if pending_update():
+        lines.append(dim("Update available — type 'update'"))
+    lines.append('')
+    return lines
 
 
-def show_duty():
-    line = duty_line()
-    if line:
-        print()
-        print(line)
+def _logo():
+    lines = LOGO.read_text(encoding="utf-8").splitlines()
+    width = shutil.get_terminal_size().columns
+    block = max((len(line) for line in lines), default=0)
+    if block > width:
+        return ['', dim(LOGO_TEXT.center(width))]
+    pad = ' ' * ((width - block) // 2)
+    return ['', *(dim(pad + line) for line in lines), '']

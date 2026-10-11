@@ -22,7 +22,7 @@ Works with drawings from the Excalidraw plugin for Obsidian, compressed or not, 
 
 - **One block, one result.** A board with 40 sticky notes gives you 40 things to find, not one file to dig through.
 - **Reads like a page.** Blocks are listed top to bottom, left to right — browse a whole board with `l`.
-- **Edit without opening the drawing.** Press `e`, change the text, confirm with `y`. The drawing itself is updated, so Excalidraw shows the change next time.
+- **Edit without opening the drawing.** Press `e`, change the text and save. The drawing itself is updated, so Excalidraw shows the change next time.
 
 ## Get started
 

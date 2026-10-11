@@ -6,7 +6,7 @@ from core import archives, search, excalidraw, favorites, checklist, editor
 from core.archives.vault import Vault, save_note
 from core.commands import HELP_SECTIONS
 from screens.help_screen import render_help
-from ui.interface import clear_screen, dim, pause, read_command, error_haptic, haptic
+from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
 from ui.note import render_note
 
@@ -74,7 +74,10 @@ def highlight(text, query):
 
 
 def _all(cases):
-    return [(0, c) for c in sorted(cases, key=lambda c: first_line(c).lower())]
+    pinned = favorites.resolve(cases)
+    ids = {id(c) for c in pinned}
+    rest = sorted((c for c in cases if id(c) not in ids), key=lambda c: first_line(c).lower())
+    return [(0, c) for c in [*pinned, *rest]]
 
 
 def _run(cases, text):
@@ -212,6 +215,23 @@ def open_case(results, number, query, rerun=True):
                 print(dim('  Editing not available for this case'))
                 pause()
                 continue
+            edited = editor.edit_text(case['text'])
+            if edited is None:
+                error('Could not open the editor')
+                continue
+            edited = edited.strip()
+            if not edited:
+                error('Empty text — edit cancelled')
+                continue
+            if edited == case['text'].strip():
+                continue
+            try:
+                _save(case, edited)
+                haptic('success')
+                results = _refresh(results, query, False)
+            except Exception as e:
+                error(f'Could not save: {e}')
+            continue
 
             original = case['text']
             edited = editor.edit_text(original)
