@@ -19,6 +19,8 @@ OPEN = [
      'isCompleted': False, 'listID': 'L1', 'listName': 'Work', 'priority': 'none'},
     {'id': 'A2', 'title': 'Buy milk', 'dueDate': '2026-10-12', 'dueDateIsAllDay': True,
      'isCompleted': False, 'listID': 'L2', 'listName': 'Дом🏡', 'priority': 'none'},
+    {'id': 'A2', 'title': 'Buy milk', 'dueDate': '2026-10-12', 'dueDateIsAllDay': True,
+     'isCompleted': False, 'listID': 'L2', 'listName': 'Дом🏡', 'priority': 'none', 'notes': ' 2 l '},
     {'id': 'A3', 'title': '  ', 'dueDateIsAllDay': False, 'isCompleted': False, 'listID': 'L1'},
     {'id': 'A4', 'title': 'Done one', 'dueDateIsAllDay': False, 'isCompleted': True, 'listID': 'L1'},
     {'title': 'no id'},
@@ -48,6 +50,42 @@ class RunJson(unittest.TestCase):
 
     def test_json(self):
         self.assertEqual(self._run(_done(0, '[1]')), [1])
+
+
+class RunOk(unittest.TestCase):
+    def _run(self, result, found=True):
+        with patch('core.sources.cli.shutil.which', return_value='/bin/x' if found else None), \
+             patch.object(cli.system, 'run', return_value=result):
+            return cli.run_ok('x')
+
+    def test_results(self):
+        self.assertFalse(self._run(_done(0, ''), found=False))
+        self.assertFalse(self._run(None))
+        self.assertFalse(self._run(_done(1, '')))
+        self.assertTrue(self._run(_done(0, '')))
+
+
+class Changes(unittest.TestCase):
+    def test_complete(self):
+        with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:
+            self.assertTrue(remindctl.complete('A1'))
+        run.assert_called_once_with('remindctl', 'complete', 'A1')
+
+    def test_add(self):
+        with patch.object(remindctl.cli, 'run_ok', return_value=False) as run:
+            self.assertFalse(remindctl.add('Buy milk', 'L2'))
+        run.assert_called_once_with('remindctl', 'add', 'Buy milk', '--list-id', 'L2')
+
+
+    def test_edit(self):
+        with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:
+            self.assertTrue(remindctl.edit('A1', title='New', notes=''))
+        run.assert_called_once_with('remindctl', 'edit', 'A1', '--title', 'New', '--notes', '')
+
+    def test_edit_nothing(self):
+        with patch.object(remindctl.cli, 'run_ok') as run:
+            self.assertTrue(remindctl.edit('A1'))
+        run.assert_not_called()
 
 
 class ParseTime(unittest.TestCase):
@@ -84,6 +122,8 @@ class Remindctl(unittest.TestCase):
         self.assertIsNone(items['A3']['due'])
         self.assertTrue(items['A4']['done'])
         self.assertEqual(items['A2']['list_name'], 'Дом🏡')
+        self.assertEqual(items['A2']['notes'], '2 l')
+        self.assertEqual(items['A3']['notes'], '')
 
     def test_not_a_list(self):
         self.assertIsNone(remindctl.parse_lists({'error': 1}))
@@ -128,3 +168,33 @@ class Selected(unittest.TestCase):
         self.assertFalse(sources.toggle_list('remindctl', 'L1'))
         self.assertEqual(sources.selected('remindctl'), [])
         self.assertEqual(self.store['operator_name'], 'me')
+
+
+    LISTS = [{'id': 'L1', 'title': 'A'}, {'id': 'L2', 'title': 'B'}, {'id': 'L3', 'title': 'C'}]
+
+    def test_default_falls_back_to_first_selected(self):
+        self.store = {'sources': {'remindctl': {'lists': ['L2', 'L3']}}}
+        self.assertEqual(sources.default('remindctl', self.LISTS), 'L2')
+
+    def test_default_none_without_lists(self):
+        self.assertIsNone(sources.default('remindctl', self.LISTS))
+
+    def test_stored_default(self):
+        self.store = {'sources': {'remindctl': {'lists': ['L1', 'L3'], 'default': 'L3'}}}
+        self.assertEqual(sources.default('remindctl', self.LISTS), 'L3')
+
+    def test_stored_default_gone_from_reminders(self):
+        self.store = {'sources': {'remindctl': {'lists': ['L1', 'L9'], 'default': 'L9'}}}
+        self.assertEqual(sources.default('remindctl', self.LISTS), 'L1')
+
+    def test_set_default_shows_hidden_list(self):
+        sources.set_default('remindctl', 'L2')
+        self.assertEqual(sources.selected('remindctl'), ['L2'])
+        self.assertEqual(sources.default('remindctl', self.LISTS), 'L2')
+
+    def test_hiding_default_clears_it(self):
+        sources.toggle_list('remindctl', 'L1')
+        sources.set_default('remindctl', 'L2')
+        sources.toggle_list('remindctl', 'L2')
+        self.assertNotIn('default', self.store['sources']['remindctl'])
+        self.assertEqual(sources.default('remindctl', self.LISTS), 'L1')

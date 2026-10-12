@@ -16,7 +16,7 @@ from core.settings import (
 )
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
-from ui.interface import clear_screen, dim, error, pause, read_command, show_menu
+from ui.interface import clear_screen, dim, error, pause, read_command, red, show_menu
 from pathlib import Path
 from ui.clean_path import clean_input_path
 from core import system
@@ -45,6 +45,12 @@ def settings_screen():
             return
 
 
+def _mark(path):
+    if not path:
+        return dim('—')
+    return dim('✓') if Path(path).exists() else red('not found')
+
+
 def archive_screen():
     while True:
         clear_screen()
@@ -55,11 +61,11 @@ def archive_screen():
         p3 = vault_path()
         p4 = keeper_model('server') or keeper_model('local')
         p5 = new_cases_path()
-        print(f'1) Excalidraw for Obsidian   {dim("✓") if p1 else dim("—")}')
-        print(f'2) Excalidraw                {dim("✓") if p2 else dim("—")}')
-        print(f'3) Vault                     {dim("✓") if p3 else dim("—")}')
+        print(f'1) Excalidraw for Obsidian   {_mark(p1)}')
+        print(f'2) Excalidraw                {_mark(p2)}')
+        print(f'3) Vault                     {_mark(p3)}')
         print(f'4) Keeper                    {dim("✓") if p4 else dim("—")}')
-        print(f'5) Notes                     {dim("✓") if p5 else dim("—")}')
+        print(f'5) Notes                     {_mark(p5)}')
         print()
         print(dim('  [number] open section   [b] back   [q] quit'))
         print()

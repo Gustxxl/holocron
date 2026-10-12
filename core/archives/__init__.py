@@ -1,6 +1,8 @@
 from .excalidraw_obsidian import ExcalidrawObsidian
 from .excalidraw_plain import ExcalidrawPlain
 from .vault import Vault
+from pathlib import Path
+from core.settings import archive_path, excalidraw_path, vault_path
 
 _ARCHIVES = [ExcalidrawObsidian(), ExcalidrawPlain(), Vault()]
 
@@ -40,3 +42,7 @@ def status():
             cases = arch.load_cases()
             info.append((arch.name, len(cases)))
     return info
+
+
+def missing():
+    return [p for p in (archive_path(), excalidraw_path(), vault_path()) if p and not Path(p).exists()]

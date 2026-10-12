@@ -40,6 +40,10 @@ def _can_write_note():
     return bool(folder) and Path(folder).is_dir() and editor.available()
 
 
+def _can_edit_reminder():
+    return remindctl.available() and editor.available()
+
+
 def _cmd_settings(raw):
     settings_screen()
 
@@ -128,6 +132,12 @@ HELP_SECTIONS = [
         HelpEntry('t',            'back to this week'),
         HelpEntry('+N / -N',      'jump N weeks ahead / back'),
         HelpEntry('type a date',  'open the week of that date, e.g. 14-11'),
+    ]),
+    ('Reminders', [
+        HelpEntry('[number]',     'open a reminder', remindctl.available),
+        HelpEntry('x number',     'mark a reminder done', remindctl.available),
+        HelpEntry('e',            'edit the open reminder', _can_edit_reminder),
+        HelpEntry('+ text #list', 'add a reminder; #list is optional', remindctl.available),
     ]),
     ('Commands', [HelpEntry(c.label, c.help, c.when) for c in COMMANDS if c.help]),
     ('Navigation', [

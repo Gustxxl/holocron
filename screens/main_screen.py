@@ -5,13 +5,12 @@ import shutil
 from core import archives
 from core.commands import lookup
 from core.settings import operator_name
+from core.sources import remindctl
 from core.updater import pending_update
 from screens.schedule_screen import duty_line
 from screens.search_screen import search_screen
-from ui.interface import clear_screen, dim, pause, read_command
-from core.sources import remindctl
 from screens.tasks_screen import summary
-
+from ui.interface import clear_screen, dim, pause, read_command
 
 APP_DIR = Path(__file__).resolve().parent.parent
 LOGO = APP_DIR / "ui" / "logo.txt"
@@ -33,7 +32,8 @@ def main_screen():
             continue
 
         if not archives.is_loaded():
-            print(dim('No archive set — add a path in settings.'))
+            hint = 'Archive not found — check settings.' if archives.missing() else 'No archive set — add a path in settings.'
+            print(dim(hint))
             pause()
             continue
         search_screen(raw)

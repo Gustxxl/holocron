@@ -25,6 +25,23 @@ def items():
     return parse_items(cli.run_json(PROGRAM, 'open', '--json'))
 
 
+def complete(task_id):
+    return cli.run_ok(PROGRAM, 'complete', task_id)
+
+
+def add(title, list_id):
+    return cli.run_ok(PROGRAM, 'add', title, '--list-id', list_id)
+
+
+def edit(task_id, title=None, notes=None):
+    args = []
+    if title is not None:
+        args += ['--title', title]
+    if notes is not None:
+        args += ['--notes', notes]
+    return cli.run_ok(PROGRAM, 'edit', task_id, *args) if args else True
+
+
 def parse_lists(data):
     if not isinstance(data, list):
         return None
@@ -48,5 +65,6 @@ def _task(raw):
         'all_day': raw.get('dueDateIsAllDay') is True,
         'list': raw.get('listID'),
         'list_name': str(raw.get('listName') or '').strip(),
+        'notes': str(raw.get('notes') or '').strip(),
         'done': raw.get('isCompleted') is True,
     }

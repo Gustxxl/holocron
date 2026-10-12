@@ -96,8 +96,11 @@ def search_screen(initial_query=None):
     cases = archives.cases()
     if not cases:
         clear_screen()
-        print('No scenes found.')
-        print(dim('Add an archive path in settings.'))
+        if archives.missing():
+            print('Archive not found — check settings.')
+        else:
+            print('No scenes found.')
+            print(dim('Add an archive path in settings.'))
         pause()
         return
 

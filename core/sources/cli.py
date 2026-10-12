@@ -10,17 +10,24 @@ def available(program):
     return shutil.which(program) is not None
 
 
-def run_json(program, *args, timeout=TIMEOUT):
+def _run(program, args, timeout):
     path = shutil.which(program)
-    if not path:
-        return None
-    out = system.run([path, *args], timeout=timeout)
+    return system.run([path, *args], timeout=timeout) if path else None
+
+
+def run_json(program, *args, timeout=TIMEOUT):
+    out = _run(program, args, timeout)
     if out is None or out.returncode != 0:
         return None
     try:
         return json.loads(out.stdout)
     except (TypeError, ValueError):
         return None
+
+
+def run_ok(program, *args, timeout=TIMEOUT):
+    out = _run(program, args, timeout)
+    return out is not None and out.returncode == 0
 
 
 def parse_time(value):
