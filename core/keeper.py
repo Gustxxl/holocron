@@ -5,6 +5,7 @@ import time
 import unicodedata
 import urllib.request
 import urllib.error
+import threading
 
 from core import search
 from core.settings import KEEPER_LOCAL_URL, keeper_server, keeper_model
@@ -19,7 +20,7 @@ MAX_REPLY = 300
 MAX_NOTE = 250
 GROUNDING_MIN = 0.5
 CHAT_TEMPERATURE = 0.3
-CACHE_SECONDS = 30
+CACHE_SECONDS = 300
 PROBE_TIMEOUT = 2
 
 SCOPES = {
@@ -161,16 +162,30 @@ def reset():
     _active.update(conn=None, at=0.0)
 
 
+def cached():
+    return bool(_active['at']) and time.monotonic() - _active['at'] < CACHE_SECONDS
+
+
+def _probe(conns):
+    states = [None] * len(conns)
+
+    def check(i, conn):
+        states[i] = status(conn)[0]
+
+    threads = [threading.Thread(target=check, args=(i, c), daemon=True) for i, c in enumerate(conns)]
+    for t in threads:
+        t.start()
+    deadline = time.monotonic() + PROBE_TIMEOUT
+    for t in threads:
+        t.join(max(0.0, deadline - time.monotonic()))
+    return next((c for c, s in zip(conns, states) if s == 'ready'), None)
+
+
 def active(refresh=False):
-    now = time.monotonic()
-    if not refresh and _active['at'] and now - _active['at'] < CACHE_SECONDS:
+    if not refresh and cached():
         return _active['conn']
-    chosen = None
-    for conn in connections():
-        if status(conn)[0] == 'ready':
-            chosen = conn
-            break
-    _active.update(conn=chosen, at=now)
+    chosen = _probe(connections())
+    _active.update(conn=chosen, at=time.monotonic())
     return chosen
 
 

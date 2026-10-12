@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import shutil
 import sys
@@ -15,6 +17,7 @@ HISTORY_TURNS = 4
 GREETING_ROW = 3
 
 LINES = {
+    'connecting': 'Connecting...',
     'ready': 'Awaiting your query...',
     'not_connected': 'No model connected. Search by words only. Settings > Archive > Keeper.',
     'unset': 'No model and no archive. Configure in settings > Archive.',
@@ -44,18 +47,18 @@ def _width():
 
 
 def _say(text):
-    print(textwrap.fill(text, width=_width(), initial_indent='  ',
-                        subsequent_indent='  ', break_long_words=False))
+    print(textwrap.fill(text, width=_width(), initial_indent='  ', subsequent_indent='  ',
+                        break_long_words=False, break_on_hyphens=False))
 
 
 def _aside(text):
-    print(dim(textwrap.fill(text, width=_width(), initial_indent='  ',
-                            subsequent_indent='  ', break_long_words=False)))
+    print(dim(textwrap.fill(text, width=_width(), initial_indent='  ', subsequent_indent='  ',
+                            break_long_words=False, break_on_hyphens=False)))
 
 
 def _quote(line, terms):
-    wrapped = textwrap.fill(line, width=_width(), initial_indent='  │ ',
-                            subsequent_indent='  │ ', break_long_words=False)
+    wrapped = textwrap.fill(line, width=_width(), initial_indent='  │ ', subsequent_indent='  │ ',
+                            break_long_words=False, break_on_hyphens=False)
     print(highlight(wrapped, terms))
 
 
@@ -209,11 +212,9 @@ def _print_answer(state):
     print()
 
 
-def _redraw(turns, pending=None):
-    clear_screen()
+def _draw(turns, pending, conn):
     print(dim('Keeper'))
     print()
-    conn = keeper.active(refresh=pending is None)
     rows = 0
     if conn is None:
         _say(LINES['not_connected'])
@@ -226,13 +227,31 @@ def _redraw(turns, pending=None):
             print(dim('  ' + note))
             rows += 1
         print()
-    print(dim('  [number] open record   [b] back   [h] help'))
+    nav = '  [number] open record   ' if any(t['sources'] for t in turns) else '  '
+    print(dim(nav + '[b] back   [h] help'))
     print()
     for turn in turns:
         print(f"Keeper> {turn['question']}")
         _print_answer(turn)
     if pending:
         print(f'Keeper> {pending}')
+    return rows
+
+
+def _redraw(turns, pending=None, refresh=False):
+    if refresh or not keeper.cached():
+        clear_screen()
+        print(dim('Keeper'))
+        print()
+        print(dim('  ' + LINES['connecting']))
+        keeper.active(refresh=True)
+    conn = keeper.active()
+    frame = io.StringIO()
+    with contextlib.redirect_stdout(frame):
+        rows = _draw(turns, pending, conn)
+    clear_screen()
+    sys.stdout.write(frame.getvalue())
+    sys.stdout.flush()
     return (conn['slot'] if conn else None), rows
 
 
@@ -265,7 +284,7 @@ def keeper_screen():
             via, greeting = _redraw(turns)
             continue
         if command == '':
-            via, greeting = _redraw(turns)
+            via, greeting = _redraw(turns, refresh=True)
             continue
         if command.isdigit():
             number = int(command)

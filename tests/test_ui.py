@@ -1,67 +1,71 @@
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import unittest
 
-from screens.search_screen import highlight, highlight_links, first_line
+from screens.search_screen import _wrap, first_line, highlight, highlight_links
 from ui.clean_path import clean_input_path
 
 
-class TestHighlight:
+class Highlight(unittest.TestCase):
     def test_highlights_match(self):
         result = highlight('hello world', 'hello')
-        assert '\033[' in result
-        assert 'hello' in result
+        self.assertIn('\033[', result)
+        self.assertIn('hello', result)
 
     def test_no_match_unchanged(self):
-        result = highlight('hello world', 'xyz')
-        assert result == 'hello world'
+        self.assertEqual(highlight('hello world', 'xyz'), 'hello world')
 
     def test_empty_query(self):
-        result = highlight('hello world', '')
-        assert result == 'hello world'
+        self.assertEqual(highlight('hello world', ''), 'hello world')
 
     def test_cyrillic(self):
-        result = highlight('привет мир', 'привет')
-        assert '\033[' in result
+        self.assertIn('\033[', highlight('привет мир', 'привет'))
 
 
-class TestHighlightLinks:
+class HighlightLinks(unittest.TestCase):
     def test_dims_url(self):
         result = highlight_links('see https://example.com here')
-        assert '\033[2m' in result
-        assert 'https://example.com' in result
+        self.assertIn('\033[2m', result)
+        self.assertIn('https://example.com', result)
 
     def test_no_url(self):
-        result = highlight_links('no links here')
-        assert result == 'no links here'
+        self.assertEqual(highlight_links('no links here'), 'no links here')
 
 
-class TestFirstLine:
+class FirstLine(unittest.TestCase):
     def test_normal(self):
-        assert first_line({'text': 'hello\nworld'}) == 'hello'
+        self.assertEqual(first_line({'text': 'hello\nworld'}), 'hello')
 
     def test_empty_first_line(self):
-        assert first_line({'text': '\nhello'}) == 'hello'
+        self.assertEqual(first_line({'text': '\nhello'}), 'hello')
 
     def test_empty_text(self):
-        assert first_line({'text': ''}) == '(empty)'
+        self.assertEqual(first_line({'text': ''}), '(empty)')
 
     def test_whitespace_only(self):
-        assert first_line({'text': '   \n   '}) == '(empty)'
+        self.assertEqual(first_line({'text': '   \n   '}), '(empty)')
 
 
-class TestCleanPath:
+class CleanPath(unittest.TestCase):
     def test_basic(self):
-        result = clean_input_path('/Users/test/file.md')
-        assert result == '/Users/test/file.md'
+        self.assertEqual(clean_input_path('/Users/test/file.md'), '/Users/test/file.md')
 
     def test_strips_quotes(self):
         result = clean_input_path('"~/file.md"')
-        assert '~' not in result or '/Users' in result
+        self.assertFalse(result.startswith('"'))
+        self.assertNotIn('~', result)
 
     def test_empty(self):
-        assert clean_input_path('') == ''
+        self.assertEqual(clean_input_path(''), '')
 
     def test_tilde(self):
-        result = clean_input_path('~/test')
-        assert '~' not in result
+        self.assertNotIn('~', clean_input_path('~/test'))
+
+
+class LongLinks(unittest.TestCase):
+    URL = 'https://example.com/docs/some-long-section/another-part/?ref=%2Fa%2Fb%2Fc-d%2Fe-f'
+
+    def test_url_stays_whole(self):
+        self.assertIn(self.URL, _wrap(f'See {self.URL} for details', 40).splitlines())
+
+    def test_hyphenated_words_not_split(self):
+        out = _wrap('word ' * 6 + 'one-two-three-four end', 20)
+        self.assertTrue(any('one-two-three-four' in ln for ln in out.splitlines()))

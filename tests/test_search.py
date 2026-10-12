@@ -1,6 +1,4 @@
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import unittest
 
 from core.search import _norm_words, score_case, search, suggest
 
@@ -9,108 +7,88 @@ def _case(text):
     return {'text': text, '_prep_for': None}
 
 
-class TestNormWords:
+class NormWords(unittest.TestCase):
     def test_basic(self):
-        assert _norm_words('hello world') == ['hello', 'world']
+        self.assertEqual(_norm_words('hello world'), ['hello', 'world'])
 
     def test_punctuation(self):
-        assert _norm_words('hello, world!') == ['hello', 'world']
+        self.assertEqual(_norm_words('hello, world!'), ['hello', 'world'])
 
     def test_empty(self):
-        assert _norm_words('') == []
+        self.assertEqual(_norm_words(''), [])
 
     def test_cyrillic(self):
         words = _norm_words('привет мир')
-        assert len(words) == 2
-        assert words[0] == 'привет'
+        self.assertEqual(len(words), 2)
+        self.assertEqual(words[0], 'привет')
 
     def test_mixed_digits(self):
-        words = _norm_words('test123')
-        assert len(words) >= 1
+        self.assertGreaterEqual(len(_norm_words('test123')), 1)
 
 
-class TestScoreCase:
+class ScoreCase(unittest.TestCase):
     def test_exact_match(self):
-        c = _case('hello world')
-        assert score_case(c, 'hello') > 0
+        self.assertGreater(score_case(_case('hello world'), 'hello'), 0)
 
     def test_no_match(self):
-        c = _case('hello world')
-        assert score_case(c, 'xyzxyz') == 0
+        self.assertEqual(score_case(_case('hello world'), 'xyzxyz'), 0)
 
     def test_empty_query(self):
-        c = _case('hello world')
-        assert score_case(c, '') == 0
+        self.assertEqual(score_case(_case('hello world'), ''), 0)
 
     def test_title_boost(self):
-        c1 = _case('hello\nsome body text\nextra line')
-        c2 = _case('extra line\nsome body text\nhello')
-        s1 = score_case(c1, 'hello')
-        s2 = score_case(c2, 'hello')
-        assert s1 >= s2
+        top = score_case(_case('hello\nsome body text\nextra line'), 'hello')
+        bottom = score_case(_case('extra line\nsome body text\nhello'), 'hello')
+        self.assertGreaterEqual(top, bottom)
 
     def test_phrase_match_boost(self):
         c = _case('the quick brown fox')
-        s_phrase = score_case(c, 'quick brown')
-        s_words = score_case(c, 'quick fox')
-        assert s_phrase > s_words
+        self.assertGreater(score_case(c, 'quick brown'), score_case(c, 'quick fox'))
 
     def test_fuzzy_match(self):
-        c = _case('configuration settings')
-        assert score_case(c, 'configuraton') > 0
+        self.assertGreater(score_case(_case('configuration settings'), 'configuraton'), 0)
 
     def test_short_word_exact_only(self):
         c = _case('the cat sat')
-        assert score_case(c, 'cat') > 0
-        assert score_case(c, 'cax') == 0
-
+        self.assertGreater(score_case(c, 'cat'), 0)
+        self.assertEqual(score_case(c, 'cax'), 0)
 
     def test_filename_matches(self):
         c = {'text': '## Summary of the day\neverything is ok', 'filename': '02 Jun 2026'}
-        assert score_case(c, '02 jun') > 0
-        assert 'filename' not in c['text']
-
+        self.assertGreater(score_case(c, '02 jun'), 0)
+        self.assertNotIn('filename', c['text'])
 
     def test_short_word_is_whole_token(self):
-        assert score_case(_case('план на 2026'), '02') == 0
-        assert score_case(_case('02 июня'), '02') > 0
-
+        self.assertEqual(score_case(_case('план на 2026'), '02'), 0)
+        self.assertGreater(score_case(_case('02 июня'), '02'), 0)
 
     def test_exact_title_wins_over_length(self):
         target = {'text': 'заметка\n' + 'длинный текст ' * 300, 'filename': '02 Jun 2026'}
         other = {'text': 'коротко', 'filename': '18 Jun 2026'}
-        assert score_case(target, '02 Jun 2026') > score_case(other, '02 Jun 2026')
+        self.assertGreater(score_case(target, '02 Jun 2026'), score_case(other, '02 Jun 2026'))
 
 
-class TestSearch:
+class Search(unittest.TestCase):
     def test_returns_sorted(self):
         cases = [_case('alpha beta'), _case('beta gamma'), _case('alpha beta gamma')]
         results = search(cases, 'alpha beta')
-        assert len(results) >= 1
+        self.assertGreaterEqual(len(results), 1)
         scores = [r[0] for r in results]
-        assert scores == sorted(scores, reverse=True)
+        self.assertEqual(scores, sorted(scores, reverse=True))
 
     def test_no_results(self):
-        cases = [_case('hello world')]
-        results = search(cases, 'xyzxyz')
-        assert results == []
+        self.assertEqual(search([_case('hello world')], 'xyzxyz'), [])
 
     def test_empty_cases(self):
-        assert search([], 'test') == []
+        self.assertEqual(search([], 'test'), [])
 
 
-class TestSuggest:
+class Suggest(unittest.TestCase):
     def test_typo_correction(self):
-        cases = [_case('конфигурация настройки')]
-        tips = suggest(cases, 'конфигураця')
-        assert len(tips) <= 1
+        self.assertLessEqual(len(suggest([_case('конфигурация настройки')], 'конфигураця')), 1)
 
     def test_garbage_no_suggestion(self):
-        cases = [_case('hello world test')]
-        tips = suggest(cases, 'zzzzzzzzz')
-        assert tips == []
+        self.assertEqual(suggest([_case('hello world test')], 'zzzzzzzzz'), [])
 
     def test_exact_no_suggestion(self):
-        cases = [_case('hello world')]
-        tips = suggest(cases, 'hello')
-        assert tips == []
+        self.assertEqual(suggest([_case('hello world')], 'hello'), [])

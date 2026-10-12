@@ -1,155 +1,118 @@
-import sys
 import json
+import os
 import tempfile
+import unittest
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.excalidraw import (
     strip_emoji, clean, decompress_from_base64, compress_to_base64,
-    load_cases, update_text, SceneError, _validate_md, _backup
+    update_text, SceneError, _validate_md, _backup,
 )
 
+BACKUPS = Path(__file__).resolve().parent.parent / 'data' / 'backups'
 
-class TestStripEmoji:
+
+def _temp(test, suffix, text=''):
+    fd, name = tempfile.mkstemp(suffix=suffix)
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        f.write(text)
+    path = Path(name)
+    test.addCleanup(path.unlink, missing_ok=True)
+    return path
+
+
+class StripEmoji(unittest.TestCase):
     def test_plain_text(self):
-        assert strip_emoji('hello world') == 'hello world'
+        self.assertEqual(strip_emoji('hello world'), 'hello world')
 
     def test_with_emoji(self):
         result = strip_emoji('hello 🌍 world')
-        assert 'hello' in result
-        assert 'world' in result
+        self.assertIn('hello', result)
+        self.assertIn('world', result)
 
     def test_preserves_newlines(self):
-        assert strip_emoji('line1\nline2') == 'line1\nline2'
+        self.assertEqual(strip_emoji('line1\nline2'), 'line1\nline2')
 
     def test_empty(self):
-        assert strip_emoji('') == ''
+        self.assertEqual(strip_emoji(''), '')
 
 
-class TestClean:
+class Clean(unittest.TestCase):
     def test_valid_utf8(self):
-        assert clean('hello') == 'hello'
+        self.assertEqual(clean('hello'), 'hello')
 
     def test_cyrillic(self):
-        assert clean('привет') == 'привет'
+        self.assertEqual(clean('привет'), 'привет')
 
 
-class TestCompression:
-    def test_round_trip_ascii(self):
-        original = '{"test": "hello world"}'
+class Compression(unittest.TestCase):
+    def _round_trip(self, original):
         compressed = compress_to_base64(original)
-        assert compressed
-        decompressed = decompress_from_base64(compressed)
-        assert decompressed == original
+        self.assertTrue(compressed)
+        self.assertEqual(decompress_from_base64(compressed), original)
+
+    def test_round_trip_ascii(self):
+        self._round_trip('{"test": "hello world"}')
 
     def test_round_trip_cyrillic(self):
-        original = '{"text": "привет мир"}'
-        compressed = compress_to_base64(original)
-        decompressed = decompress_from_base64(compressed)
-        assert decompressed == original
+        self._round_trip('{"text": "привет мир"}')
 
     def test_round_trip_long(self):
-        original = json.dumps({'elements': [{'id': str(i), 'text': f'item {i}'} for i in range(100)]})
-        compressed = compress_to_base64(original)
-        decompressed = decompress_from_base64(compressed)
-        assert decompressed == original
+        self._round_trip(json.dumps({'elements': [{'id': str(i), 'text': f'item {i}'} for i in range(100)]}))
 
     def test_empty(self):
-        assert compress_to_base64('') is not None
-        assert decompress_from_base64('') is None
+        self.assertIsNotNone(compress_to_base64(''))
+        self.assertIsNone(decompress_from_base64(''))
 
 
-class TestUpdateText:
-    def _write_scene(self, tmp, elements):
-        scene = {
-            'type': 'excalidraw',
-            'version': 2,
-            'elements': elements,
-            'appState': {},
-            'files': {}
-        }
-        tmp.write_text(json.dumps(scene, ensure_ascii=False), encoding='utf-8')
-        return tmp
+class UpdateText(unittest.TestCase):
+    def _scene(self, elements):
+        scene = {'type': 'excalidraw', 'version': 2, 'elements': elements, 'appState': {}, 'files': {}}
+        return _temp(self, '.excalidraw', json.dumps(scene, ensure_ascii=False))
 
     def test_update_existing_element(self):
-        with tempfile.NamedTemporaryFile(suffix='.excalidraw', mode='w', delete=False) as f:
-            path = Path(f.name)
-        elements = [
-            {'id': 'abc123', 'type': 'text', 'text': 'old text', 'originalText': 'old text'}
-        ]
-        self._write_scene(path, elements)
+        path = self._scene([{'id': 'abc123', 'type': 'text', 'text': 'old text', 'originalText': 'old text'}])
         update_text(str(path), 'abc123', 'new text')
-        scene = json.loads(path.read_text(encoding='utf-8'))
-        el = scene['elements'][0]
-        assert el['text'] == 'new text'
-        assert el['originalText'] == 'new text'
-        path.unlink()
+        el = json.loads(path.read_text(encoding='utf-8'))['elements'][0]
+        self.assertEqual(el['text'], 'new text')
+        self.assertEqual(el['originalText'], 'new text')
 
     def test_element_not_found(self):
-        with tempfile.NamedTemporaryFile(suffix='.excalidraw', mode='w', delete=False) as f:
-            path = Path(f.name)
-        elements = [
-            {'id': 'abc123', 'type': 'text', 'text': 'old', 'originalText': 'old'}
-        ]
-        self._write_scene(path, elements)
-        try:
+        path = self._scene([{'id': 'abc123', 'type': 'text', 'text': 'old', 'originalText': 'old'}])
+        with self.assertRaises(ValueError):
             update_text(str(path), 'nonexistent', 'new')
-            assert False, 'should have raised'
-        except ValueError:
-            pass
-        path.unlink()
 
     def test_does_not_modify_non_text(self):
-        with tempfile.NamedTemporaryFile(suffix='.excalidraw', mode='w', delete=False) as f:
-            path = Path(f.name)
-        elements = [
+        path = self._scene([
             {'id': 'rect1', 'type': 'rectangle', 'x': 0, 'y': 0},
-            {'id': 'txt1', 'type': 'text', 'text': 'keep', 'originalText': 'keep'}
-        ]
-        self._write_scene(path, elements)
-        try:
+            {'id': 'txt1', 'type': 'text', 'text': 'keep', 'originalText': 'keep'},
+        ])
+        with self.assertRaises(ValueError):
             update_text(str(path), 'rect1', 'hack')
-            assert False, 'should have raised'
-        except ValueError:
-            pass
-        scene = json.loads(path.read_text(encoding='utf-8'))
-        assert scene['elements'][0]['type'] == 'rectangle'
-        path.unlink()
+        self.assertEqual(json.loads(path.read_text(encoding='utf-8'))['elements'][0]['type'], 'rectangle')
 
 
-class TestValidateMd:
+class ValidateMd(unittest.TestCase):
     def test_valid_json(self):
-        md = '## Drawing\n```json\n{}\n```'
-        _validate_md(md)
+        _validate_md('## Drawing\n```json\n{}\n```')
 
     def test_valid_compressed(self):
-        md = '## Drawing\n```compressed-json\nABC\n```'
-        _validate_md(md)
+        _validate_md('## Drawing\n```compressed-json\nABC\n```')
 
     def test_missing_drawing(self):
-        try:
+        with self.assertRaises(SceneError):
             _validate_md('```json\n{}\n```')
-            assert False
-        except SceneError:
-            pass
 
     def test_missing_data(self):
-        try:
+        with self.assertRaises(SceneError):
             _validate_md('## Drawing\nno code block')
-            assert False
-        except SceneError:
-            pass
 
 
-class TestBackup:
+class Backup(unittest.TestCase):
     def test_creates_backup(self):
-        with tempfile.NamedTemporaryFile(suffix='.md', mode='w', delete=False, encoding='utf-8') as f:
-            f.write('test content')
-            path = Path(f.name)
+        path = _temp(self, '.md', 'test content')
+        bak = BACKUPS / path.name
+        self.addCleanup(bak.unlink, missing_ok=True)
         _backup(str(path))
-        backup_dir = Path(__file__).resolve().parent.parent / 'data' / 'backups'
-        bak = backup_dir / path.name
-        assert bak.exists()
-        assert bak.read_text(encoding='utf-8') == 'test content'
-        bak.unlink()
-        path.unlink()
+        self.assertTrue(bak.exists())
+        self.assertEqual(bak.read_text(encoding='utf-8'), 'test content')

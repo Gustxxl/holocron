@@ -8,6 +8,7 @@ from screens.help_screen import render_help
 from screens.settings_screen import settings_screen
 from ui.interface import clear_screen, pause
 from core.sources import remindctl
+from core import diagnostics
 
 
 HAS_CURSES = system.CURSES
@@ -108,6 +109,12 @@ def _cmd_waypoints(raw):
     waypoints_screen()
 
 
+def _cmd_check(raw):
+    from screens.diagnostics_screen import diagnostics_screen
+    diagnostics_screen()
+
+
+
 COMMANDS = [
     Command('keeper',     _cmd_keeper,     ('k', 'keep'), 'ask the archive in your own words'),
     Command('schedule',   _cmd_schedule,   ('sch',),      'shift schedule, week by week'),
@@ -117,6 +124,7 @@ COMMANDS = [
     Command('note',       _cmd_note,       (),            'write a new note', _can_write_note),
     Command('settings',   _cmd_settings,   ('s',),        'operator name / archives / schedule / Keeper'),
     Command('system',     _cmd_system,     ('sys',),      'show OS and version'),
+    Command('check',      _cmd_check,      (),            'run diagnostics and tests', diagnostics.available),
     Command('update',     _cmd_update,     (),            'fetch and apply a pending update'),
     Command('hyperspace', _cmd_hyperspace, ('hy',),       'go to hyperspace (any key to return)', _has_curses),
     Command('list',       _cmd_list,       ('l',)),

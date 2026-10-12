@@ -342,6 +342,7 @@ def show_list(results, page, query, page_size=PAGE, note=None):
             initial_indent=prefix,
             subsequent_indent=' ' * len(prefix),
             break_long_words=False,
+            break_on_hyphens=False,
         )
         print(highlight(wrapped, query))
         print()
@@ -431,5 +432,6 @@ def _wrap(text, width):
             width=width,
             subsequent_indent=indent,
             break_long_words=False,
+            break_on_hyphens=False,
         ))
     return '\n'.join(out)
