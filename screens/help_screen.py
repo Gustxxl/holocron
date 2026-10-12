@@ -24,3 +24,11 @@ def _row(name, desc, col, width):
     pad = " " * len(left)
     for cont in lines[1:]:
         print(pad + cont)
+
+
+def show_help():
+    from core.commands import HELP_SECTIONS
+    from ui.interface import clear_screen, pause
+    clear_screen()
+    render_help(HELP_SECTIONS)
+    pause()

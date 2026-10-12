@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
-from core import editor, sources, tasks
+from core import editor, sources, tasks, waypoints
+from screens.help_screen import show_help
 from ui.format import day_label
 from ui.interface import clear_screen, dim, error, haptic, is_back, pause, read_command, red
 
@@ -15,7 +16,7 @@ def tasks_screen(source):
         if found is None:
             _unreadable(source)
             return
-        chosen = sources.selected(source.KEY)
+        chosen = sources.selected(source. KEY)
         groups = [(title, items) for title, items in tasks.group(found, lists, chosen) if items]
         flat = tasks.numbered(groups)
         frame = '\n'.join(_frame(source, chosen, groups, datetime.now()))
@@ -27,11 +28,13 @@ def tasks_screen(source):
         if is_back(low):
             return
         if low in ('h', 'help'):
-            _help()
+            show_help()
         elif low in ('s', 'settings'):
             lists_screen(source)
-        elif command.startswith('+'):
-            _add(source, command[1:], lists, chosen)
+        elif low == 'a':
+            text = read_command('text> ')
+            if text:
+                _add(source, text, lists, chosen)
         elif check and 1 <= int(check.group(1)) <= len(flat):
             _complete(source, flat[int(check.group(1)) - 1])
         elif low.isdigit() and 1 <= int(low) <= len(flat):
@@ -104,21 +107,22 @@ def _frame(source, chosen, groups, now):
             lines.append(f'  {dim(str(n).rjust(digits))} ○ {_line(task, now)}')
         lines.append('')
     nav = '  [number] open   ' if n else '  '
-    lines += [dim(nav + '[s] lists   [b] back   [h] help'), '']
+    lines += [dim(nav + '[a] add   [s] lists   [b] back   [h] help'), '']
     return lines
 
 
 def _open(source, flat, number):
+    points = waypoints.load()
     while 1 <= number <= len(flat):
         task = flat[number - 1]
-        frame = '\n'.join(_card(task, number, len(flat), datetime.now()))
+        frame = '\n'.join(_card(task, number, len(flat), datetime.now(), points))
         clear_screen()
         print(frame)
         command = read_command('reminder> ').lower()
         if is_back(command):
             return
         if command in ('h', 'help'):
-            _help()
+            show_help()
         elif command == 'x':
             if _complete(source, task):
                 return
@@ -132,11 +136,14 @@ def _open(source, flat, number):
             number = int(command)
 
 
-def _card(task, number, total, now):
+def _card(task, number, total, now, points):
     lines = [dim(f'── {number}/{total}  {task.get("list_name", "")} ' + '─' * 20), '', task['title']]
     label = _label(task, now)
     if label:
         lines.append(label)
+    if task.get('place'):
+        name = waypoints.find(points, task['place'])
+        lines.append(dim(f'@{name}' if name else task['place']))
     if task.get('notes'):
         lines += ['', task['notes']]
     nav = '  [x] done   ' + ('[e] edit   ' if editor.available() else '')
@@ -174,18 +181,17 @@ def _edit(source, task):
 
 
 def _add(source, text, lists, chosen):
-    default = sources.default(source.KEY, lists)
-    title, list_id, problem = tasks.parse_add(text, lists, default)
+    draft, problem = tasks.parse_add(text, lists, sources.default(source.KEY, lists), waypoints.load())
     if problem:
         error(problem)
         return
-    if not source.add(title, list_id):
+    if not source.add(draft['title'], draft['list'], draft['place']):
         error('Could not add the reminder')
         return
-    if list_id in chosen:
+    if draft['list'] in chosen:
         haptic('success')
         return
-    name = next((l['title'] for l in lists if l['id'] == list_id), '')
+    name = next((l['title'] for l in lists if l['id'] == draft['list']), '')
     clear_screen()
     print(dim(f'Added to {name} — hidden in settings'))
     pause()
@@ -208,11 +214,3 @@ def _label(task, now):
 
 def _unreadable(source):
     error(source.HINT if not source.authorized() else f'Could not read {source.NAME}')
-
-
-def _help():
-    from core.commands import HELP_SECTIONS
-    from screens.help_screen import render_help
-    clear_screen()
-    render_help(HELP_SECTIONS)
-    pause()

@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 
 _TAG = re.compile(r'(?<!\S)#(\S+)')
+_PLACE = re.compile(r'(?<!\S)@(\S+)')
 
 
 def is_overdue(task, now=None):
@@ -32,25 +33,22 @@ def upcoming(items, selected, limit=3):
     return found[:limit], max(0, len(found) - limit)
 
 
-def parse_add(text, lists, default):
-    tags = _TAG.findall(text)
-    title = ' '.join(_TAG.sub(' ', text).split())
+def parse_add(text, lists, default, points=None):
+    tags, places = _TAG.findall(text), _PLACE.findall(text)
+    title = ' '.join(_PLACE.sub(' ', _TAG.sub(' ', text)).split())
     if not title:
-        return None, None, 'Type the reminder text'
+        return None, 'Type the reminder text'
     if len(tags) > 1:
-        return None, None, 'Use one #list'
-    if not tags:
-        if default is None:
-            return None, None, 'Choose lists in settings'
-        return title, default, None
-    key = _key(tags[0])
-    exact = [l for l in lists if _key(l['title']) == key]
-    found = exact or [l for l in lists if key and _key(l['title']).startswith(key)]
-    if not found:
-        return None, None, f'No list #{tags[0]}'
-    if len(found) > 1:
-        return None, None, f'#{tags[0]} matches several lists'
-    return title, found[0]['id'], None
+        return None, 'Use one #list'
+    if len(places) > 1:
+        return None, 'Use one @waypoint'
+    place = (points or {}).get(places[0].lower()) if places else None
+    if places and place is None:
+        return None, f'No waypoint @{places[0]}'
+    list_id, problem = _pick_list(tags[0] if tags else None, lists, default)
+    if problem:
+        return None, problem
+    return {'title': title, 'list': list_id, 'place': place}, None
 
 
 def to_text(task):
@@ -70,6 +68,19 @@ def changes(task, text):
     if notes != (task.get('notes') or ''):
         found['notes'] = notes
     return found
+
+
+def _pick_list(tag, lists, default):
+    if tag is None:
+        return (default, None) if default else (None, 'Choose lists in settings')
+    key = _key(tag)
+    exact = [l for l in lists if _key(l['title']) == key]
+    found = exact or [l for l in lists if key and _key(l['title']).startswith(key)]
+    if not found:
+        return None, f'No list #{tag}'
+    if len(found) > 1:
+        return None, f'#{tag} matches several lists'
+    return found[0]['id'], None
 
 
 def _key(text):

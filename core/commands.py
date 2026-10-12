@@ -103,10 +103,16 @@ def _cmd_reminders(raw):
     tasks_screen(remindctl)
 
 
+def _cmd_waypoints(raw):
+    from screens.waypoints_screen import waypoints_screen
+    waypoints_screen()
+
+
 COMMANDS = [
     Command('keeper',     _cmd_keeper,     ('k', 'keep'), 'ask the archive in your own words'),
     Command('schedule',   _cmd_schedule,   ('sch',),      'shift schedule, week by week'),
     Command('reminders',  _cmd_reminders,  ('r',),        'tasks from Apple Reminders', remindctl.available),
+    Command('waypoints',  _cmd_waypoints,  ('wp',),       'places for location reminders', remindctl.available),
     Command('favorites',  _cmd_favorites,  ('f', 'fav'),  'pinned records'),
     Command('note',       _cmd_note,       (),            'write a new note', _can_write_note),
     Command('settings',   _cmd_settings,   ('s',),        'operator name / archives / schedule / Keeper'),
@@ -137,7 +143,12 @@ HELP_SECTIONS = [
         HelpEntry('[number]',     'open a reminder', remindctl.available),
         HelpEntry('x number',     'mark a reminder done', remindctl.available),
         HelpEntry('e',            'edit the open reminder', _can_edit_reminder),
-        HelpEntry('+ text #list', 'add a reminder; #list is optional', remindctl.available),
+        HelpEntry('a',            'add a reminder; #list and @place are optional', remindctl.available),
+    ]),
+    ('Waypoints', [
+        HelpEntry('a',              'add a waypoint', remindctl.available),
+        HelpEntry('t',              'trigger on arrive / leave', remindctl.available),
+        HelpEntry('r number',       'geofence radius in meters', remindctl.available),
     ]),
     ('Commands', [HelpEntry(c.label, c.help, c.when) for c in COMMANDS if c.help]),
     ('Navigation', [

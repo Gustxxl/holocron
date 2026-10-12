@@ -92,39 +92,63 @@ class Upcoming(unittest.TestCase):
         self.assertEqual(tasks.upcoming([_task('a')], []), ([], 0))
 
 
+POINTS = {'home': {'address': 'Main 1', 'radius': 100, 'proximity': 'arriving'}}
+
+
 class ParseAdd(unittest.TestCase):
     def _add(self, text, default='L1'):
-        return tasks.parse_add(text, LISTS, default)
+        return tasks.parse_add(text, LISTS, default, POINTS)
+
+    def _ok(self, text, default='L1'):
+        draft, problem = self._add(text, default)
+        self.assertIsNone(problem)
+        return draft['title'], draft['list']
+
+    def _problem(self, text, default='L1'):
+        return self._add(text, default)[1]
 
     def test_default_list(self):
-        self.assertEqual(self._add(' Buy  bread '), ('Buy bread', 'L1', None))
+        self.assertEqual(self._ok(' Buy  bread '), ('Buy bread', 'L1'))
 
     def test_no_default(self):
-        self.assertEqual(self._add('Buy bread', None)[2], 'Choose lists in settings')
+        self.assertEqual(self._problem('Buy bread', None), 'Choose lists in settings')
 
     def test_exact_wins_over_prefix(self):
-        self.assertEqual(self._add('хлеб #Покупки')[:2], ('хлеб', 'L3'))
+        self.assertEqual(self._ok('хлеб #Покупки'), ('хлеб', 'L3'))
 
     def test_prefix_ignores_emoji_and_spaces(self):
-        self.assertEqual(self._add('хлеб #покупки_для')[:2], ('хлеб', 'L2'))
+        self.assertEqual(self._ok('хлеб #покупки_для'), ('хлеб', 'L2'))
 
     def test_tag_in_the_middle(self):
-        self.assertEqual(self._add('call #work bob')[:2], ('call bob', 'L1'))
+        self.assertEqual(self._ok('call #work bob'), ('call bob', 'L1'))
 
-    def test_hash_inside_word_is_text(self):
-        self.assertEqual(self._add('C# docs'), ('C# docs', 'L1', None))
+    def test_hash_and_at_inside_word_are_text(self):
+        self.assertEqual(self._ok('C# docs to a@b.com'), ('C# docs to a@b.com', 'L1'))
 
     def test_several_matches(self):
-        self.assertEqual(self._add('walk #pe')[2], '#pe matches several lists')
+        self.assertEqual(self._problem('walk #pe'), '#pe matches several lists')
 
     def test_unknown_list(self):
-        self.assertEqual(self._add('walk #zzz')[2], 'No list #zzz')
+        self.assertEqual(self._problem('walk #zzz'), 'No list #zzz')
 
     def test_empty_text(self):
-        self.assertEqual(self._add('  #work')[2], 'Type the reminder text')
+        self.assertEqual(self._problem('  #work @home'), 'Type the reminder text')
 
     def test_two_tags(self):
-        self.assertEqual(self._add('walk #work #pets')[2], 'Use one #list')
+        self.assertEqual(self._problem('walk #work #pets'), 'Use one #list')
+
+    def test_place(self):
+        draft, _ = self._add('bread @Home #work')
+        self.assertEqual((draft['title'], draft['list'], draft['place']), ('bread', 'L1', POINTS['home']))
+
+    def test_no_place(self):
+        self.assertIsNone(self._add('bread')[0]['place'])
+
+    def test_unknown_place(self):
+        self.assertEqual(self._problem('bread @gym'), 'No waypoint @gym')
+
+    def test_two_places(self):
+        self.assertEqual(self._problem('bread @home @home'), 'Use one @waypoint')
 
 
 class EditText(unittest.TestCase):

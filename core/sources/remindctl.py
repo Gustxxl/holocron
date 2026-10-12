@@ -29,8 +29,13 @@ def complete(task_id):
     return cli.run_ok(PROGRAM, 'complete', task_id)
 
 
-def add(title, list_id):
-    return cli.run_ok(PROGRAM, 'add', title, '--list-id', list_id)
+def add(title, list_id, place=None):
+    args = ['add', '--title', title, '--list-id', list_id]
+    if place:
+        args += ['--location', place['address'], '--radius', str(place['radius'])]
+        if place['proximity'] == 'leaving':
+            args.append('--leaving')
+    return cli.run_ok(PROGRAM, *args)
 
 
 def edit(task_id, title=None, notes=None):
@@ -58,6 +63,7 @@ def parse_items(data):
 def _task(raw):
     if not isinstance(raw, dict) or not isinstance(raw.get('id'), str):
         return None
+    trigger = raw.get('locationTrigger')
     return {
         'id': raw['id'],
         'title': str(raw.get('title') or '').strip() or '(untitled)',
@@ -66,5 +72,6 @@ def _task(raw):
         'list': raw.get('listID'),
         'list_name': str(raw.get('listName') or '').strip(),
         'notes': str(raw.get('notes') or '').strip(),
+        'place': str(trigger.get('address') or '').strip() if isinstance(trigger, dict) else '',
         'done': raw.get('isCompleted') is True,
     }

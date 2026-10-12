@@ -16,9 +16,9 @@ LISTS = [
 
 OPEN = [
     {'id': 'A1', 'title': 'Renew domain', 'dueDate': '2026-10-10T07:00:00Z', 'dueDateIsAllDay': False,
-     'isCompleted': False, 'listID': 'L1', 'listName': 'Work', 'priority': 'none'},
-    {'id': 'A2', 'title': 'Buy milk', 'dueDate': '2026-10-12', 'dueDateIsAllDay': True,
-     'isCompleted': False, 'listID': 'L2', 'listName': 'Дом🏡', 'priority': 'none'},
+     'isCompleted': False, 'listID': 'L1', 'listName': 'Work', 'priority': 'none',
+     'locationTrigger': {'address': ' Main 1 ', 'latitude': 1.0, 'longitude': 2.0,
+                         'radius': 100, 'proximity': 'arriving'}},
     {'id': 'A2', 'title': 'Buy milk', 'dueDate': '2026-10-12', 'dueDateIsAllDay': True,
      'isCompleted': False, 'listID': 'L2', 'listName': 'Дом🏡', 'priority': 'none', 'notes': ' 2 l '},
     {'id': 'A3', 'title': '  ', 'dueDateIsAllDay': False, 'isCompleted': False, 'listID': 'L1'},
@@ -65,29 +65,6 @@ class RunOk(unittest.TestCase):
         self.assertTrue(self._run(_done(0, '')))
 
 
-class Changes(unittest.TestCase):
-    def test_complete(self):
-        with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:
-            self.assertTrue(remindctl.complete('A1'))
-        run.assert_called_once_with('remindctl', 'complete', 'A1')
-
-    def test_add(self):
-        with patch.object(remindctl.cli, 'run_ok', return_value=False) as run:
-            self.assertFalse(remindctl.add('Buy milk', 'L2'))
-        run.assert_called_once_with('remindctl', 'add', 'Buy milk', '--list-id', 'L2')
-
-
-    def test_edit(self):
-        with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:
-            self.assertTrue(remindctl.edit('A1', title='New', notes=''))
-        run.assert_called_once_with('remindctl', 'edit', 'A1', '--title', 'New', '--notes', '')
-
-    def test_edit_nothing(self):
-        with patch.object(remindctl.cli, 'run_ok') as run:
-            self.assertTrue(remindctl.edit('A1'))
-        run.assert_not_called()
-
-
 class ParseTime(unittest.TestCase):
     def test_date_only(self):
         self.assertEqual(cli.parse_time('2026-10-12'), datetime(2026, 10, 12))
@@ -118,12 +95,14 @@ class Remindctl(unittest.TestCase):
         self.assertEqual(items['A2']['due'], datetime(2026, 10, 12))
         self.assertTrue(items['A2']['all_day'])
         self.assertEqual(items['A2']['list'], 'L2')
-        self.assertEqual(items['A3']['title'], '(untitled)')
-        self.assertIsNone(items['A3']['due'])
-        self.assertTrue(items['A4']['done'])
         self.assertEqual(items['A2']['list_name'], 'Дом🏡')
         self.assertEqual(items['A2']['notes'], '2 l')
+        self.assertEqual(items['A3']['title'], '(untitled)')
         self.assertEqual(items['A3']['notes'], '')
+        self.assertIsNone(items['A3']['due'])
+        self.assertTrue(items['A4']['done'])
+        self.assertEqual(items['A1']['place'], 'Main 1')
+        self.assertEqual(items['A2']['place'], '')
 
     def test_not_a_list(self):
         self.assertIsNone(remindctl.parse_lists({'error': 1}))
@@ -135,7 +114,38 @@ class Remindctl(unittest.TestCase):
             self.assertFalse(remindctl.available())
 
 
+class Changes(unittest.TestCase):
+    def test_complete(self):
+        with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:
+            self.assertTrue(remindctl.complete('A1'))
+        run.assert_called_once_with('remindctl', 'complete', 'A1')
+
+    def test_add(self):
+        with patch.object(remindctl.cli, 'run_ok', return_value=False) as run:
+            self.assertFalse(remindctl.add('Buy milk', 'L2'))
+        run.assert_called_once_with('remindctl', 'add', '--title', 'Buy milk', '--list-id', 'L2')
+
+    def test_add_place(self):
+        place = {'address': 'Main 1', 'radius': 50, 'proximity': 'leaving'}
+        with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:
+            remindctl.add('Lock up', 'L1', place)
+        run.assert_called_once_with('remindctl', 'add', '--title', 'Lock up', '--list-id', 'L1',
+                                    '--location', 'Main 1', '--radius', '50', '--leaving')
+
+    def test_edit(self):
+        with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:
+            self.assertTrue(remindctl.edit('A1', title='New', notes=''))
+        run.assert_called_once_with('remindctl', 'edit', 'A1', '--title', 'New', '--notes', '')
+
+    def test_edit_nothing(self):
+        with patch.object(remindctl.cli, 'run_ok') as run:
+            self.assertTrue(remindctl.edit('A1'))
+        run.assert_not_called()
+
+
 class Selected(unittest.TestCase):
+    LISTS = [{'id': 'L1', 'title': 'A'}, {'id': 'L2', 'title': 'B'}, {'id': 'L3', 'title': 'C'}]
+
     def setUp(self):
         self.store = {}
         load = patch.object(sources.config, 'load', side_effect=lambda: copy.deepcopy(self.store))
@@ -168,9 +178,6 @@ class Selected(unittest.TestCase):
         self.assertFalse(sources.toggle_list('remindctl', 'L1'))
         self.assertEqual(sources.selected('remindctl'), [])
         self.assertEqual(self.store['operator_name'], 'me')
-
-
-    LISTS = [{'id': 'L1', 'title': 'A'}, {'id': 'L2', 'title': 'B'}, {'id': 'L3', 'title': 'C'}]
 
     def test_default_falls_back_to_first_selected(self):
         self.store = {'sources': {'remindctl': {'lists': ['L2', 'L3']}}}
