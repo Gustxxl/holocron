@@ -81,6 +81,17 @@ def _check_path(path):
     return parts
 
 
+def _extract(tar, dest):
+    if hasattr(tarfile, 'data_filter'):
+        tar.extractall(dest, filter='data')
+        return
+    for member in tar.getmembers():
+        if not (member.isfile() or member.isdir()):
+            raise RuntimeError(f'unsafe entry in archive: {member.name}')
+        _check_path(member.name.rstrip('/'))
+    tar.extractall(dest)
+
+
 def _tree(sha):
     data = _api(TREE.format(sha=sha))
     if data.get('truncated'):
@@ -208,7 +219,7 @@ def update(restart=True):
     try:
         try:
             with tarfile.open(fileobj=io.BytesIO(blob)) as tar:
-                tar.extractall(tmp, filter='data')
+                _extract(tar, tmp)
             entries = os.listdir(tmp)
             if len(entries) != 1 or not os.path.isdir(os.path.join(tmp, entries[0])):
                 raise RuntimeError('unexpected archive layout')

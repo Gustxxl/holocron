@@ -1,3 +1,8 @@
+import sys
+
+if sys.version_info < (3, 12):
+    sys.exit(f'Holocron needs Python 3.12+, found {sys.version.split()[0]}. Install a newer Python and run install.py again.')
+
 from core.check_requirements import ensure_environment
 ensure_environment()
 

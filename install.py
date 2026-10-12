@@ -3,6 +3,11 @@ import stat
 import sys
 from pathlib import Path
 
+
+if sys.version_info < (3, 12):
+    sys.exit(f'Holocron needs Python 3.12+, found {sys.version.split()[0]}. Run install.py with a newer Python.')
+
+
 APP_DIR = Path(__file__).resolve().parent
 MAIN = APP_DIR / 'main.py'
 NAME = 'holo'
