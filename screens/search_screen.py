@@ -3,7 +3,7 @@ import difflib
 import shutil
 import textwrap
 from pathlib import Path
-from core import archives, search, excalidraw, favorites, checklist, editor
+from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks
 from core.archives.vault import Vault, save_note, create_note
 from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path
@@ -23,6 +23,16 @@ MIN_QUERY = 3
 
 _URL_RE = re.compile(r'https?://\S+')
 _CHECK_RE = re.compile(r'x\s*(\d+)')
+_JUMP_RE = re.compile(r'j\s*(\d*)')
+_LINK_RE = re.compile('\xa0\x03(\\d+)\x04')
+
+
+def _link_mark(shown, n):
+    return f'{shown}\xa0\x03{n}\x04'
+
+
+def _marks(text):
+    return _LINK_RE.sub(lambda m: ' ' + dim(f'[{m.group(1)}]'), text)
 
 
 def highlight_links(text):
@@ -231,10 +241,10 @@ def _save(case, text):
     case['text'] = text
 
 
-def open_case(results, number, query, rerun=True):
+def open_case(results, number, query, rerun=True, trail=()):
     while 1 <= number <= len(results):
         case = results[number - 1][1]
-        show_case(case, query, number, len(results))
+        jumps = show_case(case, query, number, len(results), trail)
         command = read_command('case> ')
         low = command.lower()
 
@@ -277,6 +287,16 @@ def open_case(results, number, query, rerun=True):
             except Exception as e:
                 print(f'  Error: {e}')
                 pause(feedback='error')
+            continue
+        m = _JUMP_RE.fullmatch(low)
+        if m:
+            n = int(m.group(1)) if m.group(1) else (1 if len(jumps) == 1 else 0)
+            if 1 <= n <= len(jumps):
+                target = [(0, c) for c in jumps[n - 1]]
+                new_query = open_case(target, 1, '', rerun=False, trail=(*trail, first_line(case)))
+                if new_query:
+                    return new_query
+                results = _refresh(results, query, False)
             continue
 
         if low in ('l', 'list'):
@@ -356,7 +376,7 @@ def show_list(results, page, query, page_size=PAGE, note=None):
     return page
 
 
-def show_case(case, query='', number=None, total=None):
+def show_case(case, query='', number=None, total=None, trail=()):
     clear_screen()
     name = case.get('source', '')
     for suffix in ('.excalidraw.md', '.excalidraw', '.md'):
@@ -366,7 +386,7 @@ def show_case(case, query='', number=None, total=None):
     archive = case.get('archive', '')
     pinned = favorites.is_pinned(case)
 
-    text = case['text'].strip()
+    text, jumps = wikilinks.numbered(case['text'].strip(), archives.cases(), _link_mark)
     lines = text.splitlines()
     first = next((ln.strip() for ln in lines if ln.strip()), '')
     if case.get('filename'):
@@ -382,20 +402,24 @@ def show_case(case, query='', number=None, total=None):
     label = f'{name} ({archive})' if name else f'({archive})'
     mark = ' · pinned' if pinned else ''
     asked = f'  "{query}"' if query else ''
+    if trail:
+        print(dim(' › '.join(trail)))
     print(dim(f'── {pos}{label}{mark}{asked} ' + '─' * 20))
     print()
-    print(highlight(highlight_links(_wrap(links(title), width)), query))
+    print(_marks(highlight(highlight_links(_wrap(links(title), width)), query)))
     if body:
         if case.get('filename'):
             rendered = render_note(body, width)
         else:
             rendered = render_tables(_wrap(code_blocks(links(body)), width), width)
         print()
-        print(paint_code(highlight(highlight_links(rendered), query)))
+        print(_marks(paint_code(highlight(highlight_links(rendered), query))))
     print()
     nav = '  [e] edit   ' if editor.available() else '  '
     if case.get('filename') and checklist.count(case['text']):
         nav += '[x number] check   '
+    if jumps:
+        nav += '[j number] jump   ' if len(jumps) > 1 else '[j] jump   '
     if case.get('filepath'):
         nav += '[f] unpin   ' if pinned else '[f] pin   '
     nav += '[n] next   ' if number and number < total else ''
@@ -403,6 +427,7 @@ def show_case(case, query='', number=None, total=None):
     nav += '[b] back   [h] help'
     print(dim(nav))
     print()
+    return jumps
 
 
 def first_line(case):

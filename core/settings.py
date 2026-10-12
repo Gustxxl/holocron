@@ -59,10 +59,24 @@ def vault_path():
 
 def update_vault_path(new_path):
     cfg = load()
-    cfg['vault_path'] = clean_input_path(new_path)
+    cleaned = clean_input_path(new_path)
+    if cleaned != cfg.get('vault_path'):
+        cfg['vault_exclude'] = []
+    cfg['vault_path'] = cleaned
     save(cfg)
     clear_screen()
     print('Success')
+
+
+def vault_exclude():
+    items = load().get('vault_exclude')
+    return [p for p in items if isinstance(p, str) and p] if isinstance(items, list) else []
+
+
+def update_vault_exclude(items):
+    cfg = load()
+    cfg['vault_exclude'] = items
+    save(cfg)
 
 
 def new_cases_path():

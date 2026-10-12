@@ -17,7 +17,7 @@ HISTORY_TURNS = 4
 GREETING_ROW = 3
 
 LINES = {
-    'connecting': 'Connecting...',
+    'connecting': 'Waking Keeper...',
     'ready': 'Awaiting your query...',
     'not_connected': 'No model connected. Search by words only. Settings > Archive > Keeper.',
     'unset': 'No model and no archive. Configure in settings > Archive.',

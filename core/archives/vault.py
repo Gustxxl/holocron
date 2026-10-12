@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from core.settings import vault_path, new_cases_path
+from core.settings import vault_path, new_cases_path, vault_exclude
 from .base import Archive
 
 NAME_MAX = 80
@@ -38,6 +38,39 @@ def create_note(folder, text):
     return None
 
 
+def relative(folder):
+    vault = vault_path()
+    if not vault or not folder:
+        return None
+    root = Path(vault).resolve()
+    path = Path(folder).expanduser()
+    path = (path if path.is_absolute() else root / path).resolve()
+    if path == root or not path.is_dir() or not path.is_relative_to(root):
+        return None
+    return path.relative_to(root).as_posix()
+
+
+def folders(root, skip, cases):
+    base = Path(root)
+    try:
+        top = [p.name for p in base.iterdir() if p.is_dir() and not p.name.startswith('.')]
+    except OSError:
+        top = []
+    counts = {}
+    for case in cases:
+        path = Path(case.get('filepath') or '')
+        if case.get('archive') == Vault.name and path.is_relative_to(base):
+            parts = path.relative_to(base).parts
+            if len(parts) > 1:
+                counts[parts[0]] = counts.get(parts[0], 0) + 1
+    names = sorted({*top, *skip}, key=str.casefold)
+    return [(n, None if n in skip else counts.get(n, 0)) for n in names]
+
+
+def _skipped(rel, rules):
+    return any(p.startswith('.') for p in rel.parts) or any(rel.parts[:len(r)] == r for r in rules)
+
+
 def _roots():
     return [p for p in (vault_path(), new_cases_path()) if p and Path(p).is_dir()]
 
@@ -55,14 +88,20 @@ class Vault(Archive):
 
     def load(self):
         roots = _roots()
+        vault = Path(vault_path()).resolve() if vault_path() else None
+        rules = [Path(p).parts for p in vault_exclude()]
         self._cases, seen = [], set()
         for root in roots:
+            base = Path(root)
+            own = rules if base.resolve() == vault else []
             try:
-                files = sorted(Path(root).rglob('*.md'))
+                files = sorted(base.rglob('*.md'))
             except OSError:
                 continue
             for f in files:
                 try:
+                    if _skipped(f.relative_to(base), own):
+                        continue
                     key = f.resolve()
                     if key in seen:
                         continue

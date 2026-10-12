@@ -47,6 +47,31 @@ class Dispatch(unittest.TestCase):
         self.assertEqual([c.args for c in search.call_args_list], [('nginx',), ('redis',)])
         settings.assert_called_once()
 
+    def test_back_does_nothing(self):
+        search, settings = self._run('b', 'back', 'B')
+        search.assert_not_called()
+        settings.assert_not_called()
+
+    def test_home_from_inner_screen(self):
+        with patch.object(main, '_frame', return_value=[]), \
+             patch.object(main, 'clear_screen'), \
+             patch('builtins.print'), \
+             patch.object(main.archives, 'is_loaded', return_value=True), \
+             patch.object(main, 'read_command', side_effect=['nginx', 'redis', _Stop()]), \
+             patch.object(main, 'search_screen', side_effect=[main.Home(), None]) as search:
+            with self.assertRaises(_Stop):
+                main.main_screen()
+        self.assertEqual([c.args for c in search.call_args_list], [('nginx',), ('redis',)])
+
+    def test_home_on_main_redraws(self):
+        with patch.object(main, '_frame', return_value=[]) as frame, \
+             patch.object(main, 'clear_screen'), \
+             patch('builtins.print'), \
+             patch.object(main, 'read_command', side_effect=[main.Home(), _Stop()]):
+            with self.assertRaises(_Stop):
+                main.main_screen()
+        self.assertEqual(frame.call_count, 2)
+
 
 class Frame(unittest.TestCase):
     def test_frame_ready_before_clear(self):

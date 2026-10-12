@@ -9,6 +9,7 @@ from screens.settings_screen import settings_screen
 from ui.interface import clear_screen, pause
 from core.sources import remindctl
 from core import diagnostics
+from core import archives, editor, system
 
 
 HAS_CURSES = system.CURSES
@@ -79,6 +80,11 @@ def _cmd_note(raw):
     create_case()
 
 
+def _cmd_tree(raw):
+    from screens.tree_screen import tree_screen
+    tree_screen()
+
+
 def _cmd_keeper(raw):
     from screens.keeper_screen import keeper_screen
     keeper_screen()
@@ -121,6 +127,7 @@ COMMANDS = [
     Command('reminders',  _cmd_reminders,  ('r',),        'tasks from Apple Reminders', remindctl.available),
     Command('waypoints',  _cmd_waypoints,  ('wp',),       'places for location reminders', remindctl.available),
     Command('favorites',  _cmd_favorites,  ('f', 'fav'),  'pinned records'),
+    Command('tree',       _cmd_tree,       (),            'browse the archive by folder', archives.is_loaded),
     Command('note',       _cmd_note,       (),            'write a new note', _can_write_note),
     Command('settings',   _cmd_settings,   ('s',),        'operator name / archives / schedule / Keeper'),
     Command('system',     _cmd_system,     ('sys',),      'show OS and version'),
@@ -140,6 +147,7 @@ HELP_SECTIONS = [
         HelpEntry('e',            'edit the open case', editor.available),
         HelpEntry('f',            'pin / unpin the open case'),
         HelpEntry('x number',     'check / uncheck a task in the open note'),
+        HelpEntry('j number', 'jump to a linked note'),
     ]),
     ('Schedule', [
         HelpEntry('n / p',        'next / previous week'),
@@ -161,6 +169,7 @@ HELP_SECTIONS = [
     ('Commands', [HelpEntry(c.label, c.help, c.when) for c in COMMANDS if c.help]),
     ('Navigation', [
         HelpEntry('b',     'back to previous screen'),
+        HelpEntry('w',     'back to the main screen'),
         HelpEntry('Enter', 'refresh the current screen'),
         HelpEntry('q',     'quit'),
     ]),

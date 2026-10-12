@@ -23,6 +23,10 @@ def bold(text):
     return f"\033[1m{text}\033[0m"
 
 
+class Home(BaseException):
+    pass
+
+
 def clear_screen():
     if system.IS_WINDOWS:
         os.system('cls')
@@ -141,6 +145,8 @@ def read_command(prompt='> '):
         line = f'{line} {extra}'.strip()
     if line.lower() in ('q', 'quit', 'exit'):
         quit_app()
+    if line.lower() == 'w':
+        raise Home
     return line
 
 

@@ -10,7 +10,7 @@ from core.updater import pending_update
 from screens.schedule_screen import duty_line
 from screens.search_screen import search_screen
 from screens.tasks_screen import summary
-from ui.interface import clear_screen, dim, pause, read_command
+from ui.interface import clear_screen, dim, pause, read_command, Home
 
 APP_DIR = Path(__file__).resolve().parent.parent
 LOGO = APP_DIR / "ui" / "logo.txt"
@@ -22,21 +22,25 @@ def main_screen():
         frame = '\n'.join(_frame())
         clear_screen()
         print(frame)
-        raw = read_command('system> ')
-        if raw == '':
+        try:
+            _handle(read_command('system> '))
+        except Home:
             continue
 
-        command = lookup(raw)
-        if command:
-            command.run(raw)
-            continue
 
-        if not archives.is_loaded():
-            hint = 'Archive not found — check settings.' if archives.missing() else 'No archive set — add a path in settings.'
-            print(dim(hint))
-            pause()
-            continue
-        search_screen(raw)
+def _handle(raw):
+    if raw.strip().lower() in ('', 'b', 'back'):
+        return
+    command = lookup(raw)
+    if command:
+        command.run(raw)
+        return
+    if not archives.is_loaded():
+        hint = 'Archive not found — check settings.' if archives.missing() else 'No archive set — add a path in settings.'
+        print(dim(hint))
+        pause()
+        return
+    search_screen(raw)
 
 
 def _frame():

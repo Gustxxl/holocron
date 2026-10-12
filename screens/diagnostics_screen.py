@@ -14,7 +14,7 @@ def diagnostics_screen():
             return
         haptic('error' if report['failed'] else 'success')
         if keeper.configured():
-            print(dim('  Connecting...'))
+            print(dim('  Checking Keeper...'))
         head, rows = diagnostics.system_info()
         while True:
             frame = '\n'.join(_frame(report, head, rows))

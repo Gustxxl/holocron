@@ -13,6 +13,8 @@ from core.settings import (
     keeper_model,
     update_keeper_server,
     update_keeper_model,
+    vault_exclude,
+    update_vault_exclude
 )
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
@@ -23,6 +25,7 @@ from core import system
 from core.sources import remindctl
 from screens.tasks_screen import lists_screen
 import sys
+from core.archives.vault import folders, relative
 
 
 _SOURCES = [remindctl]
@@ -189,7 +192,57 @@ def _folder_screen(title, current, update, hint):
 
 
 def vault_screen():
-    _folder_screen('Vault', vault_path, update_vault_path, 'set vault folder')
+    while True:
+        current, skip = vault_path(), vault_exclude()
+        rows = folders(current, skip, archives.cases()) if current else []
+        clear_screen()
+        print(dim('Settings > Archive > Vault'))
+        print()
+        _print_path(current)
+        if rows:
+            print()
+            digits = len(str(len(rows)))
+            col = max(len(n) for n, _ in rows)
+            for i, (name, count) in enumerate(rows, 1):
+                info = dim('excluded') if count is None else dim(str(count)) if count else ''
+                print(f'  {dim(str(i).rjust(digits))} {name.ljust(col)}   {info}'.rstrip())
+        print()
+        nav = '  [number] exclude / include   [a] exclude folder   ' if current else '  '
+        print(dim(nav + '[enter path] set vault folder   [c] clear   [b] back'))
+        print()
+        command = read_command('path> ')
+        if command == 'b':
+            return
+        if command == '':
+            continue
+        if command.isdigit() and 1 <= int(command) <= len(rows):
+            name = rows[int(command) - 1][0]
+            update_vault_exclude([p for p in skip if p != name] if name in skip else [*skip, name])
+            archives.load()
+            continue
+        if command == 'a' and current:
+            raw = read_command('folder> ')
+            if not raw:
+                continue
+            rel = relative(clean_input_path(raw))
+            if rel is None:
+                error('Folder must be inside the vault.')
+                continue
+            if rel not in skip:
+                update_vault_exclude([*skip, rel])
+                archives.load()
+            continue
+        if command == 'c':
+            update_vault_path('')
+        else:
+            cleaned = clean_input_path(command)
+            if not Path(cleaned).is_dir():
+                error('Path must be an existing folder.')
+                continue
+            update_vault_path(cleaned)
+        archives.load()
+        pause()
+        return
 
 
 def notes_screen():
