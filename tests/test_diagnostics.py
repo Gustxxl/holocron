@@ -52,3 +52,27 @@ class Run(unittest.TestCase):
         self.assertTrue(diagnostics.available())
         with patch.object(diagnostics, 'TESTS', Path('/nonexistent/tests')):
             self.assertFalse(diagnostics.available())
+
+
+class Reason(unittest.TestCase):
+    def test_assertion_with_diff(self):
+        tb = ('Traceback (most recent call last):\n'
+              '  File "t.py", line 3, in test_x\n'
+              '    self.assertEqual(a, b)\n'
+              '    ~~~~~~~~~~~~~~~~^^^^^^\n'
+              "AssertionError: 'a' != 'b'\n"
+              '- a\n'
+              '+ b\n'
+              '? ^\n')
+        self.assertEqual(diagnostics.reason(tb), "AssertionError: 'a' != 'b'")
+
+    def test_import_error(self):
+        tb = ('ImportError: Failed to import test module: test_x\n'
+              'Traceback (most recent call last):\n'
+              '  File "loader.py", line 1, in find\n'
+              '    __import__(name)\n'
+              "NameError: name 'x' is not defined\n")
+        self.assertEqual(diagnostics.reason(tb), "NameError: name 'x' is not defined")
+
+    def test_empty(self):
+        self.assertEqual(diagnostics.reason(''), '')

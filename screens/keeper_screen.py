@@ -239,7 +239,7 @@ def _draw(turns, pending, conn):
 
 
 def _redraw(turns, pending=None, refresh=False):
-    if refresh or not keeper.cached():
+    if (refresh or not keeper.cached()) and keeper.configured():
         clear_screen()
         print(dim('Keeper'))
         print()

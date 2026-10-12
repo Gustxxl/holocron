@@ -181,10 +181,15 @@ def _probe(conns):
     return next((c for c, s in zip(conns, states) if s == 'ready'), None)
 
 
+def configured():
+    return [c for c in connections() if c.get('model')]
+
+
 def active(refresh=False):
     if not refresh and cached():
         return _active['conn']
-    chosen = _probe(connections())
+    conns = configured()
+    chosen = _probe(conns) if conns else None
     _active.update(conn=chosen, at=time.monotonic())
     return chosen
 

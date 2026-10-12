@@ -73,3 +73,10 @@ def system_info():
     ]
     head = f'{system.OS} {system.version()} ({platform.machine()})   Python {platform.python_version()}'
     return head, rows
+
+
+def reason(tb):
+    lines = tb.rstrip().splitlines()
+    start = max((i for i, ln in enumerate(lines) if ln.startswith('  File ')), default=-1)
+    return next((ln for ln in lines[start + 1:] if ln.strip() and not ln.startswith(' ')),
+                lines[-1] if lines else '')

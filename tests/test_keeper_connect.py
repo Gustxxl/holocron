@@ -62,3 +62,12 @@ class Probe(unittest.TestCase):
             keeper.active(refresh=True)
         keeper.reset()
         self.assertFalse(keeper.cached())
+
+
+    def test_nothing_configured_no_probe(self):
+        bare = [dict(SERVER, model=None), dict(LOCAL, model='')]
+        with patch.object(keeper, 'connections', return_value=bare), \
+             self._status({'server': 'ready', 'local': 'ready'}):
+            self.assertIsNone(keeper.active(refresh=True))
+        self.assertEqual(self.calls, 0)
+        self.assertTrue(keeper.cached())

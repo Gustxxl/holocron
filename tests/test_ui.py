@@ -2,6 +2,7 @@ import unittest
 
 from screens.search_screen import _wrap, first_line, highlight, highlight_links
 from ui.clean_path import clean_input_path
+import os
 
 
 class Highlight(unittest.TestCase):
@@ -46,7 +47,7 @@ class FirstLine(unittest.TestCase):
 
 class CleanPath(unittest.TestCase):
     def test_basic(self):
-        self.assertEqual(clean_input_path('/Users/test/file.md'), '/Users/test/file.md')
+        self.assertEqual(clean_input_path('/Users/test/file.md'), os.path.normpath('/Users/test/file.md'))
 
     def test_strips_quotes(self):
         result = clean_input_path('"~/file.md"')

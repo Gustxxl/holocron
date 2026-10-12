@@ -1,6 +1,6 @@
 import shutil
 import sys
-from core import archives, diagnostics
+from core import archives, diagnostics, keeper
 from screens.help_screen import show_help
 from ui.interface import clear_screen, dim, haptic, is_back, pause, read_command, red
 
@@ -13,7 +13,8 @@ def diagnostics_screen():
         if report is None:
             return
         haptic('error' if report['failed'] else 'success')
-        print(dim('  Connecting...'))
+        if keeper.configured():
+            print(dim('  Connecting...'))
         head, rows = diagnostics.system_info()
         while True:
             frame = '\n'.join(_frame(report, head, rows))
@@ -68,7 +69,7 @@ def _frame(report, head, rows):
         lines.append('')
         digits = len(str(len(report['failed'])))
         for i, (label, tb) in enumerate(report['failed'], 1):
-            last = next((ln for ln in reversed(tb.strip().splitlines()) if ln.strip()), '')
+            lines += [f'  {dim(str(i).rjust(digits))} {label}', dim(f'    {diagnostics.reason(tb)}')]
             lines += [f'  {dim(str(i).rjust(digits))} {label}', dim(f'    {last.strip()}')]
     nav = '  [number] details   ' if report['failed'] else '  '
     lines += ['', dim(nav + '[↵] again   [b] back   [h] help'), '']
