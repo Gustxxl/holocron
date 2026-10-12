@@ -7,6 +7,8 @@ from core.settings import (
     update_excalidraw_path,
     vault_path,
     update_vault_path,
+    new_cases_path,
+    update_new_cases_path,
     keeper_server,
     keeper_model,
     update_keeper_server,
@@ -18,12 +20,18 @@ from ui.interface import clear_screen, dim, error, pause, read_command, show_men
 from pathlib import Path
 from ui.clean_path import clean_input_path
 from core import system
+from core.sources import remindctl
+from screens.tasks_screen import lists_screen
 import sys
+
+
+_SOURCES = [remindctl]
 
 
 def settings_screen():
     while True:
-        show_menu('Settings', ['User', 'Archive', 'Schedule'])
+        extra = [s for s in _SOURCES if s.available()]
+        show_menu('Settings', ['User', 'Archive', 'Schedule', *(s.NAME for s in extra)])
         command = read_command('settings> ')
         if command == '1':
             user_screen()
@@ -31,6 +39,8 @@ def settings_screen():
             archive_screen()
         elif command == '3':
             schedule_settings()
+        elif command.isdigit() and 4 <= int(command) < 4 + len(extra):
+            lists_screen(extra[int(command) - 4])
         elif command == 'b':
             return
 
@@ -44,10 +54,12 @@ def archive_screen():
         p2 = excalidraw_path()
         p3 = vault_path()
         p4 = keeper_model('server') or keeper_model('local')
+        p5 = new_cases_path()
         print(f'1) Excalidraw for Obsidian   {dim("✓") if p1 else dim("—")}')
         print(f'2) Excalidraw                {dim("✓") if p2 else dim("—")}')
         print(f'3) Vault                     {dim("✓") if p3 else dim("—")}')
         print(f'4) Keeper                    {dim("✓") if p4 else dim("—")}')
+        print(f'5) Notes                     {dim("✓") if p5 else dim("—")}')
         print()
         print(dim('  [number] open section   [b] back   [q] quit'))
         print()
@@ -60,6 +72,8 @@ def archive_screen():
             vault_screen()
         elif command == '4':
             keeper_screen()
+        elif command == '5':
+            notes_screen()
         elif command == 'b':
             return
 
@@ -143,31 +157,37 @@ def excalidraw_plain_screen():
         return
 
 
-def vault_screen():
+def _folder_screen(title, current, update, hint):
     while True:
         clear_screen()
-        print(dim('Settings > Archive > Vault'))
+        print(dim(f'Settings > Archive > {title}'))
         print()
-        _print_path(vault_path())
+        _print_path(current())
         print()
-        print(dim('  [enter path] set vault folder   [c] clear   [b] back'))
+        print(dim(f'  [enter path] {hint}   [c] clear   [b] back'))
         print()
         command = read_command('path> ')
         if command == 'b':
             return
         if command == 'c':
-            update_vault_path('')
-            archives.load()
-            pause()
-            return
-        cleaned = clean_input_path(command)
-        if not Path(cleaned).is_dir():
-            error('Path must be an existing folder.')
-            continue
-        update_vault_path(cleaned)
+            update('')
+        else:
+            cleaned = clean_input_path(command)
+            if not Path(cleaned).is_dir():
+                error('Path must be an existing folder.')
+                continue
+            update(cleaned)
         archives.load()
         pause()
         return
+
+
+def vault_screen():
+    _folder_screen('Vault', vault_path, update_vault_path, 'set vault folder')
+
+
+def notes_screen():
+    _folder_screen('Notes', new_cases_path, update_new_cases_path, 'set folder for new notes')
 
 
 _KEEPER_STATUS = {

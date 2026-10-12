@@ -5,6 +5,8 @@ from ui.interface import dim
 
 def render_help(sections):
     width = shutil.get_terminal_size().columns
+    sections = [(title, [e for e in entries if e.when is None or e.when()]) for title, entries in sections]
+    sections = [(title, entries) for title, entries in sections if entries]
     col = max(len(e.name) for _, entries in sections for e in entries)
     for title, entries in sections:
         print(dim(f"{title}:"))

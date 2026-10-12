@@ -2,9 +2,11 @@ import re
 import difflib
 import shutil
 import textwrap
+from pathlib import Path
 from core import archives, search, excalidraw, favorites, checklist, editor
-from core.archives.vault import Vault, save_note
+from core.archives.vault import Vault, save_note, create_note
 from core.commands import HELP_SECTIONS
+from core.settings import new_cases_path
 from screens.help_screen import render_help
 from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
@@ -183,6 +185,29 @@ def search_screen(initial_query=None):
         page = 0
 
 
+def create_case():
+    text = editor.edit_text('')
+    if text is None:
+        error('Could not open the editor')
+        return
+    if not text.strip():
+        return
+    path = create_note(new_cases_path(), text)
+    if path is None:
+        error('Could not create the note')
+        return
+    haptic('success')
+    archives.load()
+    target = Path(path).resolve()
+    found = [(0, c) for c in archives.cases()
+             if c.get('archive') == Vault.name and Path(c['filepath']).resolve() == target]
+    if not found:
+        return
+    new_query = open_case(found, 1, '', rerun=False)
+    if new_query:
+        search_screen(new_query)
+
+
 def _refresh(results, query, rerun):
     archives.load()
     cases = archives.cases()
@@ -231,46 +256,6 @@ def open_case(results, number, query, rerun=True):
                 results = _refresh(results, query, False)
             except Exception as e:
                 error(f'Could not save: {e}')
-            continue
-
-            original = case['text']
-            edited = editor.edit_text(original)
-            if edited is None:
-                print(dim('  Could not open the editor'))
-                pause(feedback='error')
-                continue
-            edited = edited.strip()
-
-            if not edited:
-                print(dim('  Empty text — edit cancelled'))
-                pause()
-                continue
-
-            if edited == original:
-                print(dim('  No changes'))
-                pause()
-                continue
-
-            clear_screen()
-            print(dim('  Old:'))
-            print(f'  {original[:200]}')
-            print()
-            print(dim('  New:'))
-            print(f'  {edited[:200]}')
-            print()
-            confirm = read_command('  Save changes? [y/n]> ')
-            if confirm.lower() != 'y':
-                print(dim('  Cancelled'))
-                pause()
-                continue
-
-            try:
-                _save(case, edited)
-                print(dim('  Saved'))
-                results = _refresh(results, query, rerun)
-            except Exception as e:
-                print(f'  Error: {e}')
-            pause()
             continue
 
         if low in ('f', 'fav'):

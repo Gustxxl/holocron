@@ -9,7 +9,7 @@ Holocron reads the same file from the terminal. Nothing renders, nothing runs in
 So drop everything on a board and don't worry about order or wording. Skip a word, use a different word form or misspell it, and the right block still comes up, ready to read or edit.
 
 - **Search everything.** Every text block on a board is its own result, alongside your regular notes.
-- **Edit in place.** Fix text on a drawing, open a note in your editor or tick off a task with `x 3`. Changes go straight to the file.
+- **Edit in place.** Fix text on a drawing, open a note in your editor, tick off a task with `x 3` or write a new note with `note`. Changes go straight to the file.
 - **Ask your notes.** Keeper answers questions by quoting the notes themselves. The model runs on your computer or your own server, so your notes stay private.
 - **Know your hours.** A regular 9–5 or a rotating shift cycle. See if you're on the clock and what's next.
 - **Pin what you use.** Favorites open with a single key.

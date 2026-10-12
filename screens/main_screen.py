@@ -3,12 +3,15 @@ from pathlib import Path
 import shutil
 
 from core import archives
-from core.commands import _INDEX
+from core.commands import lookup
 from core.settings import operator_name
 from core.updater import pending_update
 from screens.schedule_screen import duty_line
 from screens.search_screen import search_screen
 from ui.interface import clear_screen, dim, pause, read_command
+from core.sources import remindctl
+from screens.tasks_screen import summary
+
 
 APP_DIR = Path(__file__).resolve().parent.parent
 LOGO = APP_DIR / "ui" / "logo.txt"
@@ -21,13 +24,12 @@ def main_screen():
         clear_screen()
         print(frame)
         raw = read_command('system> ')
-        command = raw.lower()
-        if command == '':
+        if raw == '':
             continue
 
-        handler = _INDEX.get(command)
-        if handler:
-            handler.run(raw)
+        command = lookup(raw)
+        if command:
+            command.run(raw)
             continue
 
         if not archives.is_loaded():
@@ -48,6 +50,9 @@ def _frame():
     duty = duty_line()
     if duty:
         lines += ['', duty]
+    reminders = summary(remindctl)
+    if reminders:
+        lines += ['', *reminders]
     if pending_update():
         lines.append(dim("Update available — type 'update'"))
     lines.append('')

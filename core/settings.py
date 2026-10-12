@@ -65,6 +65,22 @@ def update_vault_path(new_path):
     print('Success')
 
 
+def new_cases_path():
+    cfg = load()
+    path = (cfg.get('new_cases_path') or '').strip()
+    if path in ('', '.'):
+        return ''
+    return path
+
+
+def update_new_cases_path(new_path):
+    cfg = load()
+    cfg['new_cases_path'] = clean_input_path(new_path)
+    save(cfg)
+    clear_screen()
+    print('Success')
+
+
 KEEPER_LOCAL_URL = 'http://localhost:11434'
 
 

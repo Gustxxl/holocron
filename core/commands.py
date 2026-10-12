@@ -1,14 +1,16 @@
 import platform
+from pathlib import Path
 from typing import Callable, NamedTuple
 from core import editor, system
+from core.settings import new_cases_path
 from core.updater import update
 from screens.help_screen import render_help
 from screens.settings_screen import settings_screen
 from ui.interface import clear_screen, pause
+from core.sources import remindctl
 
 
 HAS_CURSES = system.CURSES
-HAS_EDITOR = editor.available()
 
 
 class Command(NamedTuple):
@@ -16,6 +18,7 @@ class Command(NamedTuple):
     run: Callable
     aliases: tuple = ()
     help: str = ''
+    when: Callable = None
 
     @property
     def label(self):
@@ -25,6 +28,16 @@ class Command(NamedTuple):
 class HelpEntry(NamedTuple):
     name: str
     help: str
+    when: Callable = None
+
+
+def _has_curses():
+    return HAS_CURSES
+
+
+def _can_write_note():
+    folder = new_cases_path()
+    return bool(folder) and Path(folder).is_dir() and editor.available()
 
 
 def _cmd_settings(raw):
@@ -56,6 +69,11 @@ def _cmd_list(raw):
     search_screen('l')
 
 
+def _cmd_note(raw):
+    from screens.search_screen import create_case
+    create_case()
+
+
 def _cmd_keeper(raw):
     from screens.keeper_screen import keeper_screen
     keeper_screen()
@@ -76,17 +94,23 @@ def _cmd_hyperspace(raw):
     hyperspace()
 
 
+def _cmd_reminders(raw):
+    from screens.tasks_screen import tasks_screen
+    tasks_screen(remindctl)
+
+
 COMMANDS = [
-    Command('keeper',    _cmd_keeper,    ('k', 'keep'), 'ask the archive in your own words'),
-    Command('schedule',  _cmd_schedule,  ('sch',),      'shift schedule, week by week'),
-    Command('favorites', _cmd_favorites, ('f', 'fav'),  'pinned records'),
-    Command('settings',  _cmd_settings,  ('s',),        'operator name / archives / schedule / Keeper'),
-    Command('system',    _cmd_system,    ('sys',),      'show OS and version'),
-    Command('update',    _cmd_update,    (),            'fetch and apply a pending update'),
-    *([Command('hyperspace', _cmd_hyperspace, ('hy',), 'go to hyperspace (any key to return)')]
-      if HAS_CURSES else []),
-    Command('list',      _cmd_list,      ('l',)),
-    Command('help',      _cmd_help,      ('h',),        'this help'),
+    Command('keeper',     _cmd_keeper,     ('k', 'keep'), 'ask the archive in your own words'),
+    Command('schedule',   _cmd_schedule,   ('sch',),      'shift schedule, week by week'),
+    Command('reminders',  _cmd_reminders,  ('r',),        'tasks from Apple Reminders', remindctl.available),
+    Command('favorites',  _cmd_favorites,  ('f', 'fav'),  'pinned records'),
+    Command('note',       _cmd_note,       (),            'write a new note', _can_write_note),
+    Command('settings',   _cmd_settings,   ('s',),        'operator name / archives / schedule / Keeper'),
+    Command('system',     _cmd_system,     ('sys',),      'show OS and version'),
+    Command('update',     _cmd_update,     (),            'fetch and apply a pending update'),
+    Command('hyperspace', _cmd_hyperspace, ('hy',),       'go to hyperspace (any key to return)', _has_curses),
+    Command('list',       _cmd_list,       ('l',)),
+    Command('help',       _cmd_help,       ('h',),        'this help'),
 ]
 
 HELP_SECTIONS = [
@@ -95,7 +119,7 @@ HELP_SECTIONS = [
         HelpEntry('[number]',     'open a case from the current list'),
         HelpEntry('n / p',        'next / previous page or case'),
         HelpEntry('l / list',     'browse all cases'),
-        *([HelpEntry('e',        'edit the open case')] if HAS_EDITOR else []),
+        HelpEntry('e',            'edit the open case', editor.available),
         HelpEntry('f',            'pin / unpin the open case'),
         HelpEntry('x number',     'check / uncheck a task in the open note'),
     ]),
@@ -105,7 +129,7 @@ HELP_SECTIONS = [
         HelpEntry('+N / -N',      'jump N weeks ahead / back'),
         HelpEntry('type a date',  'open the week of that date, e.g. 14-11'),
     ]),
-    ('Commands', [HelpEntry(c.label, c.help) for c in COMMANDS if c.help]),
+    ('Commands', [HelpEntry(c.label, c.help, c.when) for c in COMMANDS if c.help]),
     ('Navigation', [
         HelpEntry('b',     'back to previous screen'),
         HelpEntry('Enter', 'refresh the current screen'),
@@ -114,3 +138,10 @@ HELP_SECTIONS = [
 ]
 
 _INDEX = {name: c for c in COMMANDS for name in (c.name, *c.aliases)}
+
+
+def lookup(raw):
+    command = _INDEX.get(raw.strip().lower())
+    if command and (command.when is None or command.when()):
+        return command
+    return None
