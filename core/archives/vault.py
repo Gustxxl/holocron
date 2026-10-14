@@ -75,59 +75,49 @@ def _roots():
     return [p for p in (vault_path(), new_cases_path()) if p and Path(p).is_dir()]
 
 
+def _note(f):
+    try:
+        text = f.read_text(encoding='utf-8').strip()
+    except (OSError, UnicodeDecodeError):
+        return []
+    if not text or '## Drawing' in text or 'excalidraw-plugin' in text:
+        return []
+    return [{
+        'text': text,
+        'source': f.name,
+        'filepath': str(f),
+        'element_id': f.stem,
+        'filename': f.stem,
+        'x': 0,
+        'y': 0,
+    }]
+
+
 class Vault(Archive):
     name = 'Vault'
     key = 'vault'
 
-    def __init__(self):
-        self._cases = []
-        self._path = None
-
     def is_configured(self):
         return bool(_roots())
 
-    def load(self):
+    def _load(self):
         roots = _roots()
         vault = Path(vault_path()).resolve() if vault_path() else None
         rules = [Path(p).parts for p in vault_exclude()]
-        self._cases, seen = [], set()
+        files, seen = [], set()
         for root in roots:
             base = Path(root)
-            own = rules if base.resolve() == vault else []
+            real = base.resolve()
+            own = rules if real == vault else []
             try:
-                files = sorted(base.rglob('*.md'))
+                found = sorted(base.rglob('*.md'))
             except OSError:
                 continue
-            for f in files:
-                try:
-                    if _skipped(f.relative_to(base), own):
-                        continue
-                    key = f.resolve()
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    text = f.read_text(encoding='utf-8').strip()
-                    if not text:
-                        continue
-                    if '## Drawing' in text or 'excalidraw-plugin' in text:
-                        continue
-                    self._cases.append({
-                        'text': text,
-                        'source': f.name,
-                        'filepath': str(f),
-                        'element_id': f.stem,
-                        'filename': f.stem,
-                        'x': 0,
-                        'y': 0,
-                    })
-                except (OSError, UnicodeDecodeError):
+            for f in found:
+                rel = f.relative_to(base)
+                if _skipped(rel, own) or real / rel in seen:
                     continue
+                seen.add(real / rel)
+                files.append(f)
+        self._cases = self._read(files, _note)
         self._path = roots[0] if roots else None
-
-    def load_cases(self):
-        if not self._cases:
-            self.load()
-        return self._cases
-
-    def path(self):
-        return self._path

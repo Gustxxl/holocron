@@ -1,5 +1,6 @@
 import re
 import difflib
+from functools import lru_cache
 
 
 MATCH_MIN = 0.6
@@ -24,6 +25,7 @@ def _prep(case):
         case["_flat"] = re.sub(r"\s+", " ", low)
         case["_tokens"] = set(_WORD_RE.findall(low))
         case["_title"] = _normalize_search_text("\n".join(searchable.splitlines()[:2]))
+        case["_title_tokens"] = set(_WORD_RE.findall(case["_title"]))
         case["_prep_for"] = key
     return case
 
@@ -36,6 +38,20 @@ def _norm_words(query):
         stripped = w.strip(_PUNCT)
         out.append(stripped or w)
     return out
+
+
+@lru_cache(maxsize=256)
+def _query(query):
+    flat = re.sub(r"\s+", " ", _normalize_search_text(query)).strip()
+    return tuple(_norm_words(query)), flat
+
+
+@lru_cache(maxsize=65536)
+def similarity(qw, tw):
+    r = difflib.SequenceMatcher(None, qw, tw).ratio()
+    if tw.startswith(qw) or qw.startswith(tw):
+        r = max(r, 0.85)
+    return r
 
 
 def _longest_phrase_run(words, flat, cap=8):
@@ -62,9 +78,7 @@ def _word_score(qw, text_low, tokens):
     for tw in tokens:
         if abs(len(tw) - len(qw)) > 3:
             continue
-        r = difflib.SequenceMatcher(None, qw, tw).ratio()
-        if tw.startswith(qw) or qw.startswith(tw):
-            r = max(r, 0.85)
+        r = similarity(qw, tw)
         if r > best:
             best = r
             if best >= 0.95:
@@ -75,7 +89,7 @@ def _word_score(qw, text_low, tokens):
 def score_case(case, query):
     _prep(case)
     text_low, title_low = case["_low"], case["_title"]
-    words = _norm_words(query)
+    words, q_flat = _query(query)
     if not words:
         return 0
 
@@ -93,7 +107,7 @@ def score_case(case, query):
     quality = sum(matched) / len(matched)
     base = quality * coverage
 
-    title_tokens = set(_WORD_RE.findall(title_low))
+    title_tokens = case["_title_tokens"]
     title_hits = sum(
         1 for qw in words
         if (qw in title_tokens if len(qw) <= 3 else qw in title_low)
@@ -101,7 +115,6 @@ def score_case(case, query):
     if title_hits:
         base += 0.4 * (title_hits / len(words))
 
-    q_flat = re.sub(r"\s+", " ", _normalize_search_text(query)).strip()
     title_flat = re.sub(r"\s+", " ", title_low)
     if q_flat and q_flat in case["_flat"]:
         base += 0.5

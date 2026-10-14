@@ -1,5 +1,4 @@
 import re
-import difflib
 import shutil
 import textwrap
 from pathlib import Path
@@ -48,7 +47,7 @@ def _hl_match(qw, tw):
         return True
     if abs(len(tw) - len(qw)) > 3:
         return False
-    return difflib.SequenceMatcher(None, qw, tw).ratio() >= search.MATCH_MIN
+    return search.similarity(qw, tw) >= search.MATCH_MIN
 
 
 def _phrase_re(query):
@@ -109,7 +108,7 @@ def search_screen(initial_query=None):
         if archives.missing():
             print('Archive not found — check settings.')
         else:
-            print('No scenes found.')
+            print('No archive set — add a path in settings.')
             print(dim('Add an archive path in settings.'))
         pause()
         return
@@ -166,7 +165,7 @@ def search_screen(initial_query=None):
         if command == '':
             if not results:
                 return
-            archives.load()
+            archives.load(force=True)
             cases = archives.cases()
             if query:
                 results = search.search(cases, query)
@@ -221,8 +220,8 @@ def create_case():
         search_screen(new_query)
 
 
-def _refresh(results, query, rerun):
-    archives.load()
+def _refresh(results, query, rerun, force=False):
+    archives.load(force)
     cases = archives.cases()
     if rerun and query:
         return search.search(cases, query)
@@ -314,7 +313,7 @@ def open_case(results, number, query, rerun=True, trail=()):
         if low in ('b', 'back'):
             return None
         if command == '':
-            results = _refresh(results, query, rerun)
+            results = _refresh(results, query, rerun, force=True)
             continue
         if low == 'n':
             if number < len(results):

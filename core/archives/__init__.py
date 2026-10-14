@@ -8,9 +8,9 @@ _ARCHIVES = [ExcalidrawObsidian(), ExcalidrawPlain(), Vault()]
 
 
 
-def load():
+def load(force=False):
     for arch in _ARCHIVES:
-        arch.load()
+        arch.load(force)
 
 
 def cases():

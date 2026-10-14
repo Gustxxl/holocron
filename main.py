@@ -11,7 +11,6 @@ colorama.init()
 
 
 from core import archives
-import sys
 from pathlib import Path
 from time import sleep
 from core.settings import update_archive_path

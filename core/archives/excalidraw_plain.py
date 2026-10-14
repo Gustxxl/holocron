@@ -2,9 +2,7 @@ import json
 from pathlib import Path
 from core.excalidraw import strip_emoji, clean
 from core.settings import excalidraw_path
-from .base import Archive
-
-_BROKEN = (OSError, ValueError, KeyError, TypeError, AttributeError)
+from .base import Archive, BROKEN
 
 
 def _load_scene(path):
@@ -32,7 +30,7 @@ def _load_scene(path):
 def _safe_scene(path):
     try:
         return _load_scene(path)
-    except _BROKEN:
+    except BROKEN:
         return []
 
 
@@ -40,32 +38,20 @@ class ExcalidrawPlain(Archive):
     name = "Excalidraw"
     key = "excalidraw"
 
-    def __init__(self):
-        self._cases = []
-        self._path = None
-
     def is_configured(self):
         p = excalidraw_path()
         return bool(p and Path(p).exists())
 
-    def load(self):
+    def _load(self):
         p = excalidraw_path()
         if not p or not Path(p).exists():
-            self._cases, self._path = [], None
+            self._reset()
             return
         path = Path(p)
         try:
             files = sorted(path.rglob("*.excalidraw")) if path.is_dir() else [path]
         except OSError:
-            self._cases, self._path = [], None
+            self._reset()
             return
-        self._cases = [c for f in files for c in _safe_scene(f)]
+        self._cases = self._read(files, _safe_scene)
         self._path = p
-
-    def load_cases(self):
-        if not self._cases:
-            self.load()
-        return self._cases
-
-    def path(self):
-        return self._path

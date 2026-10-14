@@ -70,7 +70,6 @@ def _frame(report, head, rows):
         digits = len(str(len(report['failed'])))
         for i, (label, tb) in enumerate(report['failed'], 1):
             lines += [f'  {dim(str(i).rjust(digits))} {label}', dim(f'    {diagnostics.reason(tb)}')]
-            lines += [f'  {dim(str(i).rjust(digits))} {label}', dim(f'    {last.strip()}')]
     nav = '  [number] details   ' if report['failed'] else '  '
     lines += ['', dim(nav + '[↵] again   [b] back   [h] help'), '']
     return lines
