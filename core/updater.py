@@ -10,6 +10,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 import threading
+import ssl
 
 
 REPO = 'Gustxxl/holocron'
@@ -47,11 +48,25 @@ def _get(urls, raw=False):
                 'Accept': '*/*' if raw else 'application/vnd.github+json',
                 'User-Agent': 'holocron',
             })
-            with urllib.request.urlopen(req, timeout=15) as r:
+            with urllib.request.urlopen(req, timeout=15, context=_context()) as r:
                 return r.read() if raw else json.load(r)
         except Exception as e:
             errors.append(f'{urllib.parse.urlsplit(candidate).netloc}: {e}')
     raise RuntimeError('; '.join(errors))
+
+
+_CTX = None
+
+
+def _context():
+    global _CTX
+    if _CTX is None:
+        try:
+            import truststore
+            _CTX = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        except ImportError:
+            _CTX = ssl.create_default_context()
+    return _CTX
 
 
 def _api(url):
