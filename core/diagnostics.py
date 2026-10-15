@@ -67,6 +67,7 @@ def system_info():
     rows = [
         ('Editor', Path(editor[0]).stem if editor else None),
         ('Clipboard', clipboard),
+        ('Hyperspace', 'curses' if system.CURSES else None),
         ('Reminders', remindctl.PROGRAM if remindctl.available() else None),
         ('Keeper', {'server': 'server', 'local': 'this computer'}.get(conn['slot']) if conn else None),
         ('Archive', f'{archives.count()} cases' if archives.is_loaded() else None),

@@ -35,3 +35,14 @@ class Note(unittest.TestCase):
 
     def test_hidden_without_editor(self):
         self.assertFalse(self._found(self.dir, has_editor=False))
+
+
+class Hyperspace(unittest.TestCase):
+    def test_hidden_without_curses(self):
+        with patch.object(commands, 'HAS_CURSES', False):
+            self.assertIsNone(commands.lookup('hy'))
+            self.assertIsNone(commands.lookup('hyperspace'))
+
+    def test_available_with_curses(self):
+        with patch.object(commands, 'HAS_CURSES', True):
+            self.assertEqual(commands.lookup('hy').name, 'hyperspace')

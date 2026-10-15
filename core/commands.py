@@ -1,7 +1,7 @@
 import platform
 from pathlib import Path
 from typing import Callable, NamedTuple
-from core import editor, system
+from core import archives, diagnostics, editor, system
 from core.settings import new_cases_path
 from core.updater import update
 from screens.help_screen import render_help
@@ -9,7 +9,6 @@ from screens.settings_screen import settings_screen
 from ui.interface import clear_screen, pause
 from core.sources import remindctl
 from core import diagnostics
-from core import archives, editor, system
 
 
 HAS_CURSES = system.CURSES

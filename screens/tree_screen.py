@@ -56,7 +56,7 @@ def tree_screen():
         elif low == 'p':
             page -= 1
         elif command == '':
-            archives.load()archives.load(force=True)
+            archives.load(force=True)
             root = _build()
         elif command.isdigit() and 1 <= int(command) <= len(items):
             item = items[int(command) - 1]

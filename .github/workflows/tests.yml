@@ -19,5 +19,5 @@ jobs:
             - uses: actions/setup-python@v7
               with:
                   python-version: ${{ matrix.python }}
-            - run: python -m pip install -r requirements.txt
+            - run: python -m core.check_requirements
             - run: python -m unittest discover -s tests -t tests -v
