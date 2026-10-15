@@ -1,6 +1,7 @@
 import re
 from datetime import datetime, timedelta
-from core import schedule
+from core import schedule, zones
+from core import clocks, schedule, zones
 from core.commands import HELP_SECTIONS
 from core.dates import monday, parse_date
 from screens.help_screen import render_help
@@ -119,12 +120,18 @@ def schedule_screen():
                 print(line)
                 print()
             _show_week(sched, now, offset)
+            if sched.zone and zones.differs(sched.zone):
+                print(dim(f'{zones.label(sched.zone)} time, shown in yours'))
         elif not sched.weeks:
             print('No schedule yet.')
         elif not sched.enabled:
             print('Schedule is off.')
         else:
             print('Schedule is incomplete: ' + ', '.join(sched.problems()) + '.')
+        world = clocks.line(clocks.load())
+        if world:
+            print()
+            print(dim(world))
         print()
         nav = '  '
         if sched.ready:

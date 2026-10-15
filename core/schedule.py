@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import NamedTuple, Optional
 
-from core import config
+from core import config, zones
 from core.dates import merge_ranges, monday, parse_time, period_on
 
 OFF = '-'
@@ -34,6 +34,7 @@ class Schedule:
     weeks: tuple = ()
     start: Optional[date] = None
     vacations: tuple = ()
+    zone: Optional[str] = None
 
     @property
     def cycle_days(self):
@@ -74,15 +75,25 @@ class Schedule:
                 return a, b
         return None
 
-    def code_on(self, d):
-        if self.vacation_on(d):
-            return OFF
+    def _cycle_code(self, d):
         offset = (d - self.start).days % self.cycle_days
         return self.weeks[offset // 7][offset % 7]
 
+    def code_on(self, d):
+        if self.vacation_on(d):
+            return OFF
+        return self._cycle_code(d)
+
     def shifts_on(self, d):
-        code = self.code_on(d)
-        found = [Shift(code, *period_on(d, a, b)) for a, b in self.shifts.get(code, [])]
+        if self.vacation_on(d):
+            return []
+        found = []
+        for day in (d - timedelta(days=1), d, d + timedelta(days=1)):
+            code = self._cycle_code(day)
+            for a, b in self.shifts.get(code, []):
+                start, end = (zones.to_local(t, self.zone) for t in period_on(day, a, b))
+                if start.date() == d:
+                    found.append(Shift(code, start, end))
         return sorted(found, key=lambda sh: sh.start)
 
     def current(self, now):
@@ -161,6 +172,10 @@ def _clean_vacations(raw):
     return tuple(merge_ranges(out))
 
 
+def _clean_zone(raw):
+    return raw.strip() if zones.valid(raw.strip() if isinstance(raw, str) else None) else None
+
+
 def load():
     raw = config.load().get('schedule') or {}
     weeks = raw.get('weeks') if isinstance(raw.get('weeks'), list) else []
@@ -174,6 +189,7 @@ def load():
         weeks=weeks,
         start=start,
         vacations=_clean_vacations(raw.get('vacations')),
+        zone=_clean_zone(raw.get('zone')),
     )
 
 
@@ -233,14 +249,20 @@ def set_current_week(n, today=None):
     _update(start=start_for_week(n, today).isoformat())
 
 
+def set_zone(name):
+    _update(zone=name or '')
+
+
 def reset():
-    _update(enabled=False, shifts={}, weeks=[], start='')
+    _update(enabled=False, shifts={}, weeks=[], start='', zone='')
 
 
 def share_code(sched):
     data = {'s': sched.shifts, 'w': list(sched.weeks)}
     if sched.start and len(sched.weeks) > 1:
         data['t'] = sched.start.isoformat()
+    if sched.zone:
+        data['z'] = sched.zone
     raw = json.dumps(data, separators=(',', ':')).encode('utf-8')
     return SHARE_PREFIX + base64.urlsafe_b64encode(raw).decode('ascii').rstrip('=')
 
@@ -261,6 +283,7 @@ def read_code(text):
         shifts=_clean_shifts(data.get('s')),
         weeks=tuple(_clean_week(w) for w in weeks if isinstance(w, str)),
         start=_clean_start(data.get('t')),
+        zone=_clean_zone(data.get('z')),
     )
     if not sched.weeks or len(sched.weeks) > MAX_WEEKS or sched.unknown_codes():
         return None
@@ -271,5 +294,5 @@ def read_code(text):
 
 def import_schedule(sched):
     _update(shifts=sched.shifts, weeks=list(sched.weeks),
-            start=sched.start.isoformat() if sched.start else '')
+            start=sched.start.isoformat() if sched.start else '', zone=sched.zone or '')
     set_enabled(not load().problems())

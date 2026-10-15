@@ -1,9 +1,10 @@
-from datetime import date
-from core import schedule
+from datetime import date, datetime, timezone
+from core import clocks, schedule, zones
 from core.dates import DAYS, monday, parse_date, parse_periods
 from ui.format import date_span, day_runs, days_summary, periods, plural, week_span
 from core.system import copy_text
-from ui.interface import clear_screen, confirm, dim, error, is_back, pause, read_command
+from ui.interface import clear_screen, confirm, dim, error, is_back, pause, read_command, red
+import re
 
 
 def _value(text):
@@ -103,6 +104,10 @@ def _weeks_screen():
         clear_screen()
         print(dim('Settings > Schedule > Weeks'))
         print()
+        zone = schedule.load().zone
+        if zone:
+            print(dim(f'Hours in {zones.label(zone)} time'))
+            print()
         if weeks:
             _print_weeks(weeks)
         else:
@@ -266,6 +271,135 @@ def _toggle(sched):
     schedule.set_enabled(True)
 
 
+ZONE_PAGE = 15
+_DROP_RE = re.compile(r'd\s*(\d+)')
+
+
+def _zone_value(sched):
+    if not sched.zone:
+        return _value('')
+    return _value(zones.label(sched.zone)) if zones.get(sched.zone) else red('not found')
+
+
+def _zone_rows(found, page, now):
+    start = page * ZONE_PAGE
+    chunk = found[start:start + ZONE_PAGE]
+    digits = len(str(len(found)))
+    names = [n.replace('_', ' ') for n in chunk]
+    col = max(len(n) for n in names)
+    return [f'  {dim(str(i).rjust(digits))} {name.ljust(col)}   '
+            f'{dim(zones.utc(zones.offset(n, now)))}   {dim(zones.clock(n, now))}'
+            for i, (n, name) in enumerate(zip(chunk, names), start + 1)]
+
+
+def _clock_rows(items, now):
+    digits = len(str(len(items)))
+    col = max(len(c['name']) for c in items)
+    rows = []
+    for i, c in enumerate(items, 1):
+        info = (f'{dim(zones.utc(zones.offset(c["zone"], now)))}   {dim(zones.clock(c["zone"], now))}'
+                if zones.get(c['zone']) else red('not found'))
+        rows.append(f'  {dim(str(i).rjust(digits))} {c["name"].ljust(col)}   {info}')
+    return rows
+
+
+def _zone_frame(sched, items, query, found, page, now, adding):
+    head = 'Settings > Schedule > Time zone' + (' > Add clock' if adding else '')
+    head += f'   "{query}"' if found else ''
+    lines = [dim(head), '']
+    if found:
+        pages = -(-len(found) // ZONE_PAGE)
+        lines += _zone_rows(found, page, now)
+        nav = '  [number] choose   '
+        nav += '[n] next   ' if page + 1 < pages else ''
+        nav += '[p] prev   ' if page > 0 else ''
+        nav += '[b] back'
+    else:
+        mine = now.astimezone()
+        lines.append(f'  This computer   {dim(zones.utc(mine.utcoffset()))}   {dim(f"{mine:%H:%M}")}')
+        if sched.zone and zones.get(sched.zone):
+            lines.append(f'  Schedule        {zones.label(sched.zone)}   '
+                         f'{dim(zones.utc(zones.offset(sched.zone, now)))}   {dim(zones.clock(sched.zone, now))}')
+        elif sched.zone:
+            lines.append(f'  Schedule        {sched.zone}   {red("not found")}')
+        else:
+            lines.append(f'  Schedule        {dim("same as this computer")}')
+        if items:
+            lines += ['', 'Clocks', *_clock_rows(items, now)]
+        nav = '  [type] city or UTC offset   [a] add clock   '
+        nav += '[d number] remove   ' if items else ''
+        nav += '[c] clear   ' if sched.zone else ''
+        nav += '[b] back'
+    lines += ['', dim(nav), '']
+    return '\n'.join(lines)
+
+
+def _add_clock(zone):
+    print(dim(f'  Enter for {zones.label(zone)}'))
+    clocks.add(zone, read_command('name> '))
+
+
+def _search(text):
+    if not zones.names():
+        error('Time zones are not available on this system.')
+        return []
+    result = zones.find(text)
+    if not result:
+        error(f'No time zone {text}')
+    return result
+
+
+def _zone_screen():
+    query, found, page, adding = '', [], 0, False
+    while True:
+        now = datetime.now(timezone.utc)
+        items = clocks.load()
+        pages = max(1, -(-len(found) // ZONE_PAGE))
+        page = max(0, min(page, pages - 1))
+        frame = _zone_frame(schedule.load(), items, query, found, page, now, adding)
+        clear_screen()
+        print(frame)
+        command = read_command('zone> ')
+        low = command.lower()
+        if is_back(command):
+            if not found:
+                return
+            query, found, adding = '', [], False
+            continue
+        if not command:
+            continue
+        if found and command.isdigit():
+            n = int(command)
+            if 1 <= n <= len(found):
+                (_add_clock if adding else schedule.set_zone)(found[n - 1])
+                query, found, adding = '', [], False
+            continue
+        if found and low in ('n', 'p'):
+            page += 1 if low == 'n' else -1
+            continue
+        if not found:
+            drop = _DROP_RE.fullmatch(low)
+            if drop:
+                clocks.remove(int(drop.group(1)))
+                continue
+            if low == 'c':
+                schedule.set_zone('')
+                continue
+            if low == 'a':
+                command, adding = read_command('city> '), True
+                if not command:
+                    adding = False
+                    continue
+        result = _search(command)
+        if len(result) == 1:
+            (_add_clock if adding else schedule.set_zone)(result[0])
+            adding = False
+        elif result:
+            query, found, page = command, result, 0
+        else:
+            adding = False
+
+
 def schedule_settings():
     while True:
         sched = schedule.load()
@@ -277,9 +411,10 @@ def schedule_settings():
         print(f'1) Weeks          {_value(str(n) if n else "")}')
         print(f'2) Current week   {_value(f"{current + 1} of {n}" if current is not None else "")}')
         print(f'3) Vacations      {_value(_vacations_value(sched))}')
-        print(f'4) Enabled        {dim("on" if sched.enabled else "off")}')
-        print('5) Share')
-        print('6) Import')
+        print(f'4) Time zone      {_zone_value(sched)}')
+        print(f'5) Enabled        {dim("on" if sched.enabled else "off")}')
+        print('6) Share')
+        print('7) Import')
         print()
         print(dim('  [number] open section   [b] back'))
         print()
@@ -293,8 +428,10 @@ def schedule_settings():
         elif command == '3':
             _vacations_screen()
         elif command == '4':
-            _toggle(sched)
+            _zone_screen()
         elif command == '5':
-            _share_screen(sched)
+            _toggle(sched)
         elif command == '6':
+            _share_screen(sched)
+        elif command == '7':
             _import_screen()
