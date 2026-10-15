@@ -39,15 +39,10 @@ def highlight_links(text):
 
 
 def _hl_match(qw, tw):
-    if qw in tw:
-        return True
-    if len(qw) <= 3:
-        return False
-    if tw.startswith(qw) or qw.startswith(tw):
-        return True
-    if abs(len(tw) - len(qw)) > 3:
-        return False
-    return search.similarity(qw, tw) >= search.MATCH_MIN
+    tw = tw.replace('ё', 'е')
+    if not search._WORD_RE.fullmatch(qw):
+        return qw in tw
+    return search.word_match(qw, tw) > 0
 
 
 def _phrase_re(query):
@@ -101,6 +96,12 @@ def _too_short(text):
     return len(text) < MIN_QUERY and text.lower() not in ('l', 'list')
 
 
+def _exact(results, query, list_mode):
+    if list_mode or not query:
+        return None
+    return sum(1 for score, _ in results if search.is_exact(score))
+
+
 def search_screen(initial_query=None):
     cases = archives.cases()
     if not cases:
@@ -109,12 +110,12 @@ def search_screen(initial_query=None):
             print('Archive not found — check settings.')
         else:
             print('No archive set — add a path in settings.')
-            print(dim('Add an archive path in settings.'))
         pause()
         return
 
     query = (initial_query or '').strip()
     results, list_mode, page = [], False, 0
+    exact, exact_for = None, None
 
     if query and _too_short(query):
         clear_screen()
@@ -136,8 +137,10 @@ def search_screen(initial_query=None):
             print()
             error_haptic()
         elif results:
+            if exact_for is not results:
+                exact, exact_for = _exact(results, query, list_mode), results
             ps = LIST_PAGE if list_mode else PAGE
-            page = show_list(results, page, query, ps)
+            page = show_list(results, page, query, ps, exact=exact)
         else:
             clear_screen()
             print(dim('Search the archive'))
@@ -334,26 +337,34 @@ def open_case(results, number, query, rerun=True, trail=()):
     return None
 
 
-def show_list(results, page, query, page_size=PAGE, note=None):
+def show_list(results, page, query, page_size=PAGE, note=None, exact=None):
     clear_screen()
     total = len(results)
     pages = max(1, (total + page_size - 1) // page_size)
     page = max(0, min(page, pages - 1))
     chunk = results[page * page_size: page * page_size + page_size]
 
-    if note:
-        header = note
-    elif query:
-        header = f'Search: "{query}"   {total} results'
-    else:
-        header = f'{total} cases'
-    if pages > 1:
-        header += f'   {page + 1}/{pages}'
-    print(dim(header))
-    print()
-
     width = shutil.get_terminal_size().columns - 1
+    count = f'{total} results' if query else f'{total} cases'
+    count += f'   {page + 1}/{pages}' if pages > 1 else ''
+    if note:
+        print(dim(_fit(note, width)))
+    elif query and len(query) + len(count) + 13 <= width:
+        print(dim(f'Search: "{query}"   {count}'))
+    elif query:
+        print(dim(count))
+        print(dim(_asked(query, width, indent='')))
+    else:
+        print(dim(count))
+    print()
+    if exact == 0:
+        print('No exact matches — showing similar cases.')
+        print()
+
     for n, (score, case) in enumerate(chunk, page * page_size + 1):
+        if exact and n == exact + 1:
+            print(dim('  Similar'))
+            print()
         prefix = f'  {n:>3})  '
         wrapped = textwrap.fill(
             first_line(case),
@@ -398,12 +409,11 @@ def show_case(case, query='', number=None, total=None, trail=()):
 
     width = shutil.get_terminal_size().columns - 1
     pos = f'{number}/{total}  ' if number else ''
-    label = f'{name} ({archive})' if name else f'({archive})'
     mark = ' · pinned' if pinned else ''
-    asked = f'  "{query}"' if query else ''
     if trail:
-        print(dim(' › '.join(trail)))
-    print(dim(f'── {pos}{label}{mark}{asked} ' + '─' * 20))
+        print(dim(_trail(trail, width)))
+    for line in _case_head(pos, name, archive, mark, query, width):
+        print(dim(line))
     print()
     print(_marks(highlight(highlight_links(_wrap(links(title), width)), query)))
     if body:
@@ -459,3 +469,42 @@ def _wrap(text, width):
             break_on_hyphens=False,
         ))
     return '\n'.join(out)
+
+
+def _fit(text, width):
+    return text if len(text) <= width else text[:max(width - 1, 0)].rstrip() + '…'
+
+
+def _rule(text, width):
+    return text + ' ' + '─' * max(width - len(text) - 1, 0)
+
+
+def _asked(query, width, indent='   '):
+    return textwrap.fill(f'"{query}"', width=width, initial_indent=indent, subsequent_indent=indent + ' ',
+                         break_long_words=False, break_on_hyphens=False)
+
+
+def _case_head(pos, name, archive, mark, query, width):
+    labels = [f'{name} ({archive})', name] if name else [f'({archive})']
+    line = f'── {pos}{labels[0]}{mark}'
+    if query and len(line) + len(query) + 6 <= width:
+        return [_rule(f'{line}  "{query}"', width)]
+    if not query and len(line) + 2 <= width:
+        return [_rule(line, width)]
+    for label in labels:
+        line = f'── {pos}{label}{mark}'
+        if len(line) + 2 <= width:
+            break
+    lines = [_rule(_fit(line, width - 2), width)]
+    if query:
+        lines.append(_asked(query, width))
+    return lines
+
+
+def _trail(trail, width):
+    items = list(trail)
+    while len(items) > 1 and len(' › '.join(items)) > width:
+        items = items[1:]
+        if not items[0].startswith('… › '):
+            items[0] = '… › ' + items[0]
+    return _fit(' › '.join(items), width)
