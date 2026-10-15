@@ -3,6 +3,7 @@ from ui.haptic import Holocron
 import sys
 import time
 import os
+import shutil
 
 if not system.IS_WINDOWS:
     try:
@@ -21,6 +22,10 @@ def red(text):
 
 def bold(text):
     return f"\033[1m{text}\033[0m"
+
+
+def underline(text):
+    return f'\033[4m{text}\033[24m'
 
 
 class Home(BaseException):
@@ -167,3 +172,15 @@ def show_menu(breadcrumb, options, footer='  [number] open section   [b] back   
     print()
     print(dim(footer))
     print()
+
+
+def nav_line(items, width=None):
+    width = width or shutil.get_terminal_size().columns - 1
+    items = [item if len(item) == 4 else (*item, *item) for item in items]
+    full = '  ' + '   '.join(f'[{key}] {word}' for key, word, _, _ in items)
+    if len(full) <= width:
+        return full
+    short = '  ' + ' · '.join(f'{key_s} {word_s}' for _, _, key_s, word_s in items)
+    if len(short) <= width:
+        return short
+    return '  ' + ' '.join(key_s for _, _, key_s, _ in items)

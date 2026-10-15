@@ -8,7 +8,7 @@ from screens.help_screen import render_help
 from screens.settings_screen import settings_screen
 from ui.interface import clear_screen, pause
 from core.sources import remindctl
-from core import diagnostics
+from core import diagnostics, keeper
 
 
 HAS_CURSES = system.CURSES
@@ -146,6 +146,7 @@ HELP_SECTIONS = [
         HelpEntry('e',            'edit the open case', editor.available),
         HelpEntry('f',            'pin / unpin the open case'),
         HelpEntry('x number',     'check / uncheck a task in the open note'),
+        HelpEntry('k', 'ask Keeper about this record', lambda: bool(keeper.configured())),
         HelpEntry('j number', 'jump to a linked note'),
     ]),
     ('Schedule', [

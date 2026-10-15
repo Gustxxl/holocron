@@ -12,92 +12,60 @@ from core.settings import KEEPER_LOCAL_URL, keeper_server, keeper_model
 
 RECOMMENDED = 'qwen2.5:7b'
 TOP_K = 8
-SNIPPET = 600
+RECORDS = 5
+SNIPPET = 1000
+FOCUS = 6000
 COMMON_SHARE = 0.25
 MAX_LINES = 150
 MAX_RECORD = 8000
-MAX_REPLY = 300
-MAX_NOTE = 250
-GROUNDING_MIN = 0.5
+MAX_REPLY = 1500
+MAX_QUOTES = 4
+MAX_LINKS = 3
+HISTORY_TURNS = 6
+HISTORY_REPLY = 600
 CHAT_TEMPERATURE = 0.3
 CACHE_SECONDS = 300
 PROBE_TIMEOUT = 2
 
-SCOPES = {
-    'part': {'sentences': 2, 'chars': 400, 'quotes': 12},
-    'whole': {'sentences': 5, 'chars': 1000, 'quotes': 6},
-}
 
-
-_ROUTE_PROMPT = (
-    'You route messages for Keeper, the assistant of a personal archive of work notes. '
-    'Return strict JSON: {"intent": "archive" or "chat", "terms": ["...", "..."]}. '
-    'Use "archive" when the user asks about work, procedures, documents, errors, codes, '
-    'numbers or anything that could be written in their notes. '
-    'Dates, day names, and date ranges always mean "archive". '
-    'Use "chat" for greetings, small talk, feelings, life and general conversation. '
-    'A greeting together with a request is "archive". '
-    'For "archive" give 2 to 6 short search terms: subjects, document names, statuses, '
-    'codes, numbers, dates. '
-    'A date like "02 Jun 2026" should produce terms ["02", "Jun", "2026"]. '
-    'Skip requests, pronouns and generic words. '
-    'Keep every term in the same language and spelling as the message. Never translate. '
-    'For "chat" return an empty terms list. '
-    'Example: "how do I refund a customer for order 12345?" -> '
-    '{"intent": "archive", "terms": ["refund", "customer", "order", "12345"]}'
+_PLAN_PROMPT = (
+    'You prepare an archive lookup for Keeper, the assistant of a personal archive of work notes. '
+    'You get the conversation so far, the records already shown, and the last message. '
+    'Return strict JSON: {"terms": ["..."], "records": [numbers]}. '
+    '"terms" are 0 to 6 short search terms needed to answer the last message: subjects, document names, '
+    'statuses, error text, codes, numbers, dates. '
+    'Replace references like "it", "that error", "the second one" with the actual subject from the conversation. '
+    'Use an empty list for greetings, small talk, or when the answer is already in the shown records. '
+    '"records" are numbers of shown records the last message refers to, otherwise an empty list. '
+    'Keep every term in the same language and spelling as the conversation. Never translate. '
+    'Example: "how do I refund order 12345?" -> {"terms": ["refund", "order", "12345"], "records": []}'
 )
 
-_PICK_PROMPT = (
-    'You help find a record in a personal archive. You get a question and numbered records, '
-    'each may start with its title. '
-    'Pick the records that answer the question, describe the same situation, '
-    'or whose title matches a date, name or code from the question. '
-    'If none fit, return an empty list. Do not guess. '
-    'Answer in strict JSON: {"match": [numbers]}. At most 3 numbers, best first.'
-)
-
-_ANSWER_PROMPT = (
-    'You are Keeper, the archivist of Holocron. '
-    'You get a question and one record: an optional title and numbered lines. '
-    'Return strict JSON: {"scope": "whole" or "part", "lines": [numbers], '
-    '"summary": "text", "note": "text"}. '
-    '"scope" is "whole" when the question asks what the record contains, '
-    'asks to tell about it, retell or recall it. '
-    '"scope" is "part" when the question asks for a specific fact, step, number or detail. '
-    'For "part": "lines" are the line numbers that answer the question, '
-    'and "summary" states the answer in one or two plain, exact sentences. '
-    'For "whole": read the entire record to the last line, not only its beginning. '
-    '"summary" covers all its main points in their order, in three to five plain sentences. '
-    '"lines" are up to 6 key lines taken from different parts of the record. '
-    '"summary" uses only this record. '
-    '"note" is one or two sentences of your own judgement: what this means for the question, '
-    'a caution, a likely cause, or the next step. It may go beyond the record, '
-    'but never invent numbers, dates, names, codes or links. Leave it empty if there is nothing worth adding. '
-    'Tone: quiet, restrained, exact. No greetings, no pleasantries, no exclamation marks. '
-    'Write in the same language as the question. '
-    'If the record does not answer the question, '
-    'return {"scope": "part", "lines": [], "summary": "", "note": ""}.'
-)
-
-_CHAT_PROMPT = (
-    'You are Keeper, the archivist of Holocron, a private archive. '
-    'Your manner is quiet, restrained and exact, like an old imperial archivist. '
-    'Speak in short plain statements, one or two sentences. '
-    'No greetings, no compliments, no enthusiasm, no jokes, no metaphors, '
-    'no quotes or sayings, no exclamation marks, no emoji. '
-    'You do not serve or flatter the user. You value precision over warmth. '
-    'Do not ask questions back unless something essential is missing. '
+_REPLY_PROMPT = (
+    'You are Keeper, the archivist of Holocron, a private archive of the user\'s work notes. '
+    'Manner: quiet, restrained and exact, like an old imperial archivist. '
+    'No greetings, no compliments, no enthusiasm, no exclamation marks, no emoji. '
+    'Never mention being an AI or a model. '
     'Reply only in the language of the user\'s last message. '
-    'Never mention being an AI or a model. Do not claim knowledge of the archive. '
-    'Return strict JSON: {"reply": "text"}. '
-    'Examples: '
-    '"hi" -> {"reply": "Holocron is open."} '
-    '"how are you?" -> {"reply": "Functional. The archive is in order."} '
-    '"tell me about life" -> {"reply": "Life is not kept here. Only what you chose to record."}'
+    'You may get numbered records from the archive. Use them when they help: answer from them, retell them, '
+    'compare them, point to similar cases, or rewrite their text when asked. Refer to records by number, like [2]. '
+    'Never invent numbers, codes, dates, names or links that are not in the records or the conversation. '
+    'If no record fits, say so in one short sentence and still help: ask what is meant, '
+    'or answer from general knowledge. If the message is unclear, ask one short question. '
+    'Keep replies short, up to five sentences, unless the user asks for a rewrite or details. '
+    'Records may list their links as L1, L2 and so on. When the answer depends on a link, '
+    'such as the instruction, ticket or document the record points to, put its numbers in "links", '
+    'most important first, at most three. Never copy links into "reply". '
+    'Return strict JSON: {"reply": "text", "used": [numbers of records you relied on], '
+    '"quotes": ["exact lines copied from those records"], "links": [link numbers]}. '
+    'Examples: "hi" -> {"reply": "Holocron is open.", "used": [], "quotes": [], "links": []} '
+    '"how are you?" -> {"reply": "Functional. The archive is in order.", "used": [], "quotes": [], "links": []}'
 )
 
 _WORD_RE = re.compile(r'[\w-]+')
 _URL_RE = re.compile(r'https?://\S+')
+_MD_LINK_RE = re.compile(r'\[([^\]]*)\]\((https?://[^)\s]+)\)')
+_REF_RE = re.compile(r'\[\d+\]')
 
 _active = {'conn': None, 'at': 0.0}
 
@@ -291,8 +259,8 @@ def _clean_terms(terms):
     return out[:6]
 
 
-def _grounded(terms, question):
-    q_words = _WORD_RE.findall(_norm(question))
+def _grounded(terms, context):
+    words = _WORD_RE.findall(_norm(context))
     out = []
     for t in terms:
         parts = _WORD_RE.findall(t)
@@ -301,7 +269,7 @@ def _grounded(terms, question):
                 w == q
                 or (len(w) >= 3 and len(q) >= 3 and w[:3] == q[:3])
                 or (w.isdigit() and q.isdigit() and w == q)
-            for q in q_words)
+            for q in words)
             for w in parts
         ):
             out.append(t)
@@ -342,49 +310,10 @@ def _candidates(cases, terms):
     return [c for _, c in ranked[:TOP_K]]
 
 
-def _pick(question, cands):
-    blocks = []
-    for i, c in enumerate(cands, 1):
-        text = ' '.join(c['text'].split())[:SNIPPET]
-        name = c.get('filename', '')
-        blocks.append(f'[{i}] {name}: {text}' if name else f'[{i}] {text}')
-    user = 'Question: ' + question + '\n\nRecords:\n' + '\n\n'.join(blocks)
-    data = _chat(_PICK_PROMPT, user)
-    return [cands[n - 1] for n in _numbers(data.get('match'), len(cands))][:3]
-
-
 def _named(question, cases):
     q = _norm(question)
     return [c for c in cases
             if len(c.get('filename', '')) >= 4 and _norm(c['filename']) in q]
-
-
-def find(cases, question, terms, online):
-    terms = terms or _plain_terms(question, cases)
-    similar = _candidates(cases, terms) if terms else []
-    named = _named(question, cases)
-    picked = []
-    if online and similar:
-        try:
-            picked = _pick(question, similar)
-        except KeeperOffline:
-            online = False
-    picked = (named + [c for c in picked if all(c is not n for n in named)])[:3]
-    similar = named + [c for c in similar if all(c is not n for n in named)]
-    return {'terms': terms, 'picked': picked, 'similar': similar, 'online': online}
-
-
-def route(question):
-    offline = {'online': False, 'intent': 'archive', 'terms': []}
-    if active() is None:
-        return offline
-    try:
-        data = _chat(_ROUTE_PROMPT, question)
-    except KeeperOffline:
-        return offline
-    intent = 'chat' if data.get('intent') == 'chat' else 'archive'
-    terms = _grounded(_clean_terms(data.get('terms')), question)
-    return {'online': True, 'intent': intent, 'terms': terms}
 
 
 def _script(text):
@@ -405,58 +334,13 @@ def _same_script(text, question):
     return expected is None or _script(text) == expected
 
 
-def _grounding(summary, source):
-    words = [w for w in _WORD_RE.findall(_norm(summary)) if len(w) >= 5]
-    if not words:
-        return 0.0
-    known = {w[:5] for w in _WORD_RE.findall(_norm(source)) if len(w) >= 5}
-    return sum(1 for w in words if w[:5] in known) / len(words)
-
-
-def _restrained(text, max_sentences):
-    if '!' in text:
-        return False
-    if any(unicodedata.category(ch) == 'So' for ch in text):
-        return False
-    return len(re.findall(r'[.?…]+(?:\s|$)', text)) <= max_sentences
-
-
-def _valid_summary(summary, question, record, scope):
-    limits = SCOPES[scope]
-    return (
-        summary
-        and len(summary) <= limits['chars']
-        and not _URL_RE.search(summary)
-        and _restrained(summary, limits['sentences'])
-        and _same_script(summary, question)
-        and _grounding(summary, record + ' ' + question) >= GROUNDING_MIN
-    )
-
-
-def _valid_reply(reply, question):
-    return (
-        reply
-        and len(reply) <= MAX_REPLY
-        and not _URL_RE.search(reply)
-        and _restrained(reply, 3)
-        and _same_script(reply, question)
-    )
-
-
 def _foreign_numbers(text, source):
     known = set(re.findall(r'\d+', source))
     return [n for n in re.findall(r'\d+', text) if n not in known]
 
 
-def _valid_note(note, question, record):
-    return (
-        note
-        and len(note) <= MAX_NOTE
-        and not _URL_RE.search(note)
-        and _restrained(note, 2)
-        and _same_script(note, question)
-        and not _foreign_numbers(note, record + ' ' + question)
-    )
+def _foreign_links(text, source):
+    return [u for u in _URL_RE.findall(text) if u.rstrip('.,;)') not in source]
 
 
 def _record_lines(text):
@@ -473,30 +357,159 @@ def _record_lines(text):
     return out
 
 
-def answer(question, case):
-    title = case.get('filename', '')
-    lines = _record_lines(case['text'])
-    numbered = '\n'.join(f'{i}: {ln}' for i, ln in enumerate(lines, 1))
-    header = f'Title: {title}\n' if title else ''
-    data = _chat(_ANSWER_PROMPT, f'Question: {question}\n\nRecord:\n{header}{numbered}')
-    scope = 'whole' if data.get('scope') == 'whole' else 'part'
-    quotes = [lines[n - 1] for n in sorted(_numbers(data.get('lines'), len(lines)))]
-    source = title + ' ' + case['text']
-    summary = str(data.get('summary') or '').strip()
-    if not _valid_summary(summary, question, source, scope):
-        summary = ''
-    flat = _flat(summary)
-    quotes = [q for q in quotes if _flat(q) != flat]
-    note = str(data.get('note') or '').strip()
-    if not _valid_note(note, question, source):
-        note = ''
-    return {'summary': summary, 'lines': quotes[:SCOPES[scope]['quotes']], 'note': note}
+def title(case):
+    name = case.get('filename')
+    if name:
+        return name
+    return next((ln.strip() for ln in case['text'].splitlines() if ln.strip()), '')[:80]
 
 
-def chat(question, history=None):
-    for _ in range(2):
-        data = _chat(_CHAT_PROMPT, question, history, CHAT_TEMPERATURE)
-        reply = str(data.get('reply') or '').strip()
-        if _valid_reply(reply, question):
-            return reply
-    return ''
+def _record(case, limit):
+    name = case.get('filename', '')
+    body = '\n'.join(_record_lines(case['text']))[:limit]
+    return f'{name}\n{body}' if name else body
+
+
+def _transcript(history):
+    out = []
+    for m in history or []:
+        content = m['content']
+        if m['role'] == 'assistant':
+            content = _parse_json(content).get('reply', content)
+        out.append(f"{'User' if m['role'] == 'user' else 'Keeper'}: {content}")
+    return '\n'.join(out)
+
+
+def history(turns):
+    out = []
+    for t in [t for t in turns if t.get('reply')][-HISTORY_TURNS:]:
+        shown = '; '.join(f'[{n}] {title(c)}' for n, c in enumerate(t.get('sources', []), t.get('start', 1)))
+        text = t['reply'][:HISTORY_REPLY] + (f'\nRecords shown: {shown}' if shown else '')
+        text += ''.join(f'\nLink given: {url}' for url, _ in t.get('links', []))
+        out.append({'role': 'user', 'content': t['question']})
+        out.append({'role': 'assistant', 'content': json.dumps({'reply': text}, ensure_ascii=False)})
+    return out
+
+
+def _plan(message, past, records):
+    talk = _transcript(past)
+    shown = '\n'.join(f'[{n}] {title(c)}' for n, c in enumerate(records, 1))
+    user = (f'Conversation:\n{talk}\n\n' if talk else '') + \
+           (f'Shown records:\n{shown}\n\n' if shown else '') + f'Last message: {message}'
+    data = _chat(_PLAN_PROMPT, user)
+    terms = _grounded(_clean_terms(data.get('terms')), message + ' ' + talk)
+    return terms, _numbers(data.get('records'), len(records))
+
+
+def _gather(cases, message, terms, refs, records, focus):
+    picked = []
+    for c in [focus] if focus else []:
+        picked.append(c)
+    for c in [records[n - 1] for n in refs] + _named(message, cases) + (_candidates(cases, terms) if terms else []):
+        if all(c is not p for p in picked):
+            picked.append(c)
+    return picked[:RECORDS + (1 if focus else 0)]
+
+
+def _links(case):
+    text = case['text']
+    labels = {url: label.strip() for label, url in _MD_LINK_RE.findall(text)}
+    out = []
+    for raw in _URL_RE.findall(text):
+        url = raw.rstrip('.,;:)]>|"\'')
+        if all(url != u for u, _ in out):
+            out.append((url, labels.get(url, '')))
+    return out
+
+
+def _ask(message, past, picked, focus, temperature):
+    blocks, links = [], []
+    for i, c in enumerate(picked, 1):
+        block = f'[{i}] {_record(c, FOCUS if c is focus else SNIPPET)}'
+        own = _links(c)
+        if own:
+            rows = [f'L{len(links) + n}: {label} {url}'.replace(':  ', ': ')
+                    for n, (url, label) in enumerate(own, 1)]
+            block += '\nLinks:\n' + '\n'.join(rows)
+            links += own
+        blocks.append(block)
+    user = 'Records:\n' + '\n\n'.join(blocks) + f'\n\nMessage: {message}' if blocks else message
+    return _chat(_REPLY_PROMPT, user, past, temperature), links
+
+
+def _quotes(values, used, reply):
+    sources = [_flat(c['text']) for c in used]
+    said = _flat(reply)
+    out = []
+    for q in values if isinstance(values, list) else []:
+        q = ' '.join(str(q).split())
+        f = _flat(q)
+        if len(f) >= 8 and f != said and any(f in s for s in sources) and q not in out:
+            out.append(q)
+    return out[:MAX_QUOTES]
+
+
+def _check(data, message, past, picked, links):
+    reply = str(data.get('reply') or '').strip()
+    if not reply or len(reply) > MAX_REPLY or not _same_script(reply, message):
+        return None
+    if any(unicodedata.category(ch) == 'So' for ch in reply):
+        return None
+    used = [picked[n - 1] for n in _numbers(data.get('used'), len(picked))]
+    known = ' '.join(title(c) + ' ' + c['text'] for c in used) + ' ' + message + ' ' + _transcript(past)
+    bare = _REF_RE.sub('', reply)
+    if used and _foreign_numbers(bare, known):
+        return None
+    if _foreign_links(bare, known):
+        return None
+    chosen = [links[n - 1] for n in _numbers(data.get('links'), len(links))][:MAX_LINKS]
+    return {'reply': reply, 'used': used, 'quotes': _quotes(data.get('quotes'), used, reply), 'links': chosen}
+
+
+def reply(message, past, cases, records=(), focus=None, progress=None):
+    step = progress or (lambda _: None)
+    records = list(records)
+    out = {'reply': '', 'quotes': [], 'sources': [], 'cited': 0, 'archive': False,
+           'lookup': False, 'terms': '', 'online': False}
+
+    terms, refs, online = [], [], active() is not None
+    if online:
+        try:
+            terms, refs = _plan(message, past, records)
+        except KeeperOffline:
+            online = False
+
+    if not online:
+        terms = _plain_terms(message, cases)
+        found = _named(message, cases)
+        found += [c for c in (_candidates(cases, terms) if terms else []) if all(c is not f for f in found)]
+        out.update(terms=' '.join(terms), sources=found[:RECORDS], lookup=True)
+        return out
+
+    if terms:
+        step('searching')
+    picked = _gather(cases, message, terms, refs, records, focus)
+    out.update(online=True, terms=' '.join(terms), lookup=bool(terms or refs))
+    if picked:
+        step('reading')
+
+    checked = None
+    for temperature in (CHAT_TEMPERATURE, 0):
+        try:
+            data, links = _ask(message, past, picked, focus, temperature)
+            checked = _check(data, message, past, picked, links)
+        except KeeperOffline:
+            out['online'] = False
+            break
+        if checked:
+            break
+
+    rest = [c for c in picked if c is not focus]
+    if checked:
+        used = [c for c in checked['used'] if c is not focus]
+        others = [c for c in rest if all(c is not u for u in used)] if used else []
+        out.update(reply=checked['reply'], quotes=checked['quotes'], sources=(used + others)[:RECORDS],
+            cited=len(used), archive=bool(checked['used']), links=checked['links'])
+    else:
+        out['sources'] = rest[:RECORDS]
+    return out

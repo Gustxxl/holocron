@@ -7,7 +7,7 @@ from core.dates import monday, parse_date
 from screens.help_screen import render_help
 from screens.schedule_settings_screen import schedule_settings
 from ui.format import day_label, duration, plural, time_range, week_span
-from ui.interface import bold, clear_screen, dim, error, is_back, pause, read_command, red
+from ui.interface import bold, clear_screen, dim, error, is_back, pause, read_command, red, nav_line
 
 BAR_WIDTH = 10
 BAR_FILL = '▓'
@@ -133,11 +133,11 @@ def schedule_screen():
             print()
             print(dim(world))
         print()
-        nav = '  '
-        if sched.ready:
-            nav += '[n] next   [p] prev   '
-            nav += '[t] this week   ' if offset else ''
-        nav += '[b] back   [h] help'
+        nav = [('n', 'next'), ('p', 'prev')] if sched.ready else []
+        if offset:
+            nav.append(('t', 'this week'))
+        nav += [('b', 'back'), ('h', 'help')]
+        print(dim(nav_line(nav)))
         print(dim(nav))
         print()
         command = read_command('schedule> ').lower()

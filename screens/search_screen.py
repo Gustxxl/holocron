@@ -2,12 +2,12 @@ import re
 import shutil
 import textwrap
 from pathlib import Path
-from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks
+from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks, keeper
 from core.archives.vault import Vault, save_note, create_note
 from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path
 from screens.help_screen import render_help
-from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic
+from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
 from ui.note import render_note
 
@@ -35,7 +35,12 @@ def _marks(text):
 
 
 def highlight_links(text):
-    return _URL_RE.sub(lambda m: dim(m.group()), text)
+    def _shorten(m):
+        url = m.group()
+        cut = url.find('#')
+        display = url[:cut] if cut != -1 else url
+        return dim(underline(display))
+    return _URL_RE.sub(_shorten, text)
 
 
 def _hl_match(qw, tw):
@@ -67,15 +72,24 @@ def highlight(text, query):
     def soft(part):
         return re.sub(r'\w+', repl, part, flags=re.UNICODE)
 
+    def soft_no_urls(text):
+        out, pos = [], 0
+        for m in _URL_RE.finditer(text):
+            out.append(soft(text[pos:m.start()]))
+            out.append(m.group())
+            pos = m.end()
+        out.append(soft(text[pos:]))
+        return ''.join(out)
+
     phrase = _phrase_re(query)
     if not phrase:
-        return soft(text)
+        return soft_no_urls(text)
     out, pos = [], 0
     for m in phrase.finditer(text):
-        out.append(soft(text[pos:m.start()]))
+        out.append(soft_no_urls(text[pos:m.start()]))
         out.append(f'{_MARK}{m.group(0)}{_RESET}')
         pos = m.end()
-    out.append(soft(text[pos:]))
+    out.append(soft_no_urls(text[pos:]))
     return ''.join(out)
 
 
@@ -301,6 +315,11 @@ def open_case(results, number, query, rerun=True, trail=()):
                 results = _refresh(results, query, False)
             continue
 
+        if low in ('k', 'keeper') and keeper.configured():
+            from screens.keeper_screen import keeper_screen
+            keeper_screen(case)
+            results = _refresh(results, query, False)
+            continue
         if low in ('l', 'list'):
             return 'l'
         if low in ('s', 'settings'):
@@ -377,10 +396,13 @@ def show_list(results, page, query, page_size=PAGE, note=None, exact=None):
         print(highlight(wrapped, query))
         print()
 
-    nav = '  [number] open   '
-    nav += '[n] next   ' if page + 1 < pages else ''
-    nav += '[p] prev   ' if page > 0 else ''
-    nav += '[b] back'
+    nav = [('number', 'open', '#', 'open')]
+    if page + 1 < pages:
+        nav.append(('n', 'next'))
+    if page > 0:
+        nav.append(('p', 'prev'))
+    nav.append(('b', 'back'))
+    print(dim(nav_line(nav, width)))
     print(dim(nav))
     print()
     return page
@@ -393,6 +415,8 @@ def show_case(case, query='', number=None, total=None, trail=()):
         if name.endswith(suffix):
             name = name[:-len(suffix)]
             break
+    if case.get('filepath'):
+        name = ''
     archive = case.get('archive', '')
     pinned = favorites.is_pinned(case)
 
@@ -414,27 +438,42 @@ def show_case(case, query='', number=None, total=None, trail=()):
         print(dim(_trail(trail, width)))
     for line in _case_head(pos, name, archive, mark, query, width):
         print(dim(line))
+    fp = case.get('filepath')
+    if fp:
+        parts = Path(fp).parts
+        short = str(Path(*parts[-3:])) if len(parts) > 3 else fp
+        print(dim(f'   {short}'))
     print()
-    print(_marks(highlight(highlight_links(_wrap(links(title), width)), query)))
+    print(_marks(highlight_links(highlight(_wrap(links(title), width), query))))
     if body:
         if case.get('filename'):
             rendered = render_note(body, width)
         else:
             rendered = render_tables(_wrap(code_blocks(links(body)), width), width)
         print()
-        print(_marks(paint_code(highlight(highlight_links(rendered), query))))
+        print(_marks(highlight_links(paint_code(highlight(rendered, query)))))
     print()
-    nav = '  [e] edit   ' if editor.available() else '  '
+    nav = []
+    if editor.available():
+        nav.append(('e', 'edit', 'e', 'edit'))
     if case.get('filename') and checklist.count(case['text']):
-        nav += '[x number] check   '
+        nav.append(('x number', 'check', 'x#', 'check'))
     if jumps:
-        nav += '[j number] jump   ' if len(jumps) > 1 else '[j] jump   '
+        if len(jumps) > 1:
+            nav.append(('j number', 'jump', 'j#', 'jump'))
+        else:
+            nav.append(('j', 'jump', 'j', 'jump'))
+    if keeper.configured():
+        nav.append(('k', 'ask Keeper', 'k', 'ask'))
     if case.get('filepath'):
-        nav += '[f] unpin   ' if pinned else '[f] pin   '
-    nav += '[n] next   ' if number and number < total else ''
-    nav += '[p] prev   ' if number and number > 1 else ''
-    nav += '[b] back   [h] help'
-    print(dim(nav))
+        nav.append(('f', 'unpin' if pinned else 'pin', 'f', 'unpin' if pinned else 'pin'))
+    if number and number < total:
+        nav.append(('n', 'next', 'n', 'next'))
+    if number and number > 1:
+        nav.append(('p', 'prev', 'p', 'prev'))
+    nav.append(('b', 'back', 'b', 'back'))
+    nav.append(('h', 'help', 'h', 'help'))
+    print(dim(nav_line(nav, width)))
     print()
     return jumps
 

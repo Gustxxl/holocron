@@ -3,6 +3,11 @@ import unittest
 from screens.search_screen import _wrap, first_line, highlight, highlight_links
 from ui.clean_path import clean_input_path
 import os
+from datetime import datetime
+from unittest import mock
+
+from screens.tasks_screen import _card
+from ui.interface import nav_line
 
 
 class Highlight(unittest.TestCase):
@@ -70,3 +75,47 @@ class LongLinks(unittest.TestCase):
     def test_hyphenated_words_not_split(self):
         out = _wrap('word ' * 6 + 'one-two-three-four end', 20)
         self.assertTrue(any('one-two-three-four' in ln for ln in out.splitlines()))
+
+
+class NavLine(unittest.TestCase):
+    ITEMS = [('e', 'edit'), ('j number', 'jump', 'j#', 'jump'), ('b', 'back')]
+    FULL = '  [e] edit   [j number] jump   [b] back'
+    SHORT = '  e edit · j# jump · b back'
+    KEYS = '  e j# b'
+
+    def test_full_when_fits(self):
+        self.assertEqual(nav_line(self.ITEMS, len(self.FULL)), self.FULL)
+
+    def test_short_when_full_too_long(self):
+        self.assertEqual(nav_line(self.ITEMS, len(self.FULL) - 1), self.SHORT)
+
+    def test_short_at_exact_width(self):
+        self.assertEqual(nav_line(self.ITEMS, len(self.SHORT)), self.SHORT)
+
+    def test_keys_only_when_short_too_long(self):
+        self.assertEqual(nav_line(self.ITEMS, len(self.SHORT) - 1), self.KEYS)
+
+    def test_pair_uses_same_short_form(self):
+        self.assertEqual(nav_line([('b', 'back')], 5), '  b')
+        self.assertEqual(nav_line([('b', 'back')], 80), '  [b] back')
+
+    def test_default_width_from_terminal(self):
+        size = os.terminal_size((len(self.SHORT) + 1, 24))
+        with mock.patch('ui.interface.shutil.get_terminal_size', return_value=size):
+            self.assertEqual(nav_line(self.ITEMS), self.SHORT)
+
+
+class TaskCardNav(unittest.TestCase):
+    NOW = datetime(2026, 10, 15, 12, 0)
+    TASK = {'title': 'Buy cable', 'list_name': 'Work', 'due': None, 'all_day': False,
+            'notes': '', 'place': ''}
+
+    def _nav(self, **fields):
+        task = {**self.TASK, **fields}
+        return [ln for ln in _card(task, 1, 2, self.NOW, []) if 'back' in ln]
+
+    def test_nav_without_notes(self):
+        self.assertEqual(len(self._nav()), 1)
+
+    def test_nav_with_notes(self):
+        self.assertEqual(len(self._nav(notes='USB-C')), 1)

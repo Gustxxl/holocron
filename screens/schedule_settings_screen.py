@@ -3,7 +3,7 @@ from core import clocks, schedule, zones
 from core.dates import DAYS, monday, parse_date, parse_periods
 from ui.format import date_span, day_runs, days_summary, periods, plural, week_span
 from core.system import copy_text
-from ui.interface import clear_screen, confirm, dim, error, is_back, pause, read_command, red
+from ui.interface import clear_screen, confirm, dim, error, is_back, pause, read_command, red, nav_line
 import re
 
 
@@ -310,10 +310,12 @@ def _zone_frame(sched, items, query, found, page, now, adding):
     if found:
         pages = -(-len(found) // ZONE_PAGE)
         lines += _zone_rows(found, page, now)
-        nav = '  [number] choose   '
-        nav += '[n] next   ' if page + 1 < pages else ''
-        nav += '[p] prev   ' if page > 0 else ''
-        nav += '[b] back'
+        nav = [('number', 'choose', '#', 'choose')]
+        if page + 1 < pages:
+            nav.append(('n', 'next'))
+        if page > 0:
+            nav.append(('p', 'prev'))
+        nav.append(('b', 'back'))
     else:
         mine = now.astimezone()
         lines.append(f'  This computer   {dim(zones.utc(mine.utcoffset()))}   {dim(f"{mine:%H:%M}")}')
@@ -326,10 +328,12 @@ def _zone_frame(sched, items, query, found, page, now, adding):
             lines.append(f'  Schedule        {dim("same as this computer")}')
         if items:
             lines += ['', 'Clocks', *_clock_rows(items, now)]
-        nav = '  [type] city or UTC offset   [a] add clock   '
-        nav += '[d number] remove   ' if items else ''
-        nav += '[c] clear   ' if sched.zone else ''
-        nav += '[b] back'
+        nav = [('type', 'city or UTC offset', 'type', 'city/UTC'), ('a', 'add clock', 'a', 'clock')]
+        if items:
+            nav.append(('d number', 'remove', 'd#', 'remove'))
+        if sched.zone:
+            nav.append(('c', 'clear'))
+        nav.append(('b', 'back'))
     lines += ['', dim(nav), '']
     return '\n'.join(lines)
 

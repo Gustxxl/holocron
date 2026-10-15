@@ -1,6 +1,5 @@
 import contextlib
 import io
-import json
 import shutil
 import sys
 import textwrap
@@ -12,26 +11,26 @@ from screens.search_screen import open_case, first_line, highlight
 from ui.interface import clear_screen, dim, pause, read_command, haptic
 
 MIN_QUESTION = 3
-MAX_SOURCES = 5
-HISTORY_TURNS = 4
 GREETING_ROW = 3
 
 LINES = {
     'connecting': 'Waking Keeper...',
     'ready': 'Awaiting your query...',
+    'ready_case': 'Ask about this record.',
     'not_connected': 'No model connected. Search by words only. Settings > Archive > Keeper.',
     'unset': 'No model and no archive. Configure in settings > Archive.',
-    'silent': 'No reply.',
+    'short': 'Type at least 3 characters.',
+    'silent': 'Keeper has nothing to add.',
     'empty': 'Nothing in the archive on this.',
-    'answer': 'From the archive:',
-    'similar': 'No exact match. Closest records:',
+    'similar': 'Closest records:',
     'plain': 'Search by words:',
+    'outside': 'Not from the archive.',
     'to_local': 'Server unavailable. Running on this computer.',
     'to_server': 'Server restored.',
     'to_none': 'No model reachable. Searching by words.',
     'thinking': 'Considering',
     'searching': 'Searching the archive',
-    'reading': 'Reading the record',
+    'reading': 'Reading the records',
     'searched': 'Searched:',
 }
 
@@ -41,19 +40,27 @@ _SWITCH_NOTES = {
     None: LINES['to_none'],
 }
 
+_SESSION = {'turns': [], 'records': []}
+
 
 def _width():
     return shutil.get_terminal_size().columns - 1
 
 
+def _fill(text):
+    return '\n'.join(
+        textwrap.fill(ln, width=_width(), initial_indent='  ', subsequent_indent='  ',
+                      break_long_words=False, break_on_hyphens=False) if ln.strip() else ''
+        for ln in text.splitlines()
+    )
+
+
 def _say(text):
-    print(textwrap.fill(text, width=_width(), initial_indent='  ', subsequent_indent='  ',
-                        break_long_words=False, break_on_hyphens=False))
+    print(_fill(text))
 
 
 def _aside(text):
-    print(dim(textwrap.fill(text, width=_width(), initial_indent='  ', subsequent_indent='  ',
-                            break_long_words=False, break_on_hyphens=False)))
+    print(dim(_fill(text)))
 
 
 def _quote(line, terms):
@@ -77,8 +84,8 @@ def _switch_note(via):
     return _SWITCH_NOTES[via]
 
 
-def _drop_greeting(rows):
-    sys.stdout.write(f'\0337\033[{GREETING_ROW};1H\033[{rows}M\0338\033[{rows}A')
+def _drop_greeting(row, rows):
+    sys.stdout.write(f'\0337\033[{row};1H\033[{rows}M\0338\033[{rows}A')
     sys.stdout.flush()
 
 
@@ -110,63 +117,25 @@ class _Thinking:
             self._stop.wait(0.4)
 
 
-def _history(turns):
-    out = []
-    for t in [t for t in turns if t['kind'] == 'chat' and t['reply']][-HISTORY_TURNS:]:
-        out.append({'role': 'user', 'content': t['question']})
-        out.append({'role': 'assistant', 'content': json.dumps({'reply': t['reply']}, ensure_ascii=False)})
-    return out
-
-
-def _ask(question, history, thinking):
-    thinking.label = LINES['thinking']
+def _ask(question, turns, records, focus, thinking):
     archives.load()
     cases = archives.cases()
-    route = keeper.route(question)
-    state = {
-        'question': question, 'kind': 'empty', 'summary': '', 'lines': [], 'note': '',
-        'reply': '', 'sources': [], 'terms': ' '.join(route['terms']),
-        'online': route['online'], 'via': None, 'start': 0,
-    }
+    if not cases and keeper.active() is None:
+        return {'question': question, 'kind': 'unset', 'reply': '', 'quotes': [], 'sources': [],
+                'cited': 0, 'archive': False, 'lookup': False, 'terms': '', 'online': False, 'via': None, 'links': []}
 
-    if not cases and not route['online']:
-        state['kind'] = 'unset'
-        return state
+    def step(key):
+        thinking.label = LINES[key]
 
-    talk = not cases
-    if not talk:
-        thinking.label = LINES['searching']
-        r = keeper.find(cases, question, route['terms'], route['online'])
-        state.update(terms=' '.join(r['terms']), online=r['online'])
-        if r['picked']:
-            thinking.label = LINES['reading']
-            try:
-                ans = keeper.answer(question, r['picked'][0])
-            except keeper.KeeperOffline:
-                ans = {'summary': '', 'lines': [], 'note': ''}
-            rest = [c for c in r['similar'] if all(c is not p for p in r['picked'])]
-            state['sources'] = (r['picked'] + rest)[:MAX_SOURCES]
-            if ans['summary'] or ans['lines']:
-                state.update(kind='answer', summary=ans['summary'],
-                             lines=ans['lines'], note=ans['note'])
-            else:
-                state['kind'] = 'similar'
-        elif route['intent'] == 'chat' and r['online']:
-            talk = True
-        elif r['similar']:
-            state.update(kind='similar', sources=r['similar'][:MAX_SOURCES])
-
-    if talk and state['online']:
-        thinking.label = LINES['thinking']
-        try:
-            reply = keeper.chat(question, history)
-        except keeper.KeeperOffline:
-            reply = ''
-            state['online'] = False
-        state.update(kind='chat', reply=reply, sources=[], terms='')
-
+    state = keeper.reply(question, keeper.history(turns), cases, records, focus, step)
+    state.update(question=question, kind='reply')
     state['via'] = keeper.current_slot() if state['online'] else None
     return state
+
+
+def _short(question):
+    return {'question': question, 'kind': 'short', 'reply': '', 'quotes': [], 'sources': [],
+            'cited': 0, 'archive': False, 'lookup': False, 'terms': '', 'online': False, 'via': None, 'links': []}
 
 
 def _print_answer(state):
@@ -174,60 +143,68 @@ def _print_answer(state):
     kind = state['kind']
     if kind == 'unset':
         _say(LINES['unset'])
-    elif kind == 'chat':
-        _say(state['reply'] or LINES['silent'])
-    elif kind == 'empty':
-        _say(LINES['empty'])
-    elif kind == 'answer':
-        _say(state['summary'] or LINES['answer'])
-        if state['lines']:
-            print()
-            for ln in state['lines']:
-                _quote(ln, state['terms'])
-        if state['note']:
-            print()
-            _aside(state['note'])
-    elif state['online']:
-        _say(LINES['similar'])
-    else:
-        _say(LINES['plain'])
+        print()
+        return
+    if kind == 'short':
+        _aside(LINES['short'])
+        print()
+        return
 
-    if kind in ('empty', 'similar') and state['terms']:
-        _aside(f"{LINES['searched']} {', '.join(state['terms'].split())}")
+    if state['reply']:
+        _say(state['reply'])
+        if state['quotes']:
+            print()
+            for ln in state['quotes']:
+                _quote(ln, state['terms'])
+        if state.get('links'):
+            print()
+            print(dim('  Link' if len(state['links']) == 1 else '  Links'))
+            for url, label in state['links']:
+                print(f'    {label}  {dim(url)}' if label else f'    {dim(url)}')
+        if state['lookup'] and not state['archive']:
+            print()
+            _aside(LINES['outside'])
+    elif state['online']:
+        _say(LINES['similar'] if state['sources'] else LINES['silent'])
+    else:
+        _say(LINES['plain'] if state['sources'] else LINES['empty'])
+        if not state['sources'] and state['terms']:
+            _aside(f"{LINES['searched']} {', '.join(state['terms'].split())}")
 
     sources = state['sources']
     if sources:
         print()
-        start = state['start']
-        if kind == 'answer':
+        start, cited = state['start'], state['cited']
+        if cited:
             print(dim('  Source'))
-            _source(start, sources[0])
-            if len(sources) > 1:
-                print(dim('  Related'))
-                for n, c in enumerate(sources[1:], start + 1):
-                    _source(n, c)
-        else:
-            for n, c in enumerate(sources, start):
+            for n, c in enumerate(sources[:cited], start):
                 _source(n, c)
+            if len(sources) > cited:
+                print(dim('  Related'))
+        for n, c in enumerate(sources[cited:], start + cited):
+            _source(n, c)
     print()
 
 
-def _draw(turns, pending, conn):
+def _draw(turns, records, focus, pending, conn):
     print(dim('Keeper'))
+    if focus:
+        print(dim(f'  1) {first_line(focus)}'[:_width()]))
     print()
     rows = 0
     if conn is None:
         _say(LINES['not_connected'])
         print()
     elif not turns and pending is None:
-        _say(LINES['ready'])
+        _say(LINES['ready_case' if focus else 'ready'])
         rows = 2
         note = _switch_note(conn['slot'])
         if conn['slot'] == 'local' and note:
             print(dim('  ' + note))
             rows += 1
         print()
-    nav = '  [number] open record   ' if any(t['sources'] for t in turns) else '  '
+    nav = '  [number] open record   ' if records else '  '
+    nav += '[c] clear   ' if turns else ''
     print(dim(nav + '[b] back   [h] help'))
     print()
     for turn in turns:
@@ -238,7 +215,7 @@ def _draw(turns, pending, conn):
     return rows
 
 
-def _redraw(turns, pending=None, refresh=False):
+def _redraw(turns, records, focus, pending=None, refresh=False):
     if (refresh or not keeper.cached()) and keeper.configured():
         clear_screen()
         print(dim('Keeper'))
@@ -248,24 +225,25 @@ def _redraw(turns, pending=None, refresh=False):
     conn = keeper.active()
     frame = io.StringIO()
     with contextlib.redirect_stdout(frame):
-        rows = _draw(turns, pending, conn)
+        rows = _draw(turns, records, focus, pending, conn)
     clear_screen()
     sys.stdout.write(frame.getvalue())
     sys.stdout.flush()
     return (conn['slot'] if conn else None), rows
 
 
-def _owner(turns, number):
+def _terms_for(turns, number):
     for turn in turns:
-        if turn['start'] <= number < turn['start'] + len(turn['sources']):
-            return turn
-    return None
+        if turn.get('start', 0) <= number < turn.get('start', 0) + len(turn['sources']):
+            return turn['terms']
+    return ''
 
 
-def keeper_screen():
-    turns = []
-    records = []
-    via, greeting = _redraw(turns)
+def keeper_screen(case=None):
+    session = {'turns': [], 'records': [case]} if case else _SESSION
+    turns, records = session['turns'], session['records']
+    row = GREETING_ROW + (1 if case else 0)
+    via, greeting = _redraw(turns, records, case)
 
     while True:
         command = read_command('Keeper> ')
@@ -276,38 +254,43 @@ def keeper_screen():
             clear_screen()
             render_help(HELP_SECTIONS)
             pause()
-            via, greeting = _redraw(turns)
+            via, greeting = _redraw(turns, records, case)
             continue
         if low in ('s', 'settings'):
             from screens.settings_screen import settings_screen
             settings_screen()
-            via, greeting = _redraw(turns)
+            via, greeting = _redraw(turns, records, case)
+            continue
+        if low == 'c' and turns:
+            turns.clear()
+            del records[1 if case else 0:]
+            via, greeting = _redraw(turns, records, case)
             continue
         if command == '':
-            via, greeting = _redraw(turns, refresh=True)
+            via, greeting = _redraw(turns, records, case, refresh=True)
             continue
         if command.isdigit():
             number = int(command)
-            turn = _owner(turns, number)
-            if not turn:
+            if not 1 <= number <= len(records):
                 continue
             results = [(0, c) for c in records]
-            new = open_case(results, number, turn['terms'], rerun=False)
+            new = open_case(results, number, _terms_for(turns, number), rerun=False)
             if not new or new == 'l' or len(new) < MIN_QUESTION:
-                via, greeting = _redraw(turns)
+                via, greeting = _redraw(turns, records, case)
                 continue
             command = new
-            _redraw(turns, command)
-        elif len(command) < MIN_QUESTION:
-            continue
+            _redraw(turns, records, case, command)
         elif greeting:
-            _drop_greeting(greeting)
+            _drop_greeting(row, greeting)
         greeting = 0
 
-        print()
-        with _Thinking(LINES['thinking']) as thinking:
-            state = _ask(command, _history(turns), thinking)
-        if state['kind'] != 'unset' and state['via'] != via:
+        if len(command.strip()) < MIN_QUESTION and keeper.active() is None:
+            state = _short(command)
+        else:
+            print()
+            with _Thinking(LINES['thinking']) as thinking:
+                state = _ask(command, turns, records, case, thinking)
+        if state['kind'] == 'reply' and state['via'] != via:
             note = _switch_note(state['via'])
             if note:
                 print()
@@ -318,9 +301,9 @@ def keeper_screen():
         turns.append(state)
         _print_answer(state)
 
-        if state['kind'] == 'answer':
+        if state['archive']:
             haptic('confirm')
-        elif state['kind'] in ('empty', 'unset'):
+        elif state['kind'] in ('unset', 'short') or not (state['reply'] or state['sources']):
             haptic('warning')
         else:
             haptic('tap')

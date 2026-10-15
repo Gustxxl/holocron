@@ -2,7 +2,7 @@ import re
 from core import editor, waypoints
 from core.sources import remindctl
 from screens.help_screen import show_help
-from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, read_command
+from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, read_command, nav_line
 
 _RADIUS_RE = re.compile(r'r\s*(\d+)')
 
@@ -37,8 +37,9 @@ def _frame(points, linked):
         lines.append(f'  {dim(str(i).rjust(digits))} {("@" + name).ljust(width)}   {dim(point["address"])}{tail}')
     if points:
         lines.append('')
-    nav = '  [number] open   ' if points else '  '
-    lines += [dim(nav + '[a] add   [b] back   [h] help'), '']
+        nav = [('number', 'open', '#', 'open')] if points else []
+        nav += [('a', 'add'), ('b', 'back'), ('h', 'help')]
+        lines += [dim(nav_line(nav)), '']
     return lines
 
 
@@ -104,12 +105,16 @@ def _card(name, point, here, number, total):
              f'@{name}', point['address'], dim(f'{point["proximity"]}   {point["radius"]} m')]
     if here:
         lines += ['', *(f'○ {t["title"]}' for t in here)]
-    nav = '  [e] edit   ' if editor.available() else '  '
-    nav += '[t] arrive / leave   [r number] radius   [d] delete   '
-    nav += '[n] next   ' if number < total else ''
-    nav += '[p] prev   ' if number > 1 else ''
-    nav += '[b] back   [h] help'
-    lines += ['', dim(nav), '']
+        nav = [('e', 'edit')] if editor.available() else []
+        nav += [('t', 'arrive / leave', 't', 'arrive/leave'),
+                ('r number', 'radius', 'r#', 'radius'),
+                ('d', 'delete')]
+        if number < total:
+            nav.append(('n', 'next'))
+        if number > 1:
+            nav.append(('p', 'prev'))
+        nav += [('b', 'back'), ('h', 'help')]
+        lines += ['', dim(nav_line(nav)), '']
     return lines
 
 

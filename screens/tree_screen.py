@@ -6,7 +6,7 @@ from core import archives, tree
 from core.settings import archive_path, excalidraw_path, new_cases_path, vault_path
 from screens.help_screen import show_help
 from screens.search_screen import first_line, open_case, search_screen
-from ui.interface import clear_screen, dim, read_command
+from ui.interface import clear_screen, dim, read_command, nav_line
 
 PAGE = 15
 NAME_MAX = 40
@@ -89,10 +89,13 @@ def _frame(stack, items, page):
     folder = stack[-1]['kind'] == 'folder'
     rows = _entries(chunk, start, digits) if folder else _blocks(chunk, start, digits, width)
     lines = [dim(head), '', *(rows or [dim('  Nothing indexed')])]
-    nav = '  [number] open   ' if items else '  '
-    nav += '[n] next   ' if page + 1 < pages else ''
-    nav += '[p] prev   ' if page > 0 else ''
-    lines += ['', dim(nav + '[b] back   [h] help'), '']
+    nav = [('number', 'open', '#', 'open')] if items else []
+    if page + 1 < pages:
+        nav.append(('n', 'next'))
+    if page > 0:
+        nav.append(('p', 'prev'))
+    nav += [('b', 'back'), ('h', 'help')]
+    lines += ['', dim(nav_line(nav, width)), '']
     return '\n'.join(lines), page
 
 

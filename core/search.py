@@ -12,15 +12,32 @@ EXACT_BONUS = 10.0
 FORM = 0.9
 TYPO = 0.85
 PREFIX_MIN = 4
+ABBR_MIN = 5
 FORM_TAIL = 3
+PHRASE_MIN = 4
 _WORD_RE = re.compile(r"\w+")
 _PUNCT = ".,;:!?()[]{}\"'«»—–…"
+_ALNUM_RE = re.compile(r'([^\W\d_]+)(\d+)', re.UNICODE)
 
 
 def _normalize_search_text(text):
     text = text.lower().replace('ё', 'е')
-    text = re.sub(r"(?<=\d)(?=[а-яё])|(?<=[а-яё])(?=\d)", " ", text)
+    text = re.sub(r'-{2,}', ' ', text)
+    text = re.sub(r'(?<=\w)-(?=\w)', ' ', text)
     return text
+
+
+def _doc_prefixes(text):
+    prefixes = set()
+    for m in _ALNUM_RE.finditer(text):
+        if len(m.group(1)) >= 2:
+            prefixes.add(m.group(1))
+    for token in _WORD_RE.findall(text):
+        m = re.fullmatch(r'([а-яёa-z]+)(\d+)', token)
+        if m and len(m.group(1)) >= 2:
+            prefixes.add(m.group(1))
+            prefixes.add(m.group(2))
+    return prefixes
 
 
 def _prep(case):
@@ -31,9 +48,11 @@ def _prep(case):
         low = _normalize_search_text(searchable)
         case["_low"] = low
         case["_flat"] = re.sub(r"\s+", " ", low)
-        case["_tokens"] = set(_WORD_RE.findall(low))
+        tokens = set(_WORD_RE.findall(low))
+        tokens |= _doc_prefixes(low)
+        case["_tokens"] = tokens
         case["_title"] = _normalize_search_text("\n".join(searchable.splitlines()[:2]))
-        case["_title_tokens"] = set(_WORD_RE.findall(case["_title"]))
+        case["_title_tokens"] = set(_WORD_RE.findall(case["_title"])) | _doc_prefixes(case["_title"])
         case["_prep_for"] = key
     return case
 
@@ -43,8 +62,14 @@ def _norm_words(query):
     for w in re.split(r"\s+", _normalize_search_text(query)):
         if not w:
             continue
-        stripped = w.strip(_PUNCT)
-        out.append(stripped or w)
+        stripped = w.strip(_PUNCT + '-')
+        token = stripped or w
+        if not token or not any(c.isalnum() for c in token):
+            continue
+        out.append(token)
+        m = re.fullmatch(r'([а-яёa-z]+)(\d+)', token)
+        if m and len(m.group(1)) >= 2:
+            out.append(m.group(1))
     return out
 
 
@@ -79,7 +104,11 @@ def _edits(a, b, limit):
 
 
 def _exact_only(word):
-    return len(word) <= 3 or any(ch.isdigit() for ch in word)
+    if len(word) <= 3:
+        return True
+    if any(ch.isdigit() for ch in word):
+        return True
+    return False
 
 
 @lru_cache(maxsize=65536)
@@ -89,6 +118,8 @@ def word_match(qw, tw):
     if _exact_only(qw) or _exact_only(tw) or qw[0] != tw[0]:
         return 0.0
     short, long_ = sorted((len(qw), len(tw)))
+    if len(qw) >= ABBR_MIN and tw.startswith(qw):
+        return FORM
     prefix = len(os.path.commonprefix((qw, tw)))
     if prefix >= max(PREFIX_MIN, short - FORM_TAIL) and long_ - short <= max(FORM_TAIL, short // 2):
         return FORM
@@ -119,7 +150,10 @@ def _context(cases, words):
     table = [_matches(qw, vocab) for qw in words]
     hits = [[_hit(c, qw, m) for qw, m in zip(words, table)] for c in cases]
     n = len(cases)
-    weights = [math.log(1 + n / max(sum(1 for h in hits if h[i]), 1)) for i in range(len(words))]
+    dfs = [sum(1 for h in hits if h[i]) for i in range(len(words))]
+    known = [math.log(1 + n / df) for df in dfs if df]
+    floor = min(known) if known else math.log(1 + n)
+    weights = [math.log(1 + n / df) if df else floor for df in dfs]
     return hits, weights
 
 
@@ -148,11 +182,16 @@ def _score(case, hit, weights, words, q_flat):
     total = sum(weights)
     got = sum(w for w, h in zip(weights, hit) if h)
     coverage = got / total if total else 0
-    if len(words) > 2 and coverage < MIN_COVERAGE:
+    run = _longest_phrase_run(words, case["_flat"]) if len(words) > 2 else 1
+    if len(words) > 2 and coverage < MIN_COVERAGE and run < PHRASE_MIN:
         return 0
 
     quality = sum(matched) / len(matched)
     base = quality * coverage
+    for qw, h in zip(words, hit):
+        if h == 1.0 and _ALNUM_RE.fullmatch(qw):
+            base += 0.5
+            break
 
     title_low, title_tokens = case["_title"], case["_title_tokens"]
     title_hits = sum(
@@ -171,7 +210,6 @@ def _score(case, hit, weights, words, q_flat):
         if filename and _normalize_search_text(filename).strip() == q_flat:
             base += 1.0
     elif len(words) > 2:
-        run = _longest_phrase_run(words, case["_flat"])
         if run > 1:
             base += 0.6 * (run / len(words))
 

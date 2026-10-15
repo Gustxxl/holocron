@@ -34,6 +34,13 @@ class Words(unittest.TestCase):
         self.assertEqual(search.word_match('err4021', 'err4022'), 0)
         self.assertEqual(search.word_match('abx', 'abz'), 0)
 
+    def test_abbreviation(self):
+        for a, b in (('distrib', 'distribution'), ('config', 'configuration'), ('allocat', 'allocations')):
+            self.assertGreater(search.word_match(a, b), 0, (a, b))
+
+    def test_abbreviation_one_way(self):
+        self.assertEqual(search.word_match('distribution', 'distrib'), 0)
+
 
 class Relevance(unittest.TestCase):
     def test_one_word_is_not_enough(self):
@@ -63,6 +70,12 @@ class Relevance(unittest.TestCase):
 
     def test_inflected_query_exact(self):
         results = search.search(FILLER + [{'text': 'Deleting allocations'}], 'delete allocation')
+        self.assertTrue(search.is_exact(results[0][0]))
+
+    def test_abbreviated_query(self):
+        cases = FILLER + [{'text': 'Deleting distributions'}, {'text': 'Delete line shortcut'}]
+        results = search.search(cases, 'delete distrib')
+        self.assertEqual([c['text'] for _, c in results], ['Deleting distributions'])
         self.assertTrue(search.is_exact(results[0][0]))
 
 

@@ -3,7 +3,7 @@ from datetime import datetime
 from core import editor, sources, tasks, waypoints
 from screens.help_screen import show_help
 from ui.format import day_label
-from ui.interface import clear_screen, dim, error, haptic, is_back, pause, read_command, red
+from ui.interface import clear_screen, dim, error, haptic, is_back, pause, read_command, red, nav_line
 
 _CHECK_RE = re.compile(r'x\s*(\d+)')
 _DEFAULT_RE = re.compile(r'd\s*(\d+)')
@@ -56,7 +56,8 @@ def lists_screen(source):
             lines.append(f'{i}) {l["title"]}{mark}')
         if not lists:
             lines.append('No lists')
-        lines += ['', dim('  [number] show / hide   [d number] default   [b] back'), '']
+        nav = [('number', 'show / hide', '#', 'show/hide'), ('d number', 'default', 'd#', 'default'), ('b', 'back')]
+        lines += ['', dim(nav_line(nav)), '']
         frame = '\n'.join(lines)
         clear_screen()
         print(frame)
@@ -106,8 +107,9 @@ def _frame(source, chosen, groups, now):
             n += 1
             lines.append(f'  {dim(str(n).rjust(digits))} ○ {_line(task, now)}')
         lines.append('')
-    nav = '  [number] open   ' if n else '  '
-    lines += [dim(nav + '[a] add   [s] lists   [b] back   [h] help'), '']
+    nav = [('number', 'open', '#', 'open')] if n else []
+    nav += [('a', 'add'), ('s', 'lists'), ('b', 'back'), ('h', 'help')]
+    lines += [dim(nav_line(nav)), '']
     return lines
 
 
@@ -146,11 +148,15 @@ def _card(task, number, total, now, points):
         lines.append(dim(f'@{name}' if name else task['place']))
     if task.get('notes'):
         lines += ['', task['notes']]
-    nav = '  [x] done   ' + ('[e] edit   ' if editor.available() else '')
-    nav += '[n] next   ' if number < total else ''
-    nav += '[p] prev   ' if number > 1 else ''
-    nav += '[b] back   [h] help'
-    lines += ['', dim(nav), '']
+    nav = [('x', 'done')]
+    if editor.available():
+        nav.append(('e', 'edit'))
+    if number < total:
+        nav.append(('n', 'next'))
+    if number > 1:
+        nav.append(('p', 'prev'))
+    nav += [('b', 'back'), ('h', 'help')]
+    lines += ['', dim(nav_line(nav)), '']
     return lines
 
 
