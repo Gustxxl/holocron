@@ -17,7 +17,7 @@ So drop everything on a board and don't worry about order or wording. Skip a wor
 - **Ask your notes.** Keeper answers questions by quoting your notes. The model runs on your computer or your own server, so your notes stay private.
 - **Know your hours.** A regular 9 to 5 or a rotating cycle of up to 52 weeks, with night shifts, vacations and time zones.
 - **See what's coming.** The next reminders and calendar events are on the main screen, with meeting links pulled out of the invite.
-- **Remind by place.** Waypoints tie reminders to an address, so they fire when you arrive or leave.
+- **Remind by place.** Waypoints tie reminders to an address, so they fire when you arrive or leave (macOS only).
 - **Pin what you use.** Favorites open with a single key.
 
 ## Search that forgives
@@ -78,7 +78,7 @@ Then choose which lists and calendars to show, which one is the default, how man
 - **Calendar.** Upcoming events grouped by day. Add one with `a`: `Standup 10:00` or `Lunch tomorrow 12:30-13:30 #work`.
 - **Meeting links.** Holocron looks for links in the event URL, location, notes and invitees and shows the meeting link right under the event: Zoom, Google Meet, Teams, Webex, Whereby, Jitsi and Telemost.
 
-On Windows and Linux everything else works. Reminders and calendar are macOS only.
+On Windows and Linux everything else works today. Reminders and calendar for them are coming next. If you'd like a particular service, [open an issue](https://github.com/Gustxxl/holocron/issues).
 
 ## Commands
 
