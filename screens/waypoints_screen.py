@@ -37,9 +37,9 @@ def _frame(points, linked):
         lines.append(f'  {dim(str(i).rjust(digits))} {("@" + name).ljust(width)}   {dim(point["address"])}{tail}')
     if points:
         lines.append('')
-        nav = [('number', 'open', '#', 'open')] if points else []
-        nav += [('a', 'add'), ('b', 'back'), ('h', 'help')]
-        lines += [dim(nav_line(nav)), '']
+    nav = [('number', 'open', '#', 'open')] if points else []
+    nav += [('a', 'add'), ('b', 'back'), ('h', 'help')]
+    lines += [dim(nav_line(nav)), '']
     return lines
 
 
@@ -105,16 +105,16 @@ def _card(name, point, here, number, total):
              f'@{name}', point['address'], dim(f'{point["proximity"]}   {point["radius"]} m')]
     if here:
         lines += ['', *(f'○ {t["title"]}' for t in here)]
-        nav = [('e', 'edit')] if editor.available() else []
-        nav += [('t', 'arrive / leave', 't', 'arrive/leave'),
-                ('r number', 'radius', 'r#', 'radius'),
-                ('d', 'delete')]
-        if number < total:
-            nav.append(('n', 'next'))
-        if number > 1:
-            nav.append(('p', 'prev'))
-        nav += [('b', 'back'), ('h', 'help')]
-        lines += ['', dim(nav_line(nav)), '']
+    nav = [('e', 'edit')] if editor.available() else []
+    nav += [('t', 'arrive / leave', 't', 'arrive/leave'),
+            ('r number', 'radius', 'r#', 'radius'),
+            ('d', 'delete')]
+    if number < total:
+        nav.append(('n', 'next'))
+    if number > 1:
+        nav.append(('p', 'prev'))
+    nav += [('b', 'back'), ('h', 'help')]
+    lines += ['', dim(nav_line(nav)), '']
     return lines
 
 

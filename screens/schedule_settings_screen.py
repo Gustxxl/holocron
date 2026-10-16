@@ -3,7 +3,7 @@ from core import clocks, schedule, zones
 from core.dates import DAYS, monday, parse_date, parse_periods
 from ui.format import date_span, day_runs, days_summary, periods, plural, week_span
 from core.system import copy_text
-from ui.interface import clear_screen, confirm, dim, error, is_back, pause, read_command, red
+from ui.interface import clear_screen, confirm, dim, error, is_back, pause, read_command, red, nav_line
 import re
 
 
@@ -334,7 +334,7 @@ def _zone_frame(sched, items, query, found, page, now, adding):
         if sched.zone:
             nav.append(('c', 'clear'))
         nav.append(('b', 'back'))
-    lines += ['', dim(nav), '']
+    lines += ['', dim(nav_line(nav)), '']
     return '\n'.join(lines)
 
 

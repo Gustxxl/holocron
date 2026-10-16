@@ -138,7 +138,6 @@ def schedule_screen():
             nav.append(('t', 'this week'))
         nav += [('b', 'back'), ('h', 'help')]
         print(dim(nav_line(nav)))
-        print(dim(nav))
         print()
         command = read_command('schedule> ').lower()
         if is_back(command):
