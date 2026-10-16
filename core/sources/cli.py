@@ -1,17 +1,23 @@
 import json
+import os
 import shutil
 from datetime import date, datetime
 from core import system
 
 TIMEOUT = 10
+_PATHS = ('/opt/homebrew/bin', '/usr/local/bin')
+
+
+def which(program):
+    return shutil.which(program) or shutil.which(program, path=os.pathsep.join(_PATHS))
 
 
 def available(program):
-    return shutil.which(program) is not None
+    return which(program) is not None
 
 
 def _run(program, args, timeout):
-    path = shutil.which(program)
+    path = which(program)
     return system.run([path, *args], timeout=timeout) if path else None
 
 
