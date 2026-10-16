@@ -1,3 +1,33 @@
+from core.settings import (
+    operator_name,
+    update_operator_name,
+    archive_path,
+    update_archive_path,
+    excalidraw_path,
+    update_excalidraw_path,
+    vault_path,
+    update_vault_path,
+    new_cases_path,
+    update_new_cases_path,
+    keeper_server,
+    keeper_model,
+    update_keeper_server,
+    update_keeper_model,
+    vault_exclude,
+    update_vault_exclude
+)
+from core import archives, keeper
+from screens.schedule_settings_screen import schedule_settings
+from ui.interface import clear_screen, dim, error, pause, read_command, red, show_menu
+from pathlib import Path
+from ui.clean_path import clean_input_path
+from core import system
+from core.sources import remindctl
+from screens.tasks_screen import lists_screen
+import sys
+from core.archives.vault import folders, relative
+
+
 _SOURCES = [remindctl]
 
 _SOURCE_STATUS = {
@@ -5,7 +35,6 @@ _SOURCE_STATUS = {
     'no_brew': 'needs Homebrew',
     'missing': 'not installed',
     'denied': 'no access',
-    'ready': '✓',
 }
 
 _STEPS = ['old_macos', 'no_brew', 'missing', 'denied']
@@ -15,7 +44,7 @@ _STEP_NAMES = ['macOS 14 or later', 'Homebrew', 'remindctl', 'Access to Reminder
 def settings_screen():
     while True:
         extra = [s for s in _SOURCES if s.supported()]
-        labels = [f'{s.NAME}   {dim(_SOURCE_STATUS[s.status()])}' for s in extra]
+        labels = [_source_label(s) for s in extra]
         show_menu('Settings', ['User', 'Archive', 'Schedule', *labels])
         command = read_command('settings> ')
         if command == '1':
@@ -30,6 +59,11 @@ def settings_screen():
                 lists_screen(source)
         elif command == 'b':
             return
+
+
+def _source_label(source):
+    note = _SOURCE_STATUS.get(source.status())
+    return f'{source.NAME}   {dim(note)}' if note else source.NAME
 
 
 def source_setup(source):

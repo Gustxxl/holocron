@@ -10,6 +10,9 @@ _DEFAULT_RE = re.compile(r'd\s*(\d+)')
 
 
 def tasks_screen(source):
+    from screens.settings_screen import source_setup
+    if not source_setup(remindctl):
+        return
     while True:
         lists = source.lists()
         found = source.items() if lists is not None else None

@@ -205,3 +205,30 @@ class Selected(unittest.TestCase):
         sources.toggle_list('remindctl', 'L2')
         self.assertNotIn('default', self.store['sources']['remindctl'])
         self.assertEqual(sources.default('remindctl', self.LISTS), 'L1')
+
+
+from unittest import mock
+from core.sources import remindctl
+
+
+class RemindersStatus(unittest.TestCase):
+    def _status(self, macos='15.1', tools=(), authorized=False):
+        with mock.patch('core.sources.remindctl.platform.mac_ver', return_value=(macos, '', '')), \
+             mock.patch('core.sources.cli.available', side_effect=lambda p: p in tools), \
+             mock.patch('core.sources.remindctl.authorized', return_value=authorized):
+            return remindctl.status()
+
+    def test_old_macos(self):
+        self.assertEqual(self._status(macos='13.6'), 'old_macos')
+
+    def test_no_brew(self):
+        self.assertEqual(self._status(), 'no_brew')
+
+    def test_missing(self):
+        self.assertEqual(self._status(tools=('brew',)), 'missing')
+
+    def test_denied(self):
+        self.assertEqual(self._status(tools=('brew', 'remindctl')), 'denied')
+
+    def test_ready(self):
+        self.assertEqual(self._status(tools=('remindctl',), authorized=True), 'ready')
