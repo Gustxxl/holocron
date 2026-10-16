@@ -18,7 +18,7 @@ from core.settings import (
 )
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
-from ui.interface import clear_screen, dim, error, pause, read_command, red, show_menu
+from ui.interface import clear_screen, dim, error, pause, read_command, red, show_menu, nav_line
 from pathlib import Path
 from ui.clean_path import clean_input_path
 from core import system
@@ -26,6 +26,7 @@ from core.sources import remindctl
 from screens.tasks_screen import lists_screen
 import sys
 from core.archives.vault import folders, relative
+import platform
 
 
 _SOURCES = [remindctl]
