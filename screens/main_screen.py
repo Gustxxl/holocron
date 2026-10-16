@@ -5,7 +5,8 @@ import shutil
 from core import archives
 from core.commands import lookup
 from core.settings import operator_name
-from core.sources import remindctl
+from core.sources import ekctl, remindctl
+from screens.events_screen import agenda
 from core.updater import pending_update
 from screens.schedule_screen import duty_line
 from screens.search_screen import search_screen
@@ -52,6 +53,9 @@ def _frame():
     if total:
         lines.append(dim(f'{total} cases indexed'))
     duty = duty_line()
+    meetings = agenda(ekctl)
+    if meetings:
+        lines += ['', *meetings]
     if duty:
         lines += ['', duty]
     reminders = summary(remindctl)

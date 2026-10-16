@@ -206,13 +206,20 @@ class Selected(unittest.TestCase):
         self.assertNotIn('default', self.store['sources']['remindctl'])
         self.assertEqual(sources.default('remindctl', self.LISTS), 'L1')
 
+    def test_option(self):
+        self.assertEqual(sources.option('ekctl', 'shown', 2), 2)
+        sources.set_option('ekctl', 'shown', 5)
+        self.assertEqual(sources.option('ekctl', 'shown', 2), 5)
+        self.store['sources']['ekctl']['shown'] = 'x'
+        self.assertEqual(sources.option('ekctl', 'shown', 2), 2)
+
 
 from unittest import mock
 
 
 class RemindersStatus(unittest.TestCase):
     def _status(self, macos='15.1', tools=(), authorized=False):
-        with mock.patch('core.sources.remindctl.platform.mac_ver', return_value=(macos, '', '')), \
+        with mock.patch('core.sources.macos.platform.mac_ver', return_value=(macos, '', '')), \
              mock.patch('core.sources.cli.available', side_effect=lambda p: p in tools), \
              mock.patch('core.sources.remindctl.authorized', return_value=authorized):
             return remindctl.status()

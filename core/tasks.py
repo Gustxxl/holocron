@@ -45,7 +45,7 @@ def parse_add(text, lists, default, points=None):
     place = (points or {}).get(places[0].lower()) if places else None
     if places and place is None:
         return None, f'No waypoint @{places[0]}'
-    list_id, problem = _pick_list(tags[0] if tags else None, lists, default)
+    list_id, problem = pick_list(tags[0] if tags else None, lists, default)
     if problem:
         return None, problem
     return {'title': title, 'list': list_id, 'place': place}, None
@@ -70,7 +70,7 @@ def changes(task, text):
     return found
 
 
-def _pick_list(tag, lists, default):
+def pick_list(tag, lists, default):
     if tag is None:
         return (default, None) if default else (None, 'Choose lists in settings')
     key = _key(tag)

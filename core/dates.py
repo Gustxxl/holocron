@@ -80,3 +80,9 @@ def period_on(d, a, b):
     if end <= start:
         end += timedelta(days=1)
     return start, end
+
+
+def within(moment, now, days):
+    if not days:
+        return True
+    return moment is not None and moment.date() < now.date() + timedelta(days=days)

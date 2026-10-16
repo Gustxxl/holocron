@@ -1,10 +1,12 @@
 # Holocron
 
-Search and edit the text on your Excalidraw boards and notes from the terminal.
+A terminal companion for monitoring shifts: your error board, notes, reminders, meetings and hours in one place. No rendering, no GPU drain.
 
 I kept every error I ran into at work on one Excalidraw board: the message, the cause, the fix. On monitoring shifts I need it at hand all the time, so it stayed open in Obsidian. A board that size keeps the GPU busy and noticeably drains a laptop's battery. Its search also only found the exact wording, so if I didn't remember how I'd phrased something, I didn't find it.
 
-Holocron reads the same file from the terminal. Nothing renders, nothing runs in the background, and I get the right block in a second.
+Holocron reads the same file from the terminal. Nothing renders, nothing runs in the background, and I get the right block in a second. Over time the reminders, meetings and shift hours I kept checking in other apps moved here too, so one terminal window covers the whole shift.
+
+I kept every error I ran into at work on one Excalidraw board: the message, the cause, the fix. On monitoring shifts I need it at hand all the time, so it stayed open in Obsidian. A board that size keeps the GPU busy and noticeably drains a laptop's battery. Its search also only found the exact wording, so if I didn't remember how I'd phrased something, I didn't find it.
 
 So drop everything on a board and don't worry about order or wording. Skip a word, use a different word form or misspell it, and the right block still comes up, ready to read or edit.
 
@@ -12,6 +14,8 @@ So drop everything on a board and don't worry about order or wording. Skip a wor
 - **Edit in place.** Fix text on a drawing, open a note in your editor, tick off a task with `x 3` or write a new note with `note`. Changes go straight to the file.
 - **Ask your notes.** Keeper answers questions by quoting the notes themselves. The model runs on your computer or your own server, so your notes stay private.
 - **Know your hours.** A regular 9–5 or a rotating shift cycle. See if you're on the clock and what's next.
+- **See what's coming.** Upcoming reminders and calendar events sit on the main screen. Open a meeting link straight from the list, including Telemost and links left in the invite.
+- **Remind by place.** Waypoints tie reminders to an address, so they fire when you arrive or leave.
 - **Pin what you use.** Favorites open with a single key.
 
 <img width="2388" height="2022" alt="CleanShot 2026-10-10 kpVgcpSX@2x" src="https://github.com/user-attachments/assets/11a8a3c2-0327-4de3-89ff-41bdb1dbcd33" />
@@ -24,9 +28,19 @@ Works with drawings from the Excalidraw plugin for Obsidian, compressed or not, 
 - **Reads like a page.** Blocks are listed top to bottom, left to right — browse a whole board with `l`.
 - **Edit without opening the drawing.** Press `e`, change the text and save. The drawing itself is updated, so Excalidraw shows the change next time.
 
+## Reminders and calendar (macOS)
+
+Holocron reads Apple Reminders through [remindctl](https://github.com/steipete/remindctl) and Apple Calendar through ekctl. Set them up in settings (`s`), where any missing step is shown.
+
+- **Reminders.** View, tick off and edit reminders without leaving the terminal.
+- **Events.** Upcoming events and their meeting links on the main screen.
+- **Your call on how much.** Choose how many reminders and events the main screen shows and how many days ahead to look.
+
+On Windows and Linux everything else works; reminders and calendar are macOS only.
+
 ## Get started
 
-You need [Python 3.12+](https://www.python.org/downloads/) on macOS 14+, Windows 10+ or Linux. [Ollama](https://ollama.com/download) is optional, for Keeper. Everything else installs on first launch.
+You need [Python 3.12+](https://www.python.org/downloads/) on macOS 14+, Windows 10+ or Linux. [Ollama](https://ollama.com/download) is optional, for Keeper. Reminders and calendar need remindctl and ekctl, which settings help you install. Everything else installs on first launch.
 
 ```zsh
 git clone https://github.com/Gustxxl/holocron.git

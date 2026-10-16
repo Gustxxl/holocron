@@ -1,12 +1,15 @@
-import unittest
-
-from screens.search_screen import _wrap, first_line, highlight, highlight_links
-from ui.clean_path import clean_input_path
+import io
 import os
+import unittest
+from contextlib import redirect_stdout
 from datetime import datetime
 from unittest import mock
+from unittest.mock import patch
 
+from screens import search_screen
+from screens.search_screen import _wrap, first_line, highlight, highlight_links
 from screens.tasks_screen import _card
+from ui.clean_path import clean_input_path
 from ui.interface import nav_line
 
 
@@ -25,6 +28,25 @@ class Highlight(unittest.TestCase):
     def test_cyrillic(self):
         self.assertIn('\033[', highlight('привет мир', 'привет'))
 
+    def test_part_of_underscored_name(self):
+        result = highlight('XY_AB12 - z', 'AB12')
+        self.assertIn(f'{search_screen._HL}AB12{search_screen._RESET}', result)
+
+    def test_underscore_and_space_same_phrase(self):
+        for query in ('AB12 CD', 'AB12_CD'):
+            with self.subTest(query=query):
+                result = highlight('AB12_CD - x', query)
+                self.assertIn(f'{search_screen._MARK}AB12_CD{search_screen._RESET}', result)
+
+    def test_phrase_not_inside_longer_name(self):
+        self.assertNotIn(search_screen._MARK, highlight('AB12_CD_EF', 'AB12 CD'))
+
+    def test_phrase_with_ye(self):
+        for query in ('ЛЕС_ДОМ', 'лёс дом'):
+            with self.subTest(query=query):
+                result = highlight('ЛЕС_ДОМ - x', query)
+                self.assertIn(f'{search_screen._MARK}ЛЕС_ДОМ{search_screen._RESET}', result)
+
 
 class HighlightLinks(unittest.TestCase):
     def test_dims_url(self):
@@ -34,6 +56,10 @@ class HighlightLinks(unittest.TestCase):
 
     def test_no_url(self):
         self.assertEqual(highlight_links('no links here'), 'no links here')
+
+    def test_keeps_fragment(self):
+        url = 'https://366.abc.ru/gg/operator/#uuid:serviceCall$12345'
+        self.assertIn(url, highlight_links(f'Заявка: {url}'))
 
 
 class FirstLine(unittest.TestCase):
@@ -119,3 +145,12 @@ class TaskCardNav(unittest.TestCase):
 
     def test_nav_with_notes(self):
         self.assertEqual(len(self._nav(notes='USB-C')), 1)
+
+
+class SearchList(unittest.TestCase):
+    def test_hint_not_raw(self):
+        case = {'text': 'Case one', 'source': 'a.md'}
+        with patch.object(search_screen, 'clear_screen'), \
+             redirect_stdout(io.StringIO()) as out:
+            search_screen.show_list([(0, case)], 0, 'case')
+        self.assertNotIn("[('", out.getvalue())

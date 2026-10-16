@@ -60,7 +60,7 @@ def run(progress=lambda done, total, name: None):
 
 def system_info():
     from core import archives, keeper, system
-    from core.sources import remindctl
+    from core.sources import ekctl, remindctl
     editor = system.editor()
     clipboard = next((name for name, *_ in system.CLIPBOARDS if shutil.which(name)), None)
     conn = keeper.active(refresh=True)
@@ -69,6 +69,7 @@ def system_info():
         ('Clipboard', clipboard),
         ('Hyperspace', 'curses' if system.CURSES else None),
         ('Reminders', remindctl.PROGRAM if remindctl.available() else None),
+        ('Calendar', ekctl.PROGRAM if ekctl.available() else None),
         ('Keeper', {'server': 'server', 'local': 'this computer'}.get(conn['slot']) if conn else None),
         ('Archive', f'{archives.count()} cases' if archives.is_loaded() else None),
     ]

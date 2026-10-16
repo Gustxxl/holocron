@@ -50,3 +50,15 @@ def set_default(key, list_id):
     entry['lists'] = ids
     entry['default'] = list_id
     _save(cfg, key, entry)
+
+
+def option(key, name, default):
+    value = _entry(config.load(), key).get(name)
+    return value if isinstance(value, int) and value >= 0 else default
+
+
+def set_option(key, name, value):
+    cfg = config.load()
+    entry = _entry(cfg, key)
+    entry[name] = value
+    _save(cfg, key, entry)

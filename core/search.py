@@ -21,7 +21,7 @@ _ALNUM_RE = re.compile(r'([^\W\d_]+)(\d+)', re.UNICODE)
 
 
 def _normalize_search_text(text):
-    text = text.lower().replace('ё', 'е')
+    text = text.lower().replace('ё', 'е').replace('_', ' ')
     text = re.sub(r'-{2,}', ' ', text)
     text = re.sub(r'(?<=\w)-(?=\w)', ' ', text)
     return text

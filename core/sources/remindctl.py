@@ -1,60 +1,30 @@
-import os
-import platform
-import subprocess
 from core import system
-from . import cli
+from . import cli, macos
 
 NAME = 'Reminders'
 KEY = 'remindctl'
 KIND = 'tasks'
 PROGRAM = 'remindctl'
 TAP = 'steipete/tap/remindctl'
-HINT = 'No access to Reminders. Open settings (s) > Reminders'
+MACOS = 14
+ABOUT = 'Apple Reminders'
+LISTS = 'lists'
+PRIVACY = 'Reminders'
 PRIVACY_URL = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders'
+HINT = 'No access to Reminders. Open settings (s) > Reminders'
+SHOWN = 3
+AHEAD = 0
 
-_TERMINALS = {'Apple_Terminal': 'Terminal', 'iTerm.app': 'iTerm', 'ghostty': 'Ghostty',
-              'WezTerm': 'WezTerm', 'vscode': 'VS Code', 'WarpTerminal': 'Warp'}
-
-
-def supported():
-    return system.IS_MACOS
-
-
-def _new_macos():
-    major = platform.mac_ver()[0].split('.')[0]
-    return major.isdigit() and int(major) >= 14
+supported = macos.supported
 
 
 def status():
-    if not _new_macos():
-        return 'old_macos'
-    if not cli.available(PROGRAM):
-        return 'missing' if cli.available('brew') else 'no_brew'
-    return 'ready' if authorized() else 'denied'
-
-
-def terminal():
-    return _TERMINALS.get(os.environ.get('TERM_PROGRAM', ''), 'your terminal app')
-
-
-def install():
-    try:
-        return subprocess.call([cli.which('brew'), 'install', TAP]) == 0
-    except KeyboardInterrupt:
-        return False
+    return macos.status(PROGRAM, MACOS, authorized)
 
 
 def authorize():
     cli.run_ok(PROGRAM, 'authorize', timeout=120)
     return authorized()
-
-
-def open_privacy():
-    subprocess.call(['open', PRIVACY_URL])
-
-
-def open_brew_site():
-    subprocess.call(['open', 'https://brew.sh'])
 
 
 def available():

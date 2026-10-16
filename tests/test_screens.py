@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from screens import (diagnostics_screen, favorites_screen, help_screen, keeper_screen,
-                     schedule_screen, schedule_settings_screen, settings_screen,
+from screens import (diagnostics_screen, events_screen, favorites_screen, help_screen, keeper_screen,
+                     schedule_screen, schedule_settings_screen, settings_screen, sources_screen,
                      tasks_screen, waypoints_screen)
 
 LEAK = re.compile(r"\[\('")
@@ -19,13 +19,21 @@ class _Stop(Exception):
 
 class Screen(unittest.TestCase):
     def open(self, module, call, inputs=(), patches=None):
+        feed = iter(inputs)
+
+        def read(*args, **kwargs):
+            for value in feed:
+                return value
+            raise _Stop
+
         with ExitStack() as stack:
             enter = stack.enter_context
-            for name in ('clear_screen', 'pause', 'haptic'):
-                if hasattr(module, name):
-                    enter(patch.object(module, name))
-            if hasattr(module, 'read_command'):
-                enter(patch.object(module, 'read_command', side_effect=[*inputs, _Stop()]))
+            for target in {module, sources_screen}:
+                for name in ('clear_screen', 'pause', 'haptic'):
+                    if hasattr(target, name):
+                        enter(patch.object(target, name))
+                if hasattr(target, 'read_command'):
+                    enter(patch.object(target, 'read_command', side_effect=read))
             enter(patch('ui.interface.clear_screen'))
             enter(patch('ui.interface.haptic'))
             enter(patch('builtins.input', return_value=''))
@@ -58,8 +66,9 @@ class Schedule(Screen):
         self.assertIn('back', frame)
 
 
-SOURCE = SimpleNamespace(NAME='Reminders', TAP='steipete/tap/remindctl', supported=lambda: True,
-                         status=lambda: 'denied', terminal=lambda: 'Terminal')
+SOURCE = SimpleNamespace(NAME='Reminders', TAP='steipete/tap/remindctl', PROGRAM='remindctl', MACOS=14,
+                         ABOUT='Apple Reminders', PRIVACY='Reminders', supported=lambda: True,
+                         status=lambda: 'denied', authorize=lambda: False)
 
 
 class Settings(Screen):
@@ -69,7 +78,7 @@ class Settings(Screen):
             text = self.open(settings_screen, settings_screen.settings_screen,
                              ['1', 'b', '2', 'b', '3', '4', 'b', 'b'])
         schedule.assert_called_once()
-        self.assertIn('no access', text)
+        self.assertNotIn('no access', text.split('Settings > Reminders')[0])
         self.assertIn('Settings > Reminders', text)
 
 
@@ -77,19 +86,21 @@ LISTS = [{'id': 'l1', 'title': 'Home'}]
 TASK = {'id': 't1', 'title': 'Buy milk', 'list_name': 'Home', 'due': None,
         'all_day': False, 'notes': '', 'place': ''}
 TASKS_PATCHES = {
-    'screens.settings_screen.source_setup': True,
+    'screens.tasks_screen.source_setup': True,
     'core.sources.selected': {'l1'},
     'core.sources.default': 'l1',
     'core.tasks.group': [('Home', [TASK])],
     'core.tasks.numbered': [TASK],
     'core.waypoints.load': {},
     'core.editor.available': False,
+    'core.sources.option': 0
 }
 
 
 class Tasks(Screen):
     def test_list_card_and_lists(self):
-        source = SimpleNamespace(KEY='remindctl', NAME='Reminders', lists=lambda: LISTS, items=lambda: [TASK])
+        source = SimpleNamespace(KEY='remindctl', NAME='Reminders', LISTS='lists',
+                                 lists=lambda: LISTS, items=lambda: [TASK], SHOWN=3, AHEAD=0)
         text = self.open(tasks_screen, lambda: tasks_screen.tasks_screen(source),
                          ['1', 'b', 's', 'b', 'b'], TASKS_PATCHES)
         self.assertIn('Buy milk', text)
@@ -98,7 +109,7 @@ class Tasks(Screen):
     def test_stops_when_not_set_up(self):
         source = Mock()
         self.open(tasks_screen, lambda: tasks_screen.tasks_screen(source), [],
-                  {'screens.settings_screen.source_setup': False})
+                  {'screens.tasks_screen.source_setup': False})
         source.lists.assert_not_called()
 
 
@@ -156,3 +167,65 @@ class Other(Screen):
     def test_help(self):
         text = self.open(help_screen, help_screen.show_help, [], {'ui.interface.pause': None})
         self.assertTrue(text.strip())
+
+
+CALENDARS = [{'id': 'c1', 'title': 'Work'}]
+EVENT = {'id': 'e1', 'title': 'Standup', 'start': datetime(2030, 1, 1, 10), 'end': datetime(2030, 1, 1, 11),
+         'all_day': False, 'list': 'c1', 'list_name': 'Work', 'place': '', 'notes': '',
+         'url': 'https://meet.google.com/abc'}
+
+
+class Calendar(Screen):
+    def _source(self, ahead=2):
+        return SimpleNamespace(KEY='ekctl', NAME='Calendar', LISTS='calendars', SHOWN=2, AHEAD=ahead,
+                               available=lambda: True, lists=lambda: CALENDARS, items=lambda: [EVENT])
+
+    def _agenda(self, now, ahead=2, event=EVENT):
+        source = self._source(ahead)
+        source.items = lambda: [event]
+        with patch('core.sources.selected', return_value=['c1']), \
+             patch('core.sources.option', side_effect=lambda key, name, default: default):
+            return events_screen.agenda(source, now)
+
+    def test_list_card_and_calendars(self):
+        with patch('core.sources.set_option') as set_option:
+            text = self.open(events_screen, lambda: events_screen.events_screen(self._source()),
+                             ['1', 'b', 's', 'm 1', 't 3', 'b', 'b'], {
+                                 'screens.events_screen.source_setup': True,
+                                 'core.sources.selected': ['c1'],
+                                 'core.sources.default': 'c1',
+                                 'core.sources.option': 2,
+                             })
+        self.assertIn('Standup', text)
+        self.assertIn('meet.google.com', text)
+        self.assertIn('Settings > Calendar', text)
+        self.assertIn('today and tomorrow', text)
+        self.assertEqual([c.args for c in set_option.call_args_list],
+                         [('ekctl', 'shown', 1), ('ekctl', 'ahead', 3)])
+
+    def test_agenda_shows_link(self):
+        lines = self._agenda(datetime(2030, 1, 1, 9))
+        self.assertIn('Standup', lines[0])
+        self.assertIn('https://meet.google.com/abc', lines[1])
+
+    def test_agenda_tomorrow_counts(self):
+        self.assertTrue(self._agenda(datetime(2029, 12, 31, 9)))
+        self.assertEqual(self._agenda(datetime(2029, 12, 31, 9), ahead=1), [])
+
+    def test_agenda_hides_calendar_page(self):
+        event = {**EVENT, 'url': 'https://calendar.yandex.ru/event?event_id=1'}
+        self.assertEqual(len(self._agenda(datetime(2030, 1, 1, 9), event=event)), 1)
+
+    def test_card_every_shape(self):
+        now = datetime(2030, 1, 1, 9)
+        shapes = {
+            'link only': EVENT,
+            'nothing': {**EVENT, 'url': ''},
+            'place only': {**EVENT, 'url': '', 'place': 'Room 1'},
+            'place and link': {**EVENT, 'place': 'Room 1'},
+            'link is place': {**EVENT, 'url': '', 'place': 'https://zoom.us/j/1'},
+        }
+        for name, event in shapes.items():
+            with self.subTest(name):
+                text = '\n'.join(events_screen._card(event, 1, 1, now))
+                self.assertIn('Standup', text)

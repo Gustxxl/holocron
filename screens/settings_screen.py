@@ -17,34 +17,23 @@ from core.settings import (
 )
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
-from ui.interface import clear_screen, dim, error, pause, read_command, red, show_menu, nav_line
+from ui.interface import clear_screen, dim, error, pause, read_command, red, show_menu
 from pathlib import Path
 from ui.clean_path import clean_input_path
 from core import system
-from core.sources import remindctl
-from screens.tasks_screen import lists_screen
 import sys
 from core.archives.vault import folders, relative
-import platform
+from core.sources import ekctl, remindctl
+from screens.sources_screen import lists_screen, source_setup
 
 
-_SOURCES = [remindctl]
-
-_SOURCE_STATUS = {
-    'old_macos': 'needs macOS 14',
-    'no_brew': 'needs Homebrew',
-    'missing': 'not installed',
-    'denied': 'no access',
-}
-
-_STEPS = ['old_macos', 'no_brew', 'missing', 'denied']
-_STEP_NAMES = ['macOS 14 or later', 'Homebrew', 'remindctl', 'Access to Reminders']
+_SOURCES = [remindctl, ekctl]
 
 
 def settings_screen():
     while True:
         extra = [s for s in _SOURCES if s.supported()]
-        labels = [_source_label(s) for s in extra]
+        labels = [s.NAME for s in extra]
         show_menu('Settings', ['User', 'Archive', 'Schedule', *labels])
         command = read_command('settings> ')
         if command == '1':
@@ -59,71 +48,6 @@ def settings_screen():
                 lists_screen(source)
         elif command == 'b':
             return
-
-
-def _source_label(source):
-    note = _SOURCE_STATUS.get(source.status())
-    return f'{source.NAME}   {dim(note)}' if note else source.NAME
-
-
-def source_setup(source):
-    while True:
-        state = source.status()
-        if state == 'ready':
-            return True
-        current = _STEPS.index(state)
-        clear_screen()
-        print(dim(f'Settings > {source.NAME}'))
-        print()
-        print('  Holocron shows and adds Apple Reminders through remindctl,')
-        print('  a free command-line tool.')
-        print()
-        for i, name in enumerate(_STEP_NAMES):
-            mark = dim('✓') if i < current else '→' if i == current else dim('·')
-            print(f'  {mark} {name}' if i <= current else dim(f'  · {name}'))
-        print()
-
-        nav = []
-        if state == 'old_macos':
-            print('  Reminders need macOS 14 Sonoma or later.')
-            print(dim(f'  This Mac runs macOS {platform.mac_ver()[0] or "unknown"}.'))
-        elif state == 'no_brew':
-            print('  remindctl installs with Homebrew, a package manager for macOS.')
-            print('  Open brew.sh, copy the install command into a terminal,')
-            print('  then come back and press Enter.')
-            nav.append(('o', 'open brew.sh', 'o', 'brew.sh'))
-        elif state == 'missing':
-            print('  Install remindctl with Homebrew:')
-            print(dim(f'  brew install {source.TAP}'))
-            nav.append(('i', 'install now', 'i', 'install'))
-        elif state == 'denied':
-            app = source.terminal()
-            print(f'  macOS asks once whether {app} may use Reminders.')
-            print(f'  If the request does not appear, turn on {app} in')
-            print('  System Settings > Privacy & Security > Reminders,')
-            print(f'  then quit and reopen {app}.')
-            nav += [('a', 'ask for access', 'a', 'access'), ('o', 'open System Settings', 'o', 'settings')]
-        print()
-        nav += [('↵', 'check again', '↵', 'check'), ('b', 'back')]
-        print(dim(nav_line(nav)))
-        print()
-
-        command = read_command(f'{source.NAME.lower()}> ').lower()
-        if command == 'b':
-            return False
-        if command == 'o' and state == 'no_brew':
-            source.open_brew_site()
-        elif command == 'i' and state == 'missing':
-            print()
-            ok = source.install()
-            print()
-            print('Installed.' if ok else 'Installation did not finish. See the output above.')
-            pause(feedback=None if ok else 'error')
-        elif command == 'a' and state == 'denied':
-            if not source.authorize():
-                error(f'Still no access. Turn on {source.terminal()} in System Settings.')
-        elif command == 'o' and state == 'denied':
-            source.open_privacy()
 
 
 def _mark(path):

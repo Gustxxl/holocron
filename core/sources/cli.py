@@ -36,6 +36,11 @@ def run_ok(program, *args, timeout=TIMEOUT):
     return out is not None and out.returncode == 0
 
 
+def run_code(program, *args, timeout=TIMEOUT):
+    out = _run(program, args, timeout)
+    return out.returncode if out else None
+
+
 def parse_time(value):
     if not isinstance(value, str) or not value:
         return None

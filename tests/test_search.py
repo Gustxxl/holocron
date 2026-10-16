@@ -92,3 +92,19 @@ class Suggest(unittest.TestCase):
 
     def test_exact_no_suggestion(self):
         self.assertEqual(suggest([_case('hello world')], 'hello'), [])
+
+
+class Underscore(unittest.TestCase):
+    CASES = ['AB12_CD first', 'AB12 CD second', 'AB12 other']
+
+    def _found(self, query):
+        cases = [{'text': t} for t in self.CASES]
+        return [c['text'] for _, c in search(cases, query)]
+
+    def test_underscore_same_as_space(self):
+        for query in ('AB12_CD', 'AB12 CD'):
+            with self.subTest(query=query):
+                self.assertEqual(set(self._found(query)[:2]), {'AB12_CD first', 'AB12 CD second'})
+
+    def test_code_finds_underscored(self):
+        self.assertIn('AB12_CD first', self._found('AB12'))

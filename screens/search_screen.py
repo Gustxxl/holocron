@@ -35,12 +35,7 @@ def _marks(text):
 
 
 def highlight_links(text):
-    def _shorten(m):
-        url = m.group()
-        cut = url.find('#')
-        display = url[:cut] if cut != -1 else url
-        return dim(underline(display))
-    return _URL_RE.sub(_shorten, text)
+    return _URL_RE.sub(lambda m: dim(underline(m.group())), text)
 
 
 def _hl_match(qw, tw):
@@ -51,10 +46,10 @@ def _hl_match(qw, tw):
 
 
 def _phrase_re(query):
-    parts = [re.escape(p) for p in query.lower().split()]
+    parts = [re.escape(p) for p in re.split(r'[\s_]+', query.lower().replace('ё', 'е')) if p]
     if not parts:
         return None
-    pattern = r'[ \t]+'.join(parts).replace('е', '[её]').replace('ё', '[её]')
+    pattern = r'[ \t_]+'.join(parts).replace('е', '[её]')
     return re.compile(rf'(?<!\w){pattern}(?!\w)', re.IGNORECASE)
 
 
@@ -70,7 +65,7 @@ def highlight(text, query):
         return word
 
     def soft(part):
-        return re.sub(r'\w+', repl, part, flags=re.UNICODE)
+        return re.sub(r'[^\W_]+', repl, part)
 
     def soft_no_urls(text):
         out, pos = [], 0
@@ -403,7 +398,6 @@ def show_list(results, page, query, page_size=PAGE, note=None, exact=None):
         nav.append(('p', 'prev'))
     nav.append(('b', 'back'))
     print(dim(nav_line(nav, width)))
-    print(dim(nav))
     print()
     return page
 

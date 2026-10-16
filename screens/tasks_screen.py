@@ -1,23 +1,22 @@
 import re
 from datetime import datetime
-from core import editor, sources, tasks, waypoints
+from core import dates, editor, sources, tasks, waypoints
 from screens.help_screen import show_help
 from ui.format import day_label
 from ui.interface import clear_screen, dim, error, haptic, is_back, pause, read_command, red, nav_line
+from screens.sources_screen import lists_screen, source_setup, unreadable
 
 _CHECK_RE = re.compile(r'x\s*(\d+)')
-_DEFAULT_RE = re.compile(r'd\s*(\d+)')
 
 
 def tasks_screen(source):
-    from screens.settings_screen import source_setup
     if not source_setup(source):
         return
     while True:
         lists = source.lists()
         found = source.items() if lists is not None else None
         if found is None:
-            _unreadable(source)
+            unreadable(source)
             return
         chosen = sources.selected(source. KEY)
         groups = [(title, items) for title, items in tasks.group(found, lists, chosen) if items]
@@ -44,47 +43,18 @@ def tasks_screen(source):
             _open(source, flat, int(low))
 
 
-def lists_screen(source):
-    lists = source.lists()
-    if lists is None:
-        _unreadable(source)
-        return
-    while True:
-        chosen = sources.selected(source.KEY)
-        main = sources.default(source.KEY, lists)
-        lines = [dim(f'Settings > {source.NAME}'), '']
-        for i, l in enumerate(lists, 1):
-            mark = dim('  ✓') if l['id'] in chosen else ''
-            mark += dim('  default') if l['id'] == main else ''
-            lines.append(f'{i}) {l["title"]}{mark}')
-        if not lists:
-            lines.append('No lists')
-        nav = [('number', 'show / hide', '#', 'show/hide'), ('d number', 'default', 'd#', 'default'), ('b', 'back')]
-        lines += ['', dim(nav_line(nav)), '']
-        frame = '\n'.join(lines)
-        clear_screen()
-        print(frame)
-        command = read_command('lists> ').lower()
-        pick = _DEFAULT_RE.fullmatch(command)
-        if is_back(command):
-            return
-        if pick and 1 <= int(pick.group(1)) <= len(lists):
-            sources.set_default(source.KEY, lists[int(pick.group(1)) - 1]['id'])
-            haptic('toggle')
-        elif command.isdigit() and 1 <= int(command) <= len(lists):
-            sources.toggle_list(source.KEY, lists[int(command) - 1]['id'])
-            haptic('toggle')
-
-
 def summary(source, now=None):
     chosen = sources.selected(source.KEY)
-    if not chosen or not source.available():
+    limit = sources.option(source.KEY, 'shown', source.SHOWN)
+    if not chosen or not limit or not source.available():
         return []
     found = source.items()
     if not found:
         return []
-    shown, rest = tasks.upcoming(found, chosen)
     now = now or datetime.now()
+    ahead = sources.option(source.KEY, 'ahead', source.AHEAD)
+    found = [t for t in found if dates.within(t['due'], now, ahead)]
+    shown, rest = tasks.upcoming(found, chosen, limit)
     lines = []
     for task in shown:
         line = f'○ {_line(task, now)}'
@@ -219,7 +189,3 @@ def _label(task, now):
     if not task['all_day']:
         text += f' {due:%H:%M}'
     return red(text) if tasks.is_overdue(task, now) else dim(text)
-
-
-def _unreadable(source):
-    error(source.HINT if not source.authorized() else f'Could not read {source.NAME}')

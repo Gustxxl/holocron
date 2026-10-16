@@ -7,7 +7,7 @@ from core.updater import update
 from screens.help_screen import render_help
 from screens.settings_screen import settings_screen
 from ui.interface import clear_screen, pause
-from core.sources import remindctl
+from core.sources import ekctl, remindctl
 from core import keeper
 
 
@@ -104,6 +104,11 @@ def _cmd_hyperspace(raw):
     hyperspace()
 
 
+def _cmd_calendar(raw):
+    from screens.events_screen import events_screen
+    events_screen(ekctl)
+
+
 def _cmd_reminders(raw):
     from screens.tasks_screen import tasks_screen
     tasks_screen(remindctl)
@@ -123,6 +128,7 @@ def _cmd_check(raw):
 COMMANDS = [
     Command('keeper',     _cmd_keeper,     ('k', 'keep'), 'ask the archive in your own words'),
     Command('schedule',   _cmd_schedule,   ('sch',),      'shift schedule, week by week'),
+    Command('calendar',   _cmd_calendar,   ('c', 'cal'),  'events from Apple Calendar', ekctl.available),
     Command('reminders',  _cmd_reminders,  ('r',),        'tasks from Apple Reminders', remindctl.available),
     Command('waypoints',  _cmd_waypoints,  ('wp',),       'places for location reminders', remindctl.available),
     Command('favorites',  _cmd_favorites,  ('f', 'fav'),  'pinned records'),
@@ -134,7 +140,7 @@ COMMANDS = [
     Command('update',     _cmd_update,     (),            'fetch and apply a pending update'),
     Command('hyperspace', _cmd_hyperspace, ('hy',),       'go to hyperspace (any key to return)', _has_curses),
     Command('list',       _cmd_list,       ('l',)),
-    Command('help',       _cmd_help,       ('h',),        'this help'),
+    Command('help',       _cmd_help,       ('h',),        'show commands'),
 ]
 
 HELP_SECTIONS = [
@@ -154,6 +160,10 @@ HELP_SECTIONS = [
         HelpEntry('t',            'back to this week'),
         HelpEntry('+N / -N',      'jump N weeks ahead / back'),
         HelpEntry('type a date',  'open the week of that date, e.g. 14-11'),
+    ]),
+    ('Calendar', [
+        HelpEntry('[number]', 'open an event', ekctl.available),
+        HelpEntry('a',        'add an event: title, time, optional date and #calendar', ekctl.available),
     ]),
     ('Reminders', [
         HelpEntry('[number]',     'open a reminder', remindctl.available),
