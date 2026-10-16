@@ -8,7 +8,7 @@ from screens.help_screen import render_help
 from screens.settings_screen import settings_screen
 from ui.interface import clear_screen, pause
 from core.sources import remindctl
-from core import diagnostics, keeper
+from core import keeper
 
 
 HAS_CURSES = system.CURSES

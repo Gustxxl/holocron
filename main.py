@@ -12,7 +12,6 @@ colorama.init()
 
 from core import archives
 from pathlib import Path
-from time import sleep
 from core.settings import update_archive_path
 from ui.clean_path import clean_input_path
 from screens.main_screen import main_screen

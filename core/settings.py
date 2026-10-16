@@ -1,7 +1,6 @@
 from core.config import load, save
 from ui.interface import clear_screen
 from ui.clean_path import clean_input_path
-import os
 
 
 def operator_name():

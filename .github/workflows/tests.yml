@@ -5,7 +5,18 @@ on:
     pull_request:
 
 jobs:
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+            - uses: actions/setup-python@v7
+              with:
+                  python-version: "3.x"
+            - run: pip install ruff
+            - run: ruff check --select F,E9 --output-format=github .
+
     test:
+        needs: lint
         strategy:
             fail-fast: false
             matrix:

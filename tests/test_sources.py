@@ -208,7 +208,6 @@ class Selected(unittest.TestCase):
 
 
 from unittest import mock
-from core.sources import remindctl
 
 
 class RemindersStatus(unittest.TestCase):

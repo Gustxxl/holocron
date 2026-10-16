@@ -3,7 +3,7 @@ from core import clocks, schedule, zones
 from core.dates import DAYS, monday, parse_date, parse_periods
 from ui.format import date_span, day_runs, days_summary, periods, plural, week_span
 from core.system import copy_text
-from ui.interface import clear_screen, confirm, dim, error, is_back, pause, read_command, red, nav_line
+from ui.interface import clear_screen, confirm, dim, error, is_back, pause, read_command, red
 import re
 
 

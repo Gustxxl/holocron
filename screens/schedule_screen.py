@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timedelta
 from core import schedule, zones
-from core import clocks, schedule, zones
+from core import clocks
 from core.commands import HELP_SECTIONS
 from core.dates import monday, parse_date
 from screens.help_screen import render_help

@@ -9,7 +9,6 @@ from core.settings import (
     update_vault_path,
     new_cases_path,
     update_new_cases_path,
-    keeper_server,
     keeper_model,
     update_keeper_server,
     update_keeper_model,
