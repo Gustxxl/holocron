@@ -1,46 +1,109 @@
 # Holocron
 
-A terminal companion for monitoring shifts: your error board, notes, reminders, meetings and hours in one place. No rendering, no GPU drain.
+A terminal companion for monitoring shifts. Your error board, notes, reminders, meetings and shift hours in one window. Nothing renders, nothing runs in the background, no GPU drain.
 
 I kept every error I ran into at work on one Excalidraw board: the message, the cause, the fix. On monitoring shifts I need it at hand all the time, so it stayed open in Obsidian. A board that size keeps the GPU busy and noticeably drains a laptop's battery. Its search also only found the exact wording, so if I didn't remember how I'd phrased something, I didn't find it.
 
-Holocron reads the same file from the terminal. Nothing renders, nothing runs in the background, and I get the right block in a second. Over time the reminders, meetings and shift hours I kept checking in other apps moved here too, so one terminal window covers the whole shift.
+Holocron reads the same file from the terminal and gets me the right block in a second. Over time the reminders, meetings and shift hours I kept checking in other apps moved here too, so one terminal window now covers the whole shift.
 
-I kept every error I ran into at work on one Excalidraw board: the message, the cause, the fix. On monitoring shifts I need it at hand all the time, so it stayed open in Obsidian. A board that size keeps the GPU busy and noticeably drains a laptop's battery. Its search also only found the exact wording, so if I didn't remember how I'd phrased something, I didn't find it.
-
-So drop everything on a board and don't worry about order or wording. Skip a word, use a different word form or misspell it, and the right block still comes up, ready to read or edit.
-
-- **Search everything.** Every text block on a board is its own result, alongside your regular notes.
-- **Edit in place.** Fix text on a drawing, open a note in your editor, tick off a task with `x 3` or write a new note with `note`. Changes go straight to the file.
-- **Ask your notes.** Keeper answers questions by quoting the notes themselves. The model runs on your computer or your own server, so your notes stay private.
-- **Know your hours.** A regular 9–5 or a rotating shift cycle. See if you're on the clock and what's next.
-- **See what's coming.** Upcoming reminders and calendar events sit on the main screen. Open a meeting link straight from the list, including Telemost and links left in the invite.
-- **Remind by place.** Waypoints tie reminders to an address, so they fire when you arrive or leave.
-- **Pin what you use.** Favorites open with a single key.
+So drop everything on a board and don't worry about order or wording. Skip a word, use a different word form or make a typo, and the right block still comes up, ready to read or edit.
 
 <img width="2388" height="2022" alt="CleanShot 2026-10-10 kpVgcpSX@2x" src="https://github.com/user-attachments/assets/11a8a3c2-0327-4de3-89ff-41bdb1dbcd33" />
 
-## Excalidraw, from the terminal
+## What's inside
 
-Works with drawings from the Excalidraw plugin for Obsidian, compressed or not, and with plain `.excalidraw` files.
+- **Search everything.** Every text block on a board is its own result, alongside your regular Markdown notes.
+- **Edit in place.** Fix text on a drawing, open a note in your editor, tick off a task with `x 3` or write a new note with `note`. Changes go straight to the file.
+- **Ask your notes.** Keeper answers questions by quoting your notes. The model runs on your computer or your own server, so your notes stay private.
+- **Know your hours.** A regular 9 to 5 or a rotating cycle of up to 52 weeks, with night shifts, vacations and time zones.
+- **See what's coming.** The next reminders and calendar events are on the main screen, with meeting links pulled out of the invite.
+- **Remind by place.** Waypoints tie reminders to an address, so they fire when you arrive or leave.
+- **Pin what you use.** Favorites open with a single key.
+
+## Search that forgives
+
+You don't need to remember how you wrote something. Holocron catches:
+
+- typos, one or two letters off depending on word length
+- other word forms, so `timeout`, `timeouts` and `timed out` find each other (works for Russian endings too)
+- missing words: a long query still matches if most of it is there
+- `ё` and `е`, hyphens and underscores, all treated the same
+
+Codes and short words are matched exactly, so `ERR504` won't turn up `ERR503`. Hits in a block's title rank higher, and an exact phrase goes to the top. If nothing matches, Holocron suggests a corrected query from words that are actually in your archive.
+
+## Excalidraw from the terminal
+
+Works with drawings from the Excalidraw plugin for Obsidian, compressed or not, and with plain `.excalidraw` files or a whole folder of them.
 
 - **One block, one result.** A board with 40 sticky notes gives you 40 things to find, not one file to dig through.
-- **Reads like a page.** Blocks are listed top to bottom, left to right — browse a whole board with `l`.
+- **Reads like a page.** Blocks are listed top to bottom, left to right. Browse a whole board with `l`.
 - **Edit without opening the drawing.** Press `e`, change the text and save. The drawing itself is updated, so Excalidraw shows the change next time.
+
+## Notes and vault
+
+Point Holocron to an Obsidian vault and every Markdown note becomes searchable next to the boards. Folders you don't need can be excluded in settings, where you also see how many notes each folder holds.
+
+- `[[Wikilinks]]` in a note get numbers. Type `j 2` to jump to the second one.
+- Checkboxes like `- [ ]` can be ticked with `x 3` without leaving the note.
+- `note` opens your editor and saves a new note to the folder you chose. The first line becomes the file name.
+- `tree` browses the archive by folder.
+- `f` pins the open record to favorites.
+
+## Keeper
+
+Keeper is a local assistant for your archive. Ask in your own words, in any language, and it answers from your records: it refers to them by number, shows the exact lines it relied on and lists the links from those records (an instruction, a ticket, a doc). It keeps track of the conversation, so "what about the second one?" works. Press `k` on an open record to ask about that record.
+
+Keeper runs on [Ollama](https://ollama.com/download). Settings show what's missing, and if you don't have a model yet, they can download the recommended `qwen2.5:7b` for you. You can also add the address of another machine running Ollama. Keeper uses that server when it's reachable and switches to your own computer when it's not.
+
+## Shifts
+
+Describe your schedule once in settings (`s` > Schedule):
+
+- **Weeks.** One week for a fixed schedule, or a cycle of up to 52 weeks for rotating shifts. Hours are typed as `7-15` or `20-7` for a night shift, and several days can be set at once with `1-5`.
+- **Current week.** Tell Holocron where in the cycle you are today and it works out the rest.
+- **Vacations.** Days off in the cycle are skipped and the next shift is counted after them.
+- **Time zone and clocks.** Keep shift hours in your team's time zone and add clocks for other cities.
+- **Share.** Holocron turns your schedule into a short code and copies it. A colleague pastes it into Import and gets the same cycle. Their vacations stay as they are.
+
+The main screen tells you if you're on shift and when the next one starts. `schedule` shows it week by week: `n` and `p` to move, `+4` to jump ahead, `t` for this week, or type a date like `14-11`.
 
 ## Reminders and calendar (macOS)
 
-Holocron reads Apple Reminders through [remindctl](https://github.com/steipete/remindctl) and Apple Calendar through ekctl. Set them up in settings (`s`), where any missing step is shown.
+Holocron works with Apple Reminders through [remindctl](https://github.com/openclaw/remindctl) and with Apple Calendar through [ekctl](https://github.com/schappim/ekctl). You don't have to set them up yourself. Open settings (`s`), pick Reminders or Calendar, and Holocron walks you through it: it checks your macOS version and Homebrew, installs the tool with one key, asks macOS for access and, if that doesn't work, opens the right page in System Settings.
 
-- **Reminders.** View, tick off and edit reminders without leaving the terminal.
-- **Events.** Upcoming events and their meeting links on the main screen.
-- **Your call on how much.** Choose how many reminders and events the main screen shows and how many days ahead to look.
+Then choose which lists and calendars to show, which one is the default, how many items the main screen shows and how many days ahead to look.
 
-On Windows and Linux everything else works; reminders and calendar are macOS only.
+- **Reminders.** View, tick off (`x 2`) and edit reminders. Add one with `a`: `Call the vendor #work @office`. `#list` and `@waypoint` are optional.
+- **Waypoints.** Save an address under a short name like `office` once, then use `@office` in any reminder. Choose whether it fires on arrival or when you leave, and set the radius (100 m by default).
+- **Calendar.** Upcoming events grouped by day. Add one with `a`: `Standup 10:00` or `Lunch tomorrow 12:30-13:30 #work`.
+- **Meeting links.** Holocron looks for links in the event URL, location, notes and invitees and shows the meeting link right under the event: Zoom, Google Meet, Teams, Webex, Whereby, Jitsi and Telemost.
+
+On Windows and Linux everything else works. Reminders and calendar are macOS only.
+
+## Commands
+
+Type `h` in Holocron for the full list. The main ones:
+
+| Command           | What it does                                         |
+| ----------------- | ---------------------------------------------------- |
+| any words         | search the archive                                   |
+| `l`               | browse all records                                   |
+| `k`, `keeper`     | ask Keeper                                           |
+| `sch`, `schedule` | shift schedule                                       |
+| `c`, `calendar`   | Apple Calendar events                                |
+| `r`, `reminders`  | Apple Reminders                                      |
+| `wp`, `waypoints` | places for location reminders                        |
+| `f`, `favorites`  | pinned records                                       |
+| `tree`            | browse by folder                                     |
+| `note`            | write a new note                                     |
+| `s`, `settings`   | name, archive, schedule, Keeper, reminders, calendar |
+| `check`           | run diagnostics and tests                            |
+| `update`          | install a pending update                             |
+| `b` / `w` / `q`   | back / main screen / quit                            |
 
 ## Get started
 
-You need [Python 3.12+](https://www.python.org/downloads/) on macOS 14+, Windows 10+ or Linux. [Ollama](https://ollama.com/download) is optional, for Keeper. Reminders and calendar need remindctl and ekctl, which settings help you install. Everything else installs on first launch.
+You need [Python 3.12+](https://www.python.org/downloads/) on macOS 14+, Windows 10+ or Linux. [Ollama](https://ollama.com/download) is optional, for Keeper.
 
 ```zsh
 git clone https://github.com/Gustxxl/holocron.git
@@ -48,7 +111,7 @@ cd holocron
 python3 install.py
 ```
 
-No Git? Download the ZIP (Code → Download ZIP), unzip it and run `python3 install.py` inside the folder.
+No Git? Download the ZIP (Code > Download ZIP), unzip it and run `python3 install.py` inside the folder.
 
 Open a new terminal and run:
 
@@ -56,11 +119,21 @@ Open a new terminal and run:
 holo
 ```
 
-Point Holocron to your vault or drawings in settings (`s`). Type `h` for all commands.
+On first launch Holocron creates its own virtual environment and installs what it needs, so your system Python stays clean. Point it to your board, vault or drawings in settings (`s`). You can also open a board directly with `holo path/to/board.md`.
 
-## Update and remove
+## Updates
 
-Holocron checks for updates on launch — type `update` to install. To remove the command:
+Holocron checks for a new version in the background on launch, and the main screen tells you when there is one. Type `update` to install it. Every downloaded file is checked against GitHub's hashes before anything is replaced. If something goes wrong halfway, the previous version is restored. Your settings and data stay untouched.
+
+If GitHub is blocked on your network, updates come through mirrors. You can set your own with the `HOLOCRON_MIRROR` environment variable.
+
+## Small things
+
+- `check` runs the built-in tests and shows what's connected: editor, clipboard, reminders, calendar, Keeper and the size of your archive.
+- On a MacBook, the trackpad gives a light tap when you toggle something and a different pattern for success or error.
+- `hyperspace`. Try it. Any key brings you back.
+
+## Remove
 
 ```zsh
 python3 install.py --remove
