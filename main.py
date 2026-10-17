@@ -15,8 +15,9 @@ from pathlib import Path
 from core.settings import update_archive_path
 from ui.clean_path import clean_input_path
 from screens.main_screen import main_screen
-from ui.interface import clear_screen, disconnect
+from ui.interface import clear_screen, disconnect, pause
 from core import updater
+from core import config
 
 
 def start():
@@ -29,6 +30,9 @@ def start():
         clear_screen()
         print('Accessing the archives...')
         archives.load()
+        if config.broken:
+            print(f'Settings could not be read, defaults are used. A copy is in {config.broken}')
+            pause()
         updater.pending_update(wait=5)
         main_screen()
     except (KeyboardInterrupt, EOFError):
