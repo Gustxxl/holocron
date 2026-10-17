@@ -3,7 +3,7 @@ import shutil
 import textwrap
 from pathlib import Path
 from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks, keeper
-from core.archives.vault import Vault, save_note, create_note
+from core.archives.vault import Vault, save_note, create_note, read_note
 from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path
 from screens.help_screen import render_help
@@ -244,6 +244,8 @@ def _refresh(results, query, rerun, force=False):
 def _save(case, text):
     fp, eid = case.get('filepath'), case.get('element_id')
     if case.get('archive') == Vault.name:
+        if read_note(fp) != case['text']:
+            raise ValueError('the note changed on disk, open it again')
         save_note(fp, text)
     elif fp.endswith('.md'):
         excalidraw.update_text_obsidian(fp, eid, text)
@@ -264,6 +266,8 @@ def open_case(results, number, query, rerun=True, trail=()):
                 print(dim('  Editing not available for this case'))
                 pause()
                 continue
+            results = _refresh(results, query, False)
+            case = results[number - 1][1]
             edited = editor.edit_text(case['text'])
             if edited is None:
                 error('Could not open the editor')
@@ -277,9 +281,9 @@ def open_case(results, number, query, rerun=True, trail=()):
             try:
                 _save(case, edited)
                 haptic('success')
-                results = _refresh(results, query, False)
             except Exception as e:
                 error(f'Could not save: {e}')
+            results = _refresh(results, query, False)
             continue
 
         if low in ('f', 'fav'):
@@ -289,6 +293,8 @@ def open_case(results, number, query, rerun=True, trail=()):
             continue
         m = _CHECK_RE.fullmatch(low)
         if m and case.get('filename'):
+            results = _refresh(results, query, False)
+            case = results[number - 1][1]
             text = checklist.toggle(case['text'], int(m.group(1)))
             if text is None:
                 continue
@@ -298,6 +304,7 @@ def open_case(results, number, query, rerun=True, trail=()):
             except Exception as e:
                 print(f'  Error: {e}')
                 pause(feedback='error')
+            results = _refresh(results, query, False)
             continue
         m = _JUMP_RE.fullmatch(low)
         if m:

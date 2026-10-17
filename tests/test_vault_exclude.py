@@ -64,26 +64,25 @@ class Exclude(unittest.TestCase):
 
     def test_relative_vault_itself(self):
         self.assertIsNone(self.relative(str(self.vault)))
-
-    def test_relative_missing(self):
-        self.assertIsNone(self.relative('Nope'))
-        self.assertIsNone(self.relative(''))
-
-
-        class Folders(unittest.TestCase):
-            def test_list_and_counts(self):
-                with tempfile.TemporaryDirectory() as tmp:
-                    root = Path(tmp)
-                    for name in ('Work', 'Personal', 'Old', '.obsidian'):
-                        (root / name).mkdir()
-                    cases = [{'archive': 'Vault', 'filepath': str(root / rel)}
-                             for rel in ('Work/a.md', 'Work/Logs/b.md', 'Personal/c.md', 'top.md')]
-                    rows = vault_mod.folders(root, ['Old', 'Work/Logs'], cases)
-                self.assertEqual(rows, [('Old', None), ('Personal', 1), ('Work', 2), ('Work/Logs', None)])
-
-            def test_missing_root(self):
-                self.assertEqual(vault_mod.folders('/nowhere/at/all', [], []), [])
+        def test_relative_missing(self):
+            self.assertIsNone(self.relative('Nope'))
+            self.assertIsNone(self.relative(''))
 
 
-if __name__ == '__main__':
-    unittest.main()
+    class Folders(unittest.TestCase):
+        def test_list_and_counts(self):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                for name in ('Work', 'Personal', 'Old', '.obsidian'):
+                    (root / name).mkdir()
+                cases = [{'archive': 'Vault', 'filepath': str(root / rel)}
+                         for rel in ('Work/a.md', 'Work/Logs/b.md', 'Personal/c.md', 'top.md')]
+                rows = vault_mod.folders(root, ['Old', 'Work/Logs'], cases)
+            self.assertEqual(rows, [('Old', None), ('Personal', 1), ('Work', 2), ('Work/Logs', None)])
+
+        def test_missing_root(self):
+            self.assertEqual(vault_mod.folders('/nowhere/at/all', [], []), [])
+
+
+    if __name__ == '__main__':
+        unittest.main()

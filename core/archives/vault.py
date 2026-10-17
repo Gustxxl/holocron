@@ -12,6 +12,10 @@ def save_note(filepath, text):
     Path(filepath).write_text(text.rstrip('\n') + '\n', encoding='utf-8')
 
 
+def read_note(filepath):
+    return Path(filepath).read_text(encoding='utf-8').strip()
+
+
 def note_name(text):
     first = next((ln.strip() for ln in text.splitlines() if ln.strip()), '')
     name = ' '.join(_UNSAFE.sub(' ', first.lstrip('#')).split())[:NAME_MAX].strip(' .')
