@@ -1,12 +1,12 @@
 import shutil
-import textwrap
 from pathlib import Path
 
 from core import archives, tree
 from core.settings import archive_path, excalidraw_path, new_cases_path, vault_path
 from screens.help_screen import show_help
-from screens.search_screen import first_line, open_case, search_screen
+from ui.format import plural
 from ui.interface import clear_screen, dim, read_command, nav_line
+from screens.search_screen import by_name, list_rows, open_case, search_screen
 
 PAGE = 15
 NAME_MAX = 40
@@ -38,7 +38,7 @@ def tree_screen():
         stack = _walk(root, trail)
         trail = [n['name'] for n in stack[1:]]
         node = stack[-1]
-        items = tree.entries(node) if node['kind'] == 'folder' else node['cases']
+        items = tree.entries(node) if node['kind'] == 'folder' else by_name(node['cases'])
         frame, page = _frame(stack, items, page)
         clear_screen()
         print(frame)
@@ -83,11 +83,13 @@ def _frame(stack, items, page):
     page = max(0, min(page, pages - 1))
     start = page * PAGE
     chunk = items[start:start + PAGE]
+    folder = stack[-1]['kind'] == 'folder'
     head = ' > '.join(n['name'] for n in stack)
+    if not folder:
+        head += '   ' + plural(len(items), 'block')
     head += f'   {page + 1}/{pages}' if pages > 1 else ''
     digits = len(str(len(items)))
-    folder = stack[-1]['kind'] == 'folder'
-    rows = _entries(chunk, start, digits) if folder else _blocks(chunk, start, digits, width)
+    rows = _entries(chunk, start, digits) if folder else list_rows(chunk, start, len(items), width)
     lines = [dim(head), '', *(rows or [dim('  Nothing indexed')])]
     nav = [('number', 'open', '#', 'open')] if items else []
     if page + 1 < pages:
@@ -114,13 +116,3 @@ def _info(node, cw):
         n = len(node['cases'])
         return dim(f'board · {n} block' + ('' if n == 1 else 's'))
     return ''
-
-
-def _blocks(chunk, start, digits, width):
-    pad = ' ' * (digits + 3)
-    rows = []
-    for i, case in enumerate(chunk, start + 1):
-        wrapped = textwrap.fill(first_line(case), width=width, initial_indent=pad, subsequent_indent=pad,
-                                break_long_words=False, break_on_hyphens=False)
-        rows.append(f'  {dim(str(i).rjust(digits))} {wrapped[len(pad):]}')
-    return rows

@@ -36,7 +36,7 @@ Codes and short words are matched exactly, so `ERR504` won't turn up `ERR503`. H
 Works with drawings from the Excalidraw plugin for Obsidian, compressed or not, and with plain `.excalidraw` files or a whole folder of them.
 
 - **One block, one result.** A board with 40 sticky notes gives you 40 things to find, not one file to dig through.
-- **Reads like a page.** Blocks are listed top to bottom, left to right. Browse a whole board with `l`.
+- **Sorted by name.** Blocks of a board are listed by their first line, the same way as in `l`. Browse a board with `tree`.
 - **Edit without opening the drawing.** Press `e`, change the text and save. The drawing itself is updated, so Excalidraw shows the change next time.
 
 ## Notes and vault

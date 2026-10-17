@@ -10,13 +10,14 @@ from screens.help_screen import render_help
 from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
 from ui.note import render_note
+from ui.format import plural
 
 
 _HL = '\033[38;2;116;167;254m'
 _MARK = '\033[38;2;20;20;20;48;2;116;167;254m'
 _RESET = '\033[0m'
 
-PAGE = 8
+PAGE = 15
 LIST_PAGE = 15
 MIN_QUERY = 3
 
@@ -91,8 +92,7 @@ def highlight(text, query):
 def _all(cases):
     pinned = favorites.resolve(cases)
     ids = {id(c) for c in pinned}
-    rest = sorted((c for c in cases if id(c) not in ids), key=lambda c: first_line(c).lower())
-    return [(0, c) for c in [*pinned, *rest]]
+    return [(0, c) for c in [*pinned, *by_name(c for c in cases if id(c) not in ids)]]
 
 
 def _run(cases, text):
@@ -241,6 +241,10 @@ def _refresh(results, query, rerun, force=False):
     return [(s, fresh.get((c.get('filepath'), c.get('element_id')), c)) for s, c in results]
 
 
+def _confirm(prompt):
+    return input(f'  {prompt} [y/N] ').strip().lower() in ('y', 'yes')
+
+
 def _save(case, text):
     fp, eid = case.get('filepath'), case.get('element_id')
     if case.get('archive') == Vault.name:
@@ -278,8 +282,10 @@ def open_case(results, number, query, rerun=True, trail=()):
             edited = edited.strip()
             if edited == source.strip():
                 continue
-            if not edited:
+            if not edited and case.get('archive') != Vault.name:
                 error('Empty text — edit cancelled')
+                continue
+            if not edited and not _confirm('Clear the note?'):
                 continue
             try:
                 _save(case, edited)
@@ -361,15 +367,27 @@ def open_case(results, number, query, rerun=True, trail=()):
     return None
 
 
+def list_rows(cases, start, total, width, query=''):
+    digits = len(str(total))
+    pad = ' ' * (digits + 3)
+    rows = []
+    for i, case in enumerate(cases, start + 1):
+        wrapped = textwrap.fill(first_line(case), width=width, initial_indent=pad, subsequent_indent=pad,
+                                break_long_words=False, break_on_hyphens=False)
+        rows.append(f'  {dim(str(i).rjust(digits))} {highlight(wrapped[len(pad):], query)}')
+    return rows
+
+
 def show_list(results, page, query, page_size=PAGE, note=None, exact=None):
     clear_screen()
     total = len(results)
     pages = max(1, (total + page_size - 1) // page_size)
     page = max(0, min(page, pages - 1))
-    chunk = results[page * page_size: page * page_size + page_size]
+    start = page * page_size
+    chunk = results[start: start + page_size]
 
     width = shutil.get_terminal_size().columns - 1
-    count = f'{total} results' if query else f'{total} cases'
+    count = plural(total, 'result') if query else plural(total, 'case')
     count += f'   {page + 1}/{pages}' if pages > 1 else ''
     if note:
         print(dim(_fit(note, width)))
@@ -385,21 +403,13 @@ def show_list(results, page, query, page_size=PAGE, note=None, exact=None):
         print('No exact matches — showing similar cases.')
         print()
 
-    for n, (score, case) in enumerate(chunk, page * page_size + 1):
+    for n, row in enumerate(list_rows([c for _, c in chunk], start, total, width, query), start + 1):
         if exact and n == exact + 1:
+            if n > start + 1:
+                print()
             print(dim('  Similar'))
-            print()
-        prefix = f'  {n:>3})  '
-        wrapped = textwrap.fill(
-            first_line(case),
-            width=width,
-            initial_indent=prefix,
-            subsequent_indent=' ' * len(prefix),
-            break_long_words=False,
-            break_on_hyphens=False,
-        )
-        print(highlight(wrapped, query))
-        print()
+        print(row)
+    print()
 
     nav = [('number', 'open', '#', 'open')]
     if page + 1 < pages:
@@ -407,6 +417,7 @@ def show_list(results, page, query, page_size=PAGE, note=None, exact=None):
     if page > 0:
         nav.append(('p', 'prev'))
     nav.append(('b', 'back'))
+    nav.append(('h', 'help'))
     print(dim(nav_line(nav, width)))
     print()
     return page
@@ -493,6 +504,10 @@ def first_line(case):
             return '  '.join(c for c in table_cells(links(ln)) if c)
         return links(ln)
     return '(empty)'
+
+
+def by_name(cases):
+    return sorted(cases, key=lambda c: first_line(c).casefold())
 
 
 def _wrap(text, width):
