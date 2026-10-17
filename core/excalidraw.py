@@ -9,6 +9,15 @@ _lz = lzstring.LZString()
 _KEY_B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
 
 
+def _from_utf16(s):
+    return s.encode('utf-16-le', 'surrogatepass').decode('utf-16-le', 'replace')
+
+
+def _to_utf16(s):
+    b = s.encode('utf-16-le')
+    return ''.join(chr(b[i] | b[i + 1] << 8) for i in range(0, len(b), 2))
+
+
 class SceneError(ValueError):
     '''The file is not an excalidraw scene with compressed JSON.'''
 
@@ -90,11 +99,11 @@ def decompress_from_base64(inp):
         return None
     index = {c: i for i, c in enumerate(_KEY_B64)}
     n = len(inp)
-    return _decompress(n, 32, lambda i: (index.get(inp[i], 0) if i < n else 0))
+    return _from_utf16(_decompress(n, 32, lambda i: (index.get(inp[i], 0) if i < n else 0)))
 
 
 def compress_to_base64(inp):
-    return _lz.compressToBase64(inp)
+    return _lz.compressToBase64(_to_utf16(inp))
 
 
 def strip_emoji(s: str) -> str:
@@ -145,14 +154,15 @@ def load_cases(path):
     for t in elements:
         if t.get('type') != 'text' or t.get('isDeleted'):
             continue
-        txt = strip_emoji(t.get('originalText') or t.get('text') or '').strip()
+        original = (t.get('originalText') or t.get('text') or '').strip()
+        txt = strip_emoji(original).strip()
         if not txt:
             continue
         r = rects.get(t.get('containerId'))
         x = round((r or t).get('x', 0))
         y = round((r or t).get('y', 0))
         cases.append({
-            'text': txt, 'x': x, 'y': y,
+            'text': txt, 'raw': original, 'x': x, 'y': y,
             'source': path.name,
             'filepath': str(path),
             'element_id': t['id'],

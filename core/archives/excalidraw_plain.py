@@ -16,13 +16,14 @@ def _load_scene(path):
     for t in elements:
         if t.get("type") != "text" or t.get("isDeleted"):
             continue
-        txt = strip_emoji(t.get("originalText") or t.get("text") or "").strip()
+        original = (t.get("originalText") or t.get("text") or "").strip()
+        txt = strip_emoji(original).strip()
         if not txt:
             continue
         r = rects.get(t.get("containerId"))
         x = round((r or t).get("x", 0))
         y = round((r or t).get("y", 0))
-        cases.append({"text": txt, "x": x, "y": y, "source": path.name, "filepath": str(path), "element_id": t["id"]})
+        cases.append({"text": txt, "raw": original, "x": x, "y": y, "source": path.name, "filepath": str(path), "element_id": t["id"]})
     cases.sort(key=lambda c: (round(c["y"] / 40), c["x"]))
     return cases
 

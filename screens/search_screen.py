@@ -252,6 +252,8 @@ def _save(case, text):
     else:
         excalidraw.update_text(fp, eid, text)
     case['text'] = text
+    if 'raw' in case:
+        case['raw'], case['text'] = text, excalidraw.strip_emoji(text).strip()
 
 
 def open_case(results, number, query, rerun=True, trail=()):
@@ -268,7 +270,8 @@ def open_case(results, number, query, rerun=True, trail=()):
                 continue
             results = _refresh(results, query, False)
             case = results[number - 1][1]
-            edited = editor.edit_text(case['text'])
+            source = case.get('raw', case['text'])
+            edited = editor.edit_text(source)
             if edited is None:
                 error('Could not open the editor')
                 continue
@@ -276,7 +279,7 @@ def open_case(results, number, query, rerun=True, trail=()):
             if not edited:
                 error('Empty text — edit cancelled')
                 continue
-            if edited == case['text'].strip():
+            if edited == source.strip():
                 continue
             try:
                 _save(case, edited)
@@ -421,7 +424,7 @@ def show_case(case, query='', number=None, total=None, trail=()):
     archive = case.get('archive', '')
     pinned = favorites.is_pinned(case)
 
-    text, jumps = wikilinks.numbered(case['text'].strip(), archives.cases(), _link_mark)
+    text, jumps = wikilinks.numbered(case.get('raw', case['text']).strip(), archives.cases(), _link_mark)
     lines = text.splitlines()
     first = next((ln.strip() for ln in lines if ln.strip()), '')
     if case.get('filename'):
