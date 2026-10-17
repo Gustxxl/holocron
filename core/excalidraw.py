@@ -3,6 +3,7 @@ import json
 import unicodedata
 from pathlib import Path
 import lzstring
+from core import backups
 
 _lz = lzstring.LZString()
 
@@ -211,11 +212,7 @@ def update_text(filepath, element_id, new_text):
 
 
 def _backup(filepath):
-    path = Path(filepath)
-    backup_dir = Path(__file__).resolve().parent.parent / 'data' / 'backups'
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    bak = backup_dir / path.name
-    bak.write_text(path.read_text(encoding='utf-8'), encoding='utf-8')
+    backups.save(filepath)
 
 
 def _validate_md(md):

@@ -3,13 +3,16 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
+
+from core import backups
 
 from core.excalidraw import (
     strip_emoji, clean, decompress_from_base64, compress_to_base64,
     update_text, SceneError, _validate_md, _backup,
 )
 
-BACKUPS = Path(__file__).resolve().parent.parent / 'data' / 'backups'
+
 
 
 def _temp(test, suffix, text=''):
@@ -110,9 +113,11 @@ class ValidateMd(unittest.TestCase):
 
 class Backup(unittest.TestCase):
     def test_creates_backup(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
         path = _temp(self, '.md', 'test content')
-        bak = BACKUPS / path.name
-        self.addCleanup(bak.unlink, missing_ok=True)
-        _backup(str(path))
-        self.assertTrue(bak.exists())
-        self.assertEqual(bak.read_text(encoding='utf-8'), 'test content')
+        with mock.patch.object(backups, 'DIR', Path(tmp.name)):
+            _backup(str(path))
+        found = list(Path(tmp.name).iterdir())
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].read_text(encoding='utf-8'), 'test content')

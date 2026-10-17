@@ -9,6 +9,15 @@ from core import excalidraw
 from core.archives import excalidraw_plain
 from core.excalidraw import load_cases
 from screens import search_screen
+from core import backups
+
+
+def setUpModule():
+    tmp = tempfile.TemporaryDirectory()
+    patch = mock.patch.object(backups, 'DIR', Path(tmp.name))
+    patch.start()
+    unittest.addModuleCleanup(patch.stop)
+    unittest.addModuleCleanup(tmp.cleanup)
 
 BACKUPS = Path(__file__).resolve().parent.parent / 'data' / 'backups'
 TEXT = '🔥 Prod down'

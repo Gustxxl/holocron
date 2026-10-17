@@ -276,10 +276,10 @@ def open_case(results, number, query, rerun=True, trail=()):
                 error('Could not open the editor')
                 continue
             edited = edited.strip()
+            if edited == source.strip():
+                continue
             if not edited:
                 error('Empty text — edit cancelled')
-                continue
-            if edited == source.strip():
                 continue
             try:
                 _save(case, edited)

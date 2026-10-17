@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 from core.settings import vault_path, new_cases_path, vault_exclude
 from .base import Archive
+from core import backups
 
 NAME_MAX = 80
 _UNSAFE = re.compile(r'[\\/:*?"<>|#^\[\]]')
@@ -9,6 +10,7 @@ _RESERVED = {'CON', 'PRN', 'AUX', 'NUL', *(f'COM{i}' for i in range(1, 10)), *(f
 
 
 def save_note(filepath, text):
+    backups.save(filepath)
     Path(filepath).write_text(text.rstrip('\n') + '\n', encoding='utf-8')
 
 
@@ -84,7 +86,7 @@ def _note(f):
         text = f.read_text(encoding='utf-8').strip()
     except (OSError, UnicodeDecodeError):
         return []
-    if not text or '## Drawing' in text or 'excalidraw-plugin' in text:
+    if '## Drawing' in text or 'excalidraw-plugin' in text:
         return []
     return [{
         'text': text,

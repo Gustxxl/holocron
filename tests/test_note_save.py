@@ -6,6 +6,15 @@ from unittest import mock
 from core.archives import vault as vault_mod
 from core.archives.vault import Vault, read_note
 from screens import search_screen
+from core import backups
+
+
+def setUpModule():
+    tmp = tempfile.TemporaryDirectory()
+    patch = mock.patch.object(backups, 'DIR', Path(tmp.name))
+    patch.start()
+    unittest.addModuleCleanup(patch.stop)
+    unittest.addModuleCleanup(tmp.cleanup)
 
 TEXT = '\n- [ ] one\n- [ ] two  \n\n'
 
