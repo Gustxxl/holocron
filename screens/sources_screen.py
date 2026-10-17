@@ -11,6 +11,7 @@ _AHEAD = {0: 'any day', 1: 'today', 2: 'today and tomorrow'}
 
 
 def source_setup(source):
+    clt = False
     while True:
         state = source.status()
         if state == 'ready':
@@ -40,6 +41,13 @@ def source_setup(source):
         elif state == 'missing':
             print(f'  Install {source.PROGRAM} with Homebrew:')
             print(dim(f'  brew install {source.TAP}'))
+            if clt:
+                print()
+                print(f'  Homebrew needs newer Command Line Tools to build {source.PROGRAM}.')
+                print('  Update them in System Settings > General > Software Update,')
+                print('  then press i again.')
+                print(dim('  If no update shows up, run: xcode-select --install'))
+                nav.append(('u', 'open Software Update', 'u', 'update'))
             nav.append(('i', 'install now', 'i', 'install'))
         elif state == 'denied':
             app = macos.terminal()
@@ -60,10 +68,13 @@ def source_setup(source):
             macos.open_url(macos.BREW_URL)
         elif command == 'i' and state == 'missing':
             print()
-            ok = macos.install(source.TAP)
+            result = macos.install(source.TAP)
+            clt = result == 'clt'
             print()
-            print('Installed.' if ok else 'Installation did not finish. See the output above.')
-            pause(feedback=None if ok else 'error')
+            print('Installed.' if result == 'ok' else 'Installation did not finish. See the output above.')
+            pause(feedback=None if result == 'ok' else 'error')
+        elif command == 'u' and state == 'missing' and clt:
+            macos.open_url(macos.UPDATE_URL)
         elif command == 'a' and state == 'denied':
             if not source.authorize():
                 error(f'Still no access. Turn on {macos.terminal()} in System Settings.')

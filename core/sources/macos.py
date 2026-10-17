@@ -1,10 +1,13 @@
 import os
 import platform
 import subprocess
+from collections import deque
 from core import system
 from . import cli
 
 BREW_URL = 'https://brew.sh'
+UPDATE_URL = 'x-apple.systempreferences:com.apple.Software-Update-Settings.extension'
+_CLT = 'Command Line Tools'
 
 _TERMINALS = {'Apple_Terminal': 'Terminal', 'iTerm.app': 'iTerm', 'ghostty': 'Ghostty',
               'WezTerm': 'WezTerm', 'vscode': 'VS Code', 'WarpTerminal': 'Warp'}
@@ -29,9 +32,18 @@ def terminal():
 
 def install(formula):
     try:
-        return subprocess.call([cli.which('brew'), 'install', formula]) == 0
+        proc = subprocess.Popen([cli.which('brew'), 'install', formula], stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, errors='replace')
+        tail = deque(maxlen=50)
+        for line in proc.stdout:
+            print(line, end='', flush=True)
+            tail.append(line)
+        code = proc.wait()
     except KeyboardInterrupt:
-        return False
+        return 'failed'
+    if code == 0:
+        return 'ok'
+    return 'clt' if _CLT in ''.join(tail) else 'failed'
 
 
 def open_url(url):
