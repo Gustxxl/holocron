@@ -2,7 +2,7 @@ import glob
 import hashlib
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 DIR = Path(__file__).resolve().parent.parent / 'data' / 'backups'
@@ -27,7 +27,11 @@ def save(filepath):
     old = sorted(DIR.glob(f'{glob.escape(prefix)}.*.bak'))
     if old and old[-1].read_bytes() == data:
         return old[-1]
-    target = DIR / f'{prefix}.{datetime.now():%Y%m%d-%H%M%S-%f}.bak'
+    at = datetime.now()
+    target = DIR / f'{prefix}.{at:%Y%m%d-%H%M%S-%f}.bak'
+    while target.exists():
+        at += timedelta(microseconds=1)
+        target = DIR / f'{prefix}.{at:%Y%m%d-%H%M%S-%f}.bak'
     target.write_bytes(data)
     prune(keep=target)
     return target

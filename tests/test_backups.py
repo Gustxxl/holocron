@@ -4,6 +4,7 @@ import time
 import unittest
 from pathlib import Path
 from unittest import mock
+from datetime import datetime
 
 from core import backups
 
@@ -69,6 +70,22 @@ class Save(Base):
 
     def test_missing_file(self):
         self.assertIsNone(backups.save(self.root / 'nope.md'))
+
+    def test_same_moment(self):
+        class Frozen(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2026, 1, 1, 12, 0, 0)
+
+        path = self.file('Board.md', 'one')
+        with mock.patch.object(backups, 'datetime', Frozen):
+            backups.save(path)
+            path.write_text('two', encoding='utf-8')
+            backups.save(path)
+        names = self.left()
+        self.assertEqual(len(names), 2)
+        texts = [(backups.DIR / n).read_text(encoding='utf-8') for n in names]
+        self.assertEqual(texts, ['one', 'two'])
 
 
 class Prune(Base):
