@@ -93,14 +93,18 @@ TASKS_PATCHES = {
     'core.tasks.numbered': [TASK],
     'core.waypoints.load': {},
     'core.editor.available': False,
-    'core.sources.option': 0
+    'core.sources.option': 0,
+    'core.sources.cli.origin': 'holocron',
+    'core.sources.cli.which': '/x/remindctl',
+    'core.sources.cli.shadowed': None,
 }
 
 
 class Tasks(Screen):
     def test_list_card_and_lists(self):
-        source = SimpleNamespace(KEY='remindctl', NAME='Reminders', LISTS='lists',
-                                 lists=lambda: LISTS, items=lambda: [TASK], SHOWN=3, AHEAD=0)
+        source = SimpleNamespace(KEY='remindctl', NAME='Reminders', LISTS='lists', PROGRAM='remindctl',
+                                 TAP='steipete/tap/remindctl', lists=lambda: LISTS, items=lambda: [TASK],
+                                 SHOWN=3, AHEAD=0)
         text = self.open(tasks_screen, lambda: tasks_screen.tasks_screen(source),
                          ['1', 'b', 's', 'b', 'b'], TASKS_PATCHES)
         self.assertIn('Buy milk', text)
@@ -178,7 +182,8 @@ EVENT = {'id': 'e1', 'title': 'Standup', 'start': datetime(2030, 1, 1, 10), 'end
 class Calendar(Screen):
     def _source(self, ahead=2):
         return SimpleNamespace(KEY='ekctl', NAME='Calendar', LISTS='calendars', SHOWN=2, AHEAD=ahead,
-                               available=lambda: True, lists=lambda: CALENDARS, items=lambda: [EVENT])
+                               PROGRAM='ekctl', TAP='schappim/ekctl/ekctl', available=lambda: True,
+                               lists=lambda: CALENDARS, items=lambda: [EVENT])
 
     def _agenda(self, now, ahead=2, event=EVENT):
         source = self._source(ahead)
@@ -195,6 +200,9 @@ class Calendar(Screen):
                                  'core.sources.selected': ['c1'],
                                  'core.sources.default': 'c1',
                                  'core.sources.option': 2,
+                                 'core.sources.cli.origin': 'holocron',
+                                 'core.sources.cli.which': '/x/ekctl',
+                                 'core.sources.cli.shadowed': None,
                              })
         self.assertIn('Standup', text)
         self.assertIn('meet.google.com', text)

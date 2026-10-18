@@ -1,13 +1,15 @@
 import re
 from core import sources, system
 from core.sources import cli, macos
-from ui.interface import clear_screen, dim, error, haptic, is_back, pause, read_command, nav_line
+from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, pause, read_command, nav_line
 
 _DEFAULT_RE = re.compile(r'd\s*(\d+)')
 _STEPS = ['old_macos', 'missing', 'denied']
 _MAIN_RE = re.compile(r'm\s*(\d+)')
 _AHEAD_RE = re.compile(r't\s*(\d+)')
 _AHEAD = {0: 'any day', 1: 'today', 2: 'today and tomorrow'}
+_ORIGINS = {'holocron': 'downloaded by Holocron', 'homebrew': 'installed with Homebrew', 'system': 'installed separately'}
+_REMOVABLE = ('holocron', 'homebrew')
 
 
 def source_setup(source):
@@ -68,7 +70,7 @@ def source_setup(source):
             print(f'Downloading {source.PROGRAM}...')
             ok = macos.download(source.REPO, source.PROGRAM)
             print('Installed.' if ok else 'Download did not finish. Check the connection and try again.')
-            pause(feedback=None if ok else 'error')
+            pause(feedback='success' if ok else 'error')
         elif command == 'brew' and state == 'missing' and brew:
             print()
             result = macos.install(source.TAP)
@@ -77,7 +79,7 @@ def source_setup(source):
             if result == 'clt':
                 continue
             print('Installed.' if result == 'ok' else 'Installation did not finish. See the output above.')
-            pause(feedback=None if result == 'ok' else 'error')
+            pause(feedback='success' if result == 'ok' else 'error')
         elif command == 'u' and state == 'missing' and clt:
             macos.open_url(macos.UPDATE_URL)
         elif command == 'a' and state == 'denied':
@@ -87,12 +89,46 @@ def source_setup(source):
             macos.open_url(source.PRIVACY_URL)
 
 
+def tool_screen(source):
+    while True:
+        where = cli.origin(source.PROGRAM)
+        if where is None:
+            return
+        clear_screen()
+        print(dim(f'Settings > {source.NAME} > {source.PROGRAM}'))
+        print()
+        print(f'  {source.PROGRAM}   {_ORIGINS[where]}')
+        print(dim(f'  {cli.which(source.PROGRAM)}'))
+        other = cli.shadowed(source.PROGRAM)
+        if other:
+            print(dim(f'  Also installed at {other}, Holocron uses it once this copy is deleted'))
+        print()
+        nav = [('d', 'delete')] if where in _REMOVABLE else []
+        nav.append(('b', 'back'))
+        print(dim(nav_line(nav)))
+        print()
+        command = read_command(f'{source.PROGRAM}> ').lower()
+        if is_back(command):
+            return
+        if command == 'd' and where in _REMOVABLE and confirm(f'Delete {source.PROGRAM}?'):
+            if macos.remove(source.PROGRAM, source.TAP):
+                haptic('success')
+            elif where == 'homebrew':
+                print()
+                print('Could not delete. See the output above.')
+                pause(feedback='error')
+            else:
+                error(f'Could not delete {source.PROGRAM}')
+
+
 def lists_screen(source):
     lists = source.lists()
     if lists is None:
         unreadable(source)
         return
     while True:
+        if not cli.available(source.PROGRAM):
+            return
         chosen = sources.selected(source.KEY)
         main = sources.default(source.KEY, lists)
         shown = sources.option(source.KEY, 'shown', source.SHOWN)
@@ -106,9 +142,9 @@ def lists_screen(source):
             lines.append(f'No {source.LISTS}')
         when = _AHEAD.get(ahead, f'next {ahead} days')
         lines += ['', f'Main screen   {dim(f"{shown} · {when}" if shown else "hidden")}']
-        nav = [('number', 'show / hide', '#', 'show/hide'), ('d number', 'default', 'd#', 'default'),
-               ('m number', 'on main screen', 'm#', 'main'), ('t number', 'days ahead', 't#', 'days'),
-               ('b', 'back')]
+        nav = [('number', 'show/hide', '#', 'show/hide'), ('d number', 'default', 'd#', 'default'),
+               ('m number', 'main screen', 'm#', 'main'), ('t number', 'days', 't#', 'days'),
+               ('i', 'info'), ('b', 'back')]
         lines += ['', dim(nav_line(nav)), '']
         frame = '\n'.join(lines)
         clear_screen()
@@ -119,7 +155,9 @@ def lists_screen(source):
         days = _AHEAD_RE.fullmatch(command)
         if is_back(command):
             return
-        if pick and 1 <= int(pick.group(1)) <= len(lists):
+        if command == 'i':
+            tool_screen(source)
+        elif pick and 1 <= int(pick.group(1)) <= len(lists):
             sources.set_default(source.KEY, lists[int(pick.group(1)) - 1]['id'])
             haptic('toggle')
         elif count and int(count.group(1)) <= 20:

@@ -73,6 +73,10 @@ Holocron works with Apple Reminders through [remindctl](https://github.com/openc
 
 Then choose which lists and calendars to show, which one is the default, how many items the main screen shows and how many days ahead to look.
 
+Settings also show which copy of the tool Holocron uses, the one it downloaded or the one from Homebrew. Press `i` to see where it is and delete it.
+
+Settings also show which copy of the tool Holocron uses, the one it downloaded or the one from Homebrew. Press `i` to see where it is and remove it.
+
 - **Reminders.** View, tick off (`x 2`) and edit reminders. Add one with `a`: `Call the vendor #work @office`. `#list` and `@waypoint` are optional.
 - **Waypoints.** Save an address under a short name like `office` once, then use `@office` in any reminder. Choose whether it fires on arrival or when you leave, and set the radius (100 m by default).
 - **Calendar.** Upcoming events grouped by day. Add one with `a`: `Standup 10:00` or `Lunch tomorrow 12:30-13:30 #work`.
@@ -139,7 +143,7 @@ If downloads from GitHub are slow or blocked on your network, the update archive
 python3 install.py --remove
 ```
 
-Then delete the Holocron folder.
+This removes the `holo` command and the reminders and calendar tools Holocron downloaded. Tools installed with Homebrew stay, Holocron prints the command to remove them. This removes the `holo` command and the reminders and calendar tools Holocron downloaded. Tools installed with Homebrew stay, Holocron prints the command to remove them. Then delete the Holocron folder.
 
 ---
 

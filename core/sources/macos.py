@@ -17,6 +17,9 @@ UPDATE_URL = 'x-apple.systempreferences:com.apple.Software-Update-Settings.exten
 _CLT = 'Command Line Tools'
 _API = 'https://api.github.com/repos/{}/releases/latest'
 _ARCHIVES = ('.tar.gz', '.zip')
+_ARCH_NAMES = {'arm64': ('arm64', 'aarch64'), 'x86_64': ('x86_64', 'amd64')}
+_OTHER_OS = ('linux', 'windows', 'freebsd')
+_CPU = {'arm64': 0x0100000c, 'x86_64': 0x01000007}
 
 _TERMINALS = {'Apple_Terminal': 'Terminal', 'iTerm.app': 'iTerm', 'ghostty': 'Ghostty',
               'WezTerm': 'WezTerm', 'vscode': 'VS Code', 'WarpTerminal': 'Warp'}
@@ -40,8 +43,22 @@ def terminal():
 
 
 def install(formula):
+    return _brew('install', formula)
+
+
+def remove(program, formula):
+    if cli.origin(program) == 'holocron':
+        try:
+            (cli.BIN / program).unlink(missing_ok=True)
+        except OSError:
+            return False
+        return True
+    return cli.available('brew') and _brew('uninstall', formula) == 'ok'
+
+
+def _brew(action, formula):
     try:
-        proc = subprocess.Popen([cli.which('brew'), 'install', formula], stdout=subprocess.PIPE,
+        proc = subprocess.Popen([cli.which('brew'), action, formula], stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True, errors='replace')
         tail = deque(maxlen=50)
         for line in proc.stdout:
@@ -58,21 +75,20 @@ def install(formula):
 def download(repo, program):
     try:
         release = json.loads(_fetch(_API.format(repo)))
-        assets = {a['name']: a['browser_download_url'] for a in release['assets']}
-        names = [n for n in assets if n.endswith(_ARCHIVES)]
-        if not names:
+        assets = {a['name']: a for a in release['assets']}
+        name = _pick(assets, platform.machine())
+        if name is None:
             return False
-        name = min(names, key=lambda n: ('universal' not in n, n))
-        data = _fetch(assets[name])
-        sums = assets.get(name + '.sha256') or assets.get('checksums.txt')
-        if sums:
-            want = _digest(_fetch(sums).decode(), name)
-            if want is None or hashlib.sha256(data).hexdigest() != want:
-                return False
+        want = _expected(assets, name)
+        if want is None:
+            return False
+        data = _fetch(assets[name]['browser_download_url'])
+        if hashlib.sha256(data).hexdigest() != want:
+            return False
         blob = _extract(name, data, program)
     except (KeyboardInterrupt, Exception):
         return False
-    if blob is None:
+    if blob is None or _CPU.get(platform.machine()) not in _arches(blob):
         return False
     cli.BIN.mkdir(parents=True, exist_ok=True)
     target = cli.BIN / program
@@ -81,6 +97,29 @@ def download(repo, program):
     tmp.chmod(0o755)
     os.replace(tmp, target)
     return True
+
+
+def _pick(names, arch):
+    other = _ARCH_NAMES['x86_64' if arch == 'arm64' else 'arm64']
+    builds = [n for n in names if n.endswith(_ARCHIVES) and not any(w in n.lower() for w in _OTHER_OS + other)]
+    return min(builds, key=lambda n: ('universal' not in n.lower(), n), default=None)
+
+
+def _expected(assets, name):
+    digest = assets[name].get('digest') or ''
+    if digest.startswith('sha256:'):
+        return digest.removeprefix('sha256:')
+    sums = assets.get(name + '.sha256') or assets.get('checksums.txt')
+    return _digest(_fetch(sums['browser_download_url']).decode(), name) if sums else None
+
+
+def _arches(blob):
+    if blob[:4] == b'\xca\xfe\xba\xbe':
+        count = int.from_bytes(blob[4:8], 'big')
+        return {int.from_bytes(blob[8 + i * 20:12 + i * 20], 'big') for i in range(count)}
+    if blob[:4] == b'\xcf\xfa\xed\xfe':
+        return {int.from_bytes(blob[4:8], 'little')}
+    return set()
 
 
 def _fetch(url):

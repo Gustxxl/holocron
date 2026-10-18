@@ -12,6 +12,9 @@ APP_DIR = Path(__file__).resolve().parent
 MAIN = APP_DIR / 'main.py'
 NAME = 'holo'
 PATH_LINE = 'export PATH="$HOME/.local/bin:$PATH"'
+TOOLS = APP_DIR / 'data' / 'bin'
+TOOL_NAMES = ('remindctl', 'ekctl')
+BREW = ('/opt/homebrew/bin', '/usr/local/bin')
 
 
 def _windows_target():
@@ -71,13 +74,34 @@ def install():
     print(f'Open a new terminal and type: {NAME}')
 
 
+def _remove_tools():
+    removed = []
+    if TOOLS.is_dir():
+        for path in sorted(TOOLS.iterdir()):
+            if path.is_file():
+                path.unlink()
+                removed.append(path)
+    return removed
+
+
+def _brew_tools():
+    paths = [Path(folder) / name for name in TOOL_NAMES for folder in BREW]
+    return sorted({p.name for p in paths if p.exists() and '/Cellar/' in os.path.realpath(p)})
+
+
 def remove():
     target = _windows_target() if os.name == 'nt' else _posix_target()
+    removed = []
     if target.exists():
         target.unlink()
-        print(f'Removed: {target}')
-    else:
+        removed.append(target)
+    removed += _remove_tools()
+    for path in removed:
+        print(f'Removed: {path}')
+    if not removed:
         print('Nothing to remove.')
+    for name in _brew_tools():
+        print(f'{name} was installed with Homebrew and stays. To remove it run: brew uninstall {name}')
 
 
 if __name__ == '__main__':

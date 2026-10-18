@@ -84,6 +84,21 @@ def _zip(name, data):
     return buf.getvalue()
 
 
+ARM64 = 0x0100000c
+X86_64 = 0x01000007
+
+
+def _thin(cpu):
+    return b'\xcf\xfa\xed\xfe' + cpu.to_bytes(4, 'little') + bytes(24)
+
+
+def _fat(*cpus):
+    return b'\xca\xfe\xba\xbe' + len(cpus).to_bytes(4, 'big') + b''.join(c.to_bytes(4, 'big') + bytes(16) for c in cpus)
+
+
+TOOL = _fat(X86_64, ARM64)
+
+
 class Setup(unittest.TestCase):
     def run_setup(self, commands, result='failed', brew=True):
         with mock.patch.object(sources_screen, 'clear_screen'), \
@@ -136,9 +151,20 @@ class Download(unittest.TestCase):
         patch = mock.patch.object(macos.cli, 'BIN', self.bin)
         patch.start()
         self.addCleanup(patch.stop)
+        machine = mock.patch.object(macos.platform, 'machine', return_value='arm64')
+        machine.start()
+        self.addCleanup(machine.stop)
 
-    def serve(self, files):
-        release = {'assets': [{'name': n, 'browser_download_url': f'https://x/{n}'} for n in files]}
+    def serve(self, files, digests=None):
+        if digests is None:
+            digests = {n: 'sha256:' + hashlib.sha256(d).hexdigest() for n, d in files.items()}
+        assets = []
+        for name in files:
+            asset = {'name': name, 'browser_download_url': f'https://x/{name}'}
+            if name in digests:
+                asset['digest'] = digests[name]
+            assets.append(asset)
+        release = {'assets': assets}
 
         def urlopen(url, timeout=None):
             return io.BytesIO(json.dumps(release).encode() if 'api.github.com' in url else files[url[10:]])
@@ -149,24 +175,35 @@ class Download(unittest.TestCase):
         return path.read_bytes() if path.exists() else None
 
     def test_tar(self):
-        with self.serve({'sampletool-v1.tar.gz': _tar('sampletool', b'tool')}):
+        with self.serve({'sampletool-v1.tar.gz': _tar('sampletool', TOOL)}):
             self.assertTrue(macos.download('sample/sampletool', 'sampletool'))
-        self.assertEqual(self.installed(), b'tool')
+        self.assertEqual(self.installed(), TOOL)
 
     def test_nested_zip(self):
-        with self.serve({'sampletool-macos-universal.zip': _zip('dist/sampletool', b'tool')}):
+        with self.serve({'sampletool-macos-universal.zip': _zip('dist/sampletool', TOOL)}):
             self.assertTrue(macos.download('sample/sampletool', 'sampletool'))
-        self.assertEqual(self.installed(), b'tool')
+        self.assertEqual(self.installed(), TOOL)
+
+    def test_digest_mismatch(self):
+        with self.serve({'sampletool-v1.tar.gz': _tar('sampletool', TOOL)},
+                        {'sampletool-v1.tar.gz': 'sha256:' + '0' * 64}):
+            self.assertFalse(macos.download('sample/sampletool', 'sampletool'))
+        self.assertIsNone(self.installed())
+
+    def test_no_hash_refused(self):
+        with self.serve({'sampletool-v1.tar.gz': _tar('sampletool', TOOL)}, {}):
+            self.assertFalse(macos.download('sample/sampletool', 'sampletool'))
+        self.assertIsNone(self.installed())
 
     def test_checksum_ok(self):
-        data = _tar('sampletool', b'tool')
+        data = _tar('sampletool', TOOL)
         digest = hashlib.sha256(data).hexdigest().encode()
-        with self.serve({'sampletool-v1.tar.gz': data, 'sampletool-v1.tar.gz.sha256': digest + b'  sampletool-v1.tar.gz\n'}):
+        with self.serve({'sampletool-v1.tar.gz': data, 'sampletool-v1.tar.gz.sha256': digest + b'  sampletool-v1.tar.gz\n'}, {}):
             self.assertTrue(macos.download('sample/sampletool', 'sampletool'))
 
     def test_checksum_mismatch(self):
-        with self.serve({'sampletool-v1.tar.gz': _tar('sampletool', b'tool'),
-                         'sampletool-v1.tar.gz.sha256': b'0' * 64}):
+        with self.serve({'sampletool-v1.tar.gz': _tar('sampletool', TOOL),
+                         'sampletool-v1.tar.gz.sha256': b'0' * 64}, {}):
             self.assertFalse(macos.download('sample/sampletool', 'sampletool'))
         self.assertIsNone(self.installed())
 
@@ -175,7 +212,7 @@ class Download(unittest.TestCase):
             self.assertFalse(macos.download('sample/sampletool', 'sampletool'))
 
     def test_binary_missing_in_archive(self):
-        with self.serve({'sampletool-v1.tar.gz': _tar('other', b'x')}):
+        with self.serve({'sampletool-v1.tar.gz': _tar('other', TOOL)}):
             self.assertFalse(macos.download('sample/sampletool', 'sampletool'))
         self.assertIsNone(self.installed())
 
@@ -184,22 +221,63 @@ class Download(unittest.TestCase):
             self.assertFalse(macos.download('sample/sampletool', 'sampletool'))
 
     def test_checksums_file(self):
-        data = _zip('sampletool', b'tool')
+        data = _zip('sampletool', TOOL)
         digest = hashlib.sha256(data).hexdigest().encode()
         sums = b'abc  inventory.json\n' + digest + b'  sampletool-macos.zip\n'
-        with self.serve({'sampletool-macos.zip': data, 'checksums.txt': sums}):
+        with self.serve({'sampletool-macos.zip': data, 'checksums.txt': sums}, {}):
             self.assertTrue(macos.download('sample/sampletool', 'sampletool'))
 
     def test_checksums_file_mismatch(self):
         sums = b'0' * 64 + b'  sampletool-macos.zip\n'
-        with self.serve({'sampletool-macos.zip': _zip('sampletool', b'tool'), 'checksums.txt': sums}):
+        with self.serve({'sampletool-macos.zip': _zip('sampletool', TOOL), 'checksums.txt': sums}, {}):
+            self.assertFalse(macos.download('sample/sampletool', 'sampletool'))
+        self.assertIsNone(self.installed())
+
+    def test_arm64_build_picked(self):
+        with self.serve({'sampletool-darwin-amd64.tar.gz': _tar('sampletool', _thin(X86_64)),
+                         'sampletool-darwin-arm64.tar.gz': _tar('sampletool', _thin(ARM64))}):
+            self.assertTrue(macos.download('sample/sampletool', 'sampletool'))
+        self.assertEqual(self.installed(), _thin(ARM64))
+
+    def test_intel_build_picked(self):
+        with mock.patch.object(macos.platform, 'machine', return_value='x86_64'), \
+             self.serve({'sampletool-arm64.zip': _zip('sampletool', _thin(ARM64)),
+                         'sampletool-x86_64.zip': _zip('sampletool', _thin(X86_64))}):
+            self.assertTrue(macos.download('sample/sampletool', 'sampletool'))
+        self.assertEqual(self.installed(), _thin(X86_64))
+
+    def test_linux_build_skipped(self):
+        with self.serve({'sampletool-linux.tar.gz': _tar('sampletool', b'\x7fELF'),
+                         'sampletool-macos.tar.gz': _tar('sampletool', TOOL)}):
+            self.assertTrue(macos.download('sample/sampletool', 'sampletool'))
+        self.assertEqual(self.installed(), TOOL)
+
+    def test_universal_preferred(self):
+        with self.serve({'sampletool-arm64.zip': _zip('sampletool', _thin(ARM64)),
+                         'sampletool-universal.zip': _zip('sampletool', TOOL)}):
+            self.assertTrue(macos.download('sample/sampletool', 'sampletool'))
+        self.assertEqual(self.installed(), TOOL)
+
+    def test_only_other_arch_refused(self):
+        with self.serve({'sampletool-x86_64.zip': _zip('sampletool', _thin(X86_64))}):
+            self.assertFalse(macos.download('sample/sampletool', 'sampletool'))
+        self.assertIsNone(self.installed())
+
+    def test_wrong_binary_refused(self):
+        with self.serve({'sampletool-macos.zip': _zip('sampletool', _thin(X86_64))}):
+            self.assertFalse(macos.download('sample/sampletool', 'sampletool'))
+        self.assertIsNone(self.installed())
+
+    def test_not_macho_refused(self):
+        with self.serve({'sampletool-v1.tar.gz': _tar('sampletool', b'#!/bin/sh\n')}):
             self.assertFalse(macos.download('sample/sampletool', 'sampletool'))
         self.assertIsNone(self.installed())
 
     def test_ssl_falls_back_to_curl(self):
+        data = _tar('sampletool', TOOL)
         release = json.dumps({'assets': [{'name': 'sampletool-v1.tar.gz',
-                                          'browser_download_url': 'https://x/sampletool-v1.tar.gz'}]}).encode()
-        data = _tar('sampletool', b'tool')
+                                          'browser_download_url': 'https://x/sampletool-v1.tar.gz',
+                                          'digest': 'sha256:' + hashlib.sha256(data).hexdigest()}]}).encode()
 
         def curl(cmd, **kwargs):
             return subprocess.CompletedProcess(cmd, 0, release if 'api.github.com' in cmd[-1] else data, b'')
@@ -207,7 +285,22 @@ class Download(unittest.TestCase):
         with mock.patch.object(macos.urllib.request, 'urlopen', side_effect=err), \
              mock.patch.object(macos.subprocess, 'run', side_effect=curl):
             self.assertTrue(macos.download('sample/sampletool', 'sampletool'))
-        self.assertEqual(self.installed(), b'tool')
+        self.assertEqual(self.installed(), TOOL)
+
+
+class Pick(unittest.TestCase):
+    def test_remindctl_release(self):
+        names = ['checksums.txt', 'release-inventory.json', 'remindctl-macos.zip']
+        self.assertEqual(macos._pick(names, 'arm64'), 'remindctl-macos.zip')
+
+    def test_ekctl_release(self):
+        names = ['ekctl-v1.9.0.tar.gz', 'ekctl-v1.9.0.tar.gz.sha256']
+        self.assertEqual(macos._pick(names, 'x86_64'), 'ekctl-v1.9.0.tar.gz')
+
+    def test_macho_arches(self):
+        self.assertEqual(macos._arches(TOOL), {X86_64, ARM64})
+        self.assertEqual(macos._arches(_thin(ARM64)), {ARM64})
+        self.assertEqual(macos._arches(b'\x7fELF'), set())
 
 
 class Which(unittest.TestCase):
@@ -215,6 +308,92 @@ class Which(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, mock.patch.object(cli, 'BIN', Path(d)):
             (Path(d) / 'sampletool').write_bytes(b'')
             self.assertEqual(cli.which('sampletool'), str(Path(d) / 'sampletool'))
+
+
+class Copies(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        patch = mock.patch.object(cli, 'BIN', self.root / 'bin')
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def tool(self, folder):
+        path = self.root / folder / 'sampletool'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'')
+        return path
+
+    def brew_link(self):
+        link = self.root / 'brew' / 'sampletool'
+        link.parent.mkdir()
+        link.symlink_to(self.tool('Cellar/sampletool/1.0/bin'))
+        return str(link)
+
+    def test_downloaded_copy(self):
+        local = self.tool('bin')
+        with mock.patch.object(cli, '_system', return_value='/opt/homebrew/bin/sampletool'):
+            self.assertEqual(cli.origin('sampletool'), 'holocron')
+            self.assertEqual(cli.which('sampletool'), str(local))
+            self.assertEqual(cli.shadowed('sampletool'), '/opt/homebrew/bin/sampletool')
+
+    def test_homebrew_copy(self):
+        with mock.patch.object(cli, '_system', return_value=self.brew_link()):
+            self.assertEqual(cli.origin('sampletool'), 'homebrew')
+            self.assertIsNone(cli.shadowed('sampletool'))
+
+    def test_other_copy(self):
+        with mock.patch.object(cli, '_system', return_value=str(self.tool('usr/bin'))):
+            self.assertEqual(cli.origin('sampletool'), 'system')
+
+    def test_missing(self):
+        with mock.patch.object(cli, '_system', return_value=None):
+            self.assertIsNone(cli.origin('sampletool'))
+
+    def test_remove_downloaded_copy(self):
+        local = self.tool('bin')
+        with mock.patch.object(macos.subprocess, 'Popen') as popen:
+            self.assertTrue(macos.remove('sampletool', 'sample/tap/sampletool'))
+        self.assertFalse(local.exists())
+        popen.assert_not_called()
+
+    def test_remove_keeps_homebrew_copy(self):
+        self.tool('bin')
+        link = self.brew_link()
+        with mock.patch.object(cli, '_system', return_value=link), \
+             mock.patch.object(macos.subprocess, 'Popen') as popen:
+            macos.remove('sampletool', 'sample/tap/sampletool')
+            self.assertEqual(cli.origin('sampletool'), 'homebrew')
+        self.assertTrue(Path(link).exists())
+        popen.assert_not_called()
+
+    def test_remove_homebrew_copy(self):
+        with mock.patch.object(macos.cli, 'origin', return_value='homebrew'), \
+             mock.patch.object(macos.cli, 'which', return_value='/x/brew'), \
+             mock.patch.object(macos.subprocess, 'Popen', return_value=_Proc(['done\n'], 0)) as popen, \
+             mock.patch('builtins.print'):
+            self.assertTrue(macos.remove('sampletool', 'sample/tap/sampletool'))
+        self.assertEqual(popen.call_args.args[0], ['/x/brew', 'uninstall', 'sample/tap/sampletool'])
+
+    def test_remove_homebrew_failed(self):
+        with mock.patch.object(macos.cli, 'origin', return_value='homebrew'), \
+             mock.patch.object(macos.cli, 'which', return_value='/x/brew'), \
+             mock.patch.object(macos.subprocess, 'Popen', return_value=_Proc(['Error\n'], 1)), \
+             mock.patch('builtins.print'):
+            self.assertFalse(macos.remove('sampletool', 'sample/tap/sampletool'))
+
+    def test_remove_locked_copy(self):
+        self.tool('bin')
+        with mock.patch.object(Path, 'unlink', side_effect=PermissionError('locked')):
+            self.assertFalse(macos.remove('sampletool', 'sample/tap/sampletool'))
+
+    def test_remove_homebrew_without_brew(self):
+        with mock.patch.object(macos.cli, 'origin', return_value='homebrew'), \
+             mock.patch.object(macos.cli, 'available', return_value=False), \
+             mock.patch.object(macos.subprocess, 'Popen') as popen:
+            self.assertFalse(macos.remove('sampletool', 'sample/tap/sampletool'))
+        popen.assert_not_called()
 
 
 if __name__ == '__main__':

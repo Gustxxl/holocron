@@ -14,7 +14,24 @@ def which(program):
     local = BIN / program
     if local.is_file():
         return str(local)
+    return _system(program)
+
+
+def _system(program):
     return shutil.which(program) or shutil.which(program, path=os.pathsep.join(_PATHS))
+
+
+def origin(program):
+    path = which(program)
+    if path is None:
+        return None
+    if path == str(BIN / program):
+        return 'holocron'
+    return 'homebrew' if '/Cellar/' in os.path.realpath(path) else 'system'
+
+
+def shadowed(program):
+    return _system(program) if (BIN / program).is_file() else None
 
 
 def available(program):
