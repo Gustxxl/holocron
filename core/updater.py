@@ -12,6 +12,7 @@ import urllib.request
 import urllib.error
 import threading
 import ssl
+from ui.interface import wait
 
 
 REPO = 'Gustxxl/holocron'
@@ -322,21 +323,19 @@ def update(restart=True):
     if _is_dev():
         print('Dev mode: auto-update disabled.')
         return False
-    print('Checking the system...')
     try:
-        sha, blobs = _remote_tree()
+        sha, blobs = wait('Checking the system', _remote_tree)
     except Exception as e:
         print(f'System unreachable, api.github.com is needed to verify the update: {e}')
         return False
 
-    if _is_current(blobs):
+    if wait('Checking the system', _is_current, blobs):
         _adopt(blobs)
         print(f'System is up to date — build {sha[:7]}.')
         return False
 
-    print('Update found. Retrieving...')
     try:
-        blob = _download(sha)
+        blob = wait('Retrieving the update', _download, sha)
     except Exception as e:
         print(f'Retrieval failed: {e}')
         return False

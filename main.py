@@ -14,8 +14,8 @@ from core import archives
 from pathlib import Path
 from core.settings import update_archive_path
 from ui.clean_path import clean_input_path
-from screens.main_screen import main_screen
-from ui.interface import clear_screen, disconnect, pause
+from screens.main_screen import main_frame, main_screen
+from ui.interface import Spinner, clear_screen, disconnect, pause
 from core import updater
 from core import config
 
@@ -28,13 +28,14 @@ def start():
             update_archive_path(p)
     try:
         clear_screen()
-        print('Accessing the archives...')
-        archives.load()
+        with Spinner('Accessing the archives'):
+            archives.load()
+            updater.pending_update(5)
+            first = None if config.broken else main_frame()
         if config.broken:
             print(f'Settings could not be read, defaults are used. A copy is in {config.broken}')
             pause()
-        updater.pending_update(wait=5)
-        main_screen()
+        main_screen(first)
     except (KeyboardInterrupt, EOFError):
         disconnect()
 

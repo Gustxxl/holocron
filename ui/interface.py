@@ -72,16 +72,69 @@ def error(text):
     pause(feedback=None)
 
 
+_SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+SPIN_DELAY = 0.15
+BAR = 20
+
+
+class Spinner:
+    def __init__(self, label=''):
+        self.label = label
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def __enter__(self):
+        if sys.stdout.isatty():
+            self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        if self._thread.is_alive():
+            self._thread.join()
+        return False
+
+    def _run(self):
+        if self._stop.wait(SPIN_DELAY):
+            return
+        sys.stdout.write('\033[?25l')
+        i = 0
+        while not self._stop.is_set():
+            width = shutil.get_terminal_size().columns - 1
+            line = f'  {_SPIN[i % len(_SPIN)]} {self.label}'
+            sys.stdout.write('\r\033[2K' + dim(line[:width]))
+            sys.stdout.flush()
+            i += 1
+            self._stop.wait(0.08)
+        sys.stdout.write('\r\033[2K\033[?25h')
+        sys.stdout.flush()
+
+
+def wait(text, fn, *args):
+    with Spinner(text):
+        return fn(*args)
+
+
+def progress(label, done, total, note=''):
+    filled = BAR * min(done, total) // total if total else 0
+    line = f'  {label}  {"•" * filled}{"·" * (BAR - filled)}  {note}'.rstrip()
+    width = shutil.get_terminal_size().columns - 1
+    sys.stdout.write('\r\033[2K' + dim(line[:width]))
+    sys.stdout.flush()
+
+
+def clear_line():
+    sys.stdout.write('\r\033[2K')
+    sys.stdout.flush()
+
+
 def disconnect():
     clear_screen()
-    msg = "Disconnecting from the archives"
-    sys.stdout.write(msg)
-    sys.stdout.flush()
-    for _ in range(3):
-        time.sleep(0.12)
-        sys.stdout.write(".")
-        sys.stdout.flush()
-    time.sleep(0.12)
+    if sys.stdout.isatty():
+        for frame in _SPIN[:4]:
+            sys.stdout.write(f'\r\033[2K  {dim(frame + " Disconnecting from the archives")}')
+            sys.stdout.flush()
+            time.sleep(0.12)
     clear_screen()
 
 
@@ -166,39 +219,6 @@ def is_back(command):
 def confirm(question):
     return read_command(f'{question} [y/N] ').lower() == 'y'
 
-
-_SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-
-
-def wait(text, fn, *args):
-    if not sys.stdout.isatty():
-        return fn(*args)
-    result = {}
-
-    def run():
-        try:
-            result['value'] = fn(*args)
-        except BaseException as e:
-            result['error'] = e
-
-    worker = threading.Thread(target=run, daemon=True)
-    worker.start()
-    worker.join(0.15)
-    if worker.is_alive():
-        sys.stdout.write('\033[?25l')
-        try:
-            i = 0
-            while worker.is_alive():
-                sys.stdout.write(f'\r\033[2K  {dim(_SPIN[i % len(_SPIN)] + " " + text)}')
-                sys.stdout.flush()
-                worker.join(0.08)
-                i += 1
-        finally:
-            sys.stdout.write('\r\033[2K\033[?25h')
-            sys.stdout.flush()
-    if 'error' in result:
-        raise result['error']
-    return result['value']
 
 
 def show_menu(breadcrumb, options, footer='  [number] open section   [b] back   [q] quit'):

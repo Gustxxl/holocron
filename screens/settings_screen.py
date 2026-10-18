@@ -17,11 +17,10 @@ from core.settings import (
 )
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
-from ui.interface import clear_screen, dim, error, num, pause, read_command, red, show_menu, wait
+from ui.interface import clear_line, clear_screen, dim, error, num, pause, progress, read_command, red, show_menu, wait
 from pathlib import Path
 from ui.clean_path import clean_input_path
 from core import system
-import sys
 from core.archives.vault import folders, relative
 from core.sources import ekctl, remindctl
 from screens.sources_screen import lists_screen, source_setup
@@ -274,30 +273,26 @@ def _keeper_download(conn):
     clear_screen()
     print(dim(f'Settings > Archive > Keeper > {_KEEPER_NAMES[conn["slot"]]}'))
     print()
-    print(f'Downloading {keeper.RECOMMENDED}...')
-    print(dim('Ctrl+C to cancel'))
+    print(f'  {keeper.RECOMMENDED}')
+    print(dim('  Ctrl+C to cancel'))
     print()
 
-    def progress(status, done, total):
-        if total and done:
-            line = f'  {status[:30]:<30} {done * 100 // total:>3}%'
-        else:
-            line = f'  {status[:40]:<40}'
-        sys.stdout.write('\r\033[2K' + line)
-        sys.stdout.flush()
+    def step(status, done, total):
+        note = f'{done * 100 // total}%  {status}' if total and done else status
+        progress('Downloading', done or 0, total or 0, note)
 
     try:
-        keeper.pull(conn, keeper.RECOMMENDED, progress)
+        keeper.pull(conn, keeper.RECOMMENDED, step)
         update_keeper_model(conn['slot'], keeper.RECOMMENDED)
-        print('\n')
+        clear_line()
         print('Done.')
         pause()
     except keeper.KeeperOffline as e:
-        print('\n')
+        clear_line()
         print(f'Download failed: {e}')
         pause(feedback='error')
     except KeyboardInterrupt:
-        print('\n')
+        clear_line()
         print('Cancelled.')
         pause(feedback=None)
 

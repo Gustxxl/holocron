@@ -1,10 +1,7 @@
-import shutil
 import sys
 from core import archives, diagnostics, keeper
 from screens.help_screen import show_help
-from ui.interface import clear_screen, dim, haptic, is_back, pause, read_command, red
-
-BAR = 20
+from ui.interface import clear_screen, dim, haptic, is_back, pause, progress, read_command, red
 
 
 def diagnostics_screen():
@@ -46,11 +43,7 @@ def _run():
 
 
 def _progress(done, total, name):
-    filled = BAR * done // max(total, 1)
-    line = f'  Running diagnostics  {"•" * filled}{"·" * (BAR - filled)}  {done}/{total}  {name}'
-    width = shutil.get_terminal_size().columns - 1
-    sys.stdout.write('\r\033[2K' + dim(line[:width]))
-    sys.stdout.flush()
+    progress('Running diagnostics', done, total, f'{done}/{total}  {name}')
 
 
 def _frame(report, head, rows):

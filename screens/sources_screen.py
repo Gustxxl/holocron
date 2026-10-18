@@ -1,7 +1,7 @@
 import re
 from core import sources, system
 from core.sources import cli, macos
-from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, num, pause, read_command, nav_line
+from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, num, pause, read_command, nav_line, wait
 
 _DEFAULT_RE = re.compile(r'd\s*(\d+)')
 _STEPS = ['old_macos', 'missing', 'denied']
@@ -67,8 +67,7 @@ def source_setup(source):
             return False
         if command == 'i' and state == 'missing':
             print()
-            print(f'Downloading {source.PROGRAM}...')
-            ok = macos.download(source.REPO, source.PROGRAM)
+            ok = wait(f'Downloading {source.PROGRAM}', macos.download, source.REPO, source.PROGRAM)
             print('Installed.' if ok else 'Download did not finish. Check the connection and try again.')
             pause(feedback='success' if ok else 'error')
         elif command == 'brew' and state == 'missing' and brew:

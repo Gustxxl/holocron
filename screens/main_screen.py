@@ -18,15 +18,20 @@ LOGO = APP_DIR / "ui" / "logo.txt"
 LOGO_TEXT = "HOLOCRON"
 
 
-def main_screen():
+def main_screen(first=None):
     while True:
-        frame = '\n'.join(_frame())
+        frame = first or main_frame()
+        first = None
         clear_screen()
         print(frame)
         try:
             _handle(read_command('system> '))
         except Home:
             continue
+
+
+def main_frame():
+    return '\n'.join(_frame())
 
 
 def _handle(raw):

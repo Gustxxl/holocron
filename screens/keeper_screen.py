@@ -3,19 +3,18 @@ import io
 import shutil
 import sys
 import textwrap
-import threading
 from core import archives, keeper
 from core.commands import HELP_SECTIONS
 from screens.help_screen import render_help
 from screens.search_screen import open_case, first_line, highlight, highlight_links
-from ui.interface import clear_screen, dim, nav_line, num, pause, read_command, haptic
+from ui.interface import Spinner, clear_screen, dim, haptic, nav_line, num, pause, read_command, wait
 
 MIN_QUESTION = 3
 GREETING_ROW = 3
 NAV_ROWS = 2
 
 LINES = {
-    'connecting': 'Waking Keeper...',
+    'connecting': 'Waking Keeper',
     'ready': 'Awaiting your query...',
     'ready_case': 'Ask about this record.',
     'not_connected': 'No model connected. Search by words only. Settings > Archive > Keeper.',
@@ -104,34 +103,6 @@ def _drop_nav(command):
     up = (len('Keeper> ' + command) - 1) // cols + 1 + NAV_ROWS
     sys.stdout.write(f'\033[{up}A\033[{NAV_ROWS}M\033[{up - NAV_ROWS}B')
     sys.stdout.flush()
-
-
-class _Thinking:
-    def __init__(self, label=''):
-        self.label = label
-        self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-
-    def __enter__(self):
-        sys.stdout.write('\033[?25l')
-        sys.stdout.flush()
-        self._thread.start()
-        return self
-
-    def __exit__(self, *exc):
-        self._stop.set()
-        self._thread.join()
-        sys.stdout.write('\r\033[2K\033[1A\033[?25h')
-        sys.stdout.flush()
-
-    def _run(self):
-        i = 0
-        while not self._stop.is_set():
-            line = f'  {self.label}{"." * (i % 3 + 1)}'
-            sys.stdout.write('\r\033[2K' + dim(line[:_width()]))
-            sys.stdout.flush()
-            i += 1
-            self._stop.wait(0.4)
 
 
 def _ask(question, turns, records, focus, thinking):
@@ -236,8 +207,7 @@ def _redraw(turns, records, focus, pending=None, refresh=False):
         clear_screen()
         print(dim('Keeper'))
         print()
-        print(dim('  ' + LINES['connecting']))
-        keeper.active(refresh=True)
+        wait(LINES['connecting'], keeper.active, True)
     conn = keeper.active()
     frame = io.StringIO()
     with contextlib.redirect_stdout(frame):
@@ -305,8 +275,7 @@ def keeper_screen(case=None):
         if len(command.strip()) < MIN_QUESTION and keeper.active() is None:
             state = _short(command)
         else:
-            print()
-            with _Thinking(LINES['thinking']) as thinking:
+            with Spinner(LINES['thinking']) as thinking:
                 state = _ask(command, turns, records, case, thinking)
         if state['kind'] == 'reply' and state['via'] != via:
             note = _switch_note(state['via'])

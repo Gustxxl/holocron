@@ -11,6 +11,7 @@ from screens.search_screen import _wrap, first_line, highlight, highlight_links
 from screens.tasks_screen import _card
 from ui.clean_path import clean_input_path
 from ui.interface import nav_line
+from ui import interface
 
 
 class Highlight(unittest.TestCase):
@@ -154,3 +155,28 @@ class SearchList(unittest.TestCase):
              redirect_stdout(io.StringIO()) as out:
             search_screen.show_list([(0, case)], 0, 'case')
         self.assertNotIn("[('", out.getvalue())
+
+
+class Loading(unittest.TestCase):
+    def test_wait_returns_value(self):
+        self.assertEqual(interface.wait('x', lambda a: a + 1, 1), 2)
+
+    def test_wait_raises(self):
+        with self.assertRaises(ValueError):
+            interface.wait('x', int, 'nope')
+
+    def test_spinner_quiet_without_tty(self):
+        with redirect_stdout(io.StringIO()) as out, interface.Spinner('x'):
+            pass
+        self.assertEqual(out.getvalue(), '')
+
+    def test_progress_bar(self):
+        with redirect_stdout(io.StringIO()) as out:
+            interface.progress('Downloading', 5, 10, '50%')
+        self.assertIn('•' * 10 + '·' * 10, out.getvalue())
+        self.assertIn('50%', out.getvalue())
+
+    def test_progress_without_total(self):
+        with redirect_stdout(io.StringIO()) as out:
+            interface.progress('Downloading', 0, 0, 'pulling manifest')
+        self.assertIn('·' * 20, out.getvalue())
