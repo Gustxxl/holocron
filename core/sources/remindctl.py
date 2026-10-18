@@ -5,6 +5,7 @@ NAME = 'Reminders'
 KEY = 'remindctl'
 KIND = 'tasks'
 PROGRAM = 'remindctl'
+REPO = 'openclaw/remindctl'
 TAP = 'steipete/tap/remindctl'
 MACOS = 14
 ABOUT = 'Apple Reminders'

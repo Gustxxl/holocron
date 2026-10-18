@@ -227,8 +227,8 @@ class RemindersStatus(unittest.TestCase):
     def test_old_macos(self):
         self.assertEqual(self._status(macos='13.6'), 'old_macos')
 
-    def test_no_brew(self):
-        self.assertEqual(self._status(), 'no_brew')
+    def test_missing_without_brew(self):
+        self.assertEqual(self._status(), 'missing')
 
     def test_missing(self):
         self.assertEqual(self._status(tools=('brew',)), 'missing')

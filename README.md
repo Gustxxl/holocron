@@ -69,7 +69,7 @@ The main screen tells you if you're on shift and when the next one starts. `sche
 
 ## Reminders and calendar (macOS)
 
-Holocron works with Apple Reminders through [remindctl](https://github.com/openclaw/remindctl) and with Apple Calendar through [ekctl](https://github.com/schappim/ekctl). You don't have to set them up yourself. Open settings (`s`), pick Reminders or Calendar, and Holocron walks you through it: it checks your macOS version and Homebrew, installs the tool with one key, asks macOS for access and, if that doesn't work, opens the right page in System Settings.
+Holocron works with Apple Reminders through [remindctl](https://github.com/openclaw/remindctl) and with Apple Calendar through [ekctl](https://github.com/schappim/ekctl). You don't have to set them up yourself. Open settings (`s`), pick Reminders or Calendar, and Holocron walks you through it: it checks your macOS version, downloads the tool with one key (or installs it with Homebrew, if you prefer), asks macOS for access and, if that doesn't work, opens the right page in System Settings.
 
 Then choose which lists and calendars to show, which one is the default, how many items the main screen shows and how many days ahead to look.
 

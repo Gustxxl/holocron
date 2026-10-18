@@ -1,10 +1,10 @@
 import re
 from core import sources, system
-from core.sources import macos
+from core.sources import cli, macos
 from ui.interface import clear_screen, dim, error, haptic, is_back, pause, read_command, nav_line
 
 _DEFAULT_RE = re.compile(r'd\s*(\d+)')
-_STEPS = ['old_macos', 'no_brew', 'missing', 'denied']
+_STEPS = ['old_macos', 'missing', 'denied']
 _MAIN_RE = re.compile(r'm\s*(\d+)')
 _AHEAD_RE = re.compile(r't\s*(\d+)')
 _AHEAD = {0: 'any day', 1: 'today', 2: 'today and tomorrow'}
@@ -17,7 +17,8 @@ def source_setup(source):
         if state == 'ready':
             return True
         current = _STEPS.index(state)
-        names = [f'macOS {source.MACOS} or later', 'Homebrew', source.PROGRAM, f'Access to {source.PRIVACY}']
+        names = [f'macOS {source.MACOS} or later', source.PROGRAM, f'Access to {source.PRIVACY}']
+        brew = cli.available('brew')
         clear_screen()
         print(dim(f'Settings > {source.NAME}'))
         print()
@@ -31,24 +32,22 @@ def source_setup(source):
 
         nav = []
         if state == 'old_macos':
-            print(f'  {source.NAME} needs macOS {source. MACOS} or later.')
+            print(f'  {source.NAME} needs macOS {source.MACOS} or later.')
             print(dim(f'  This Mac runs macOS {system.version() or "unknown"}.'))
-        elif state == 'no_brew':
-            print(f'  {source.PROGRAM} installs with Homebrew, a package manager for macOS.')
-            print('  Open brew.sh, copy the install command into a terminal,')
-            print('  then come back and press Enter.')
-            nav.append(('o', 'open brew.sh', 'o', 'brew.sh'))
         elif state == 'missing':
-            print(f'  Install {source.PROGRAM} with Homebrew:')
-            print(dim(f'  brew install {source.TAP}'))
+            print(f'  Holocron can download {source.PROGRAM} for you, nothing else is needed.')
+            if brew:
+                print(dim(f'  Or install it with Homebrew: brew install {source.TAP}'))
             if clt:
                 print()
                 print(f'  Homebrew needs newer Command Line Tools to build {source.PROGRAM}.')
-                print('  Update them in System Settings > General > Software Update,')
-                print('  then press i again.')
+                print('  Press i to download it without Homebrew,')
+                print('  or update them in System Settings > General > Software Update.')
                 print(dim('  If no update shows up, run: xcode-select --install'))
                 nav.append(('u', 'open Software Update', 'u', 'update'))
             nav.append(('i', 'install now', 'i', 'install'))
+            if brew:
+                nav.append(('brew', 'install with Homebrew', 'brew', 'brew'))
         elif state == 'denied':
             app = macos.terminal()
             print(f'  macOS asks once whether {app} may use {source.PRIVACY}.')
@@ -64,13 +63,19 @@ def source_setup(source):
         command = read_command(f'{source.NAME.lower()}> ').lower()
         if command == 'b':
             return False
-        if command == 'o' and state == 'no_brew':
-            macos.open_url(macos.BREW_URL)
-        elif command == 'i' and state == 'missing':
+        if command == 'i' and state == 'missing':
+            print()
+            print(f'Downloading {source.PROGRAM}...')
+            ok = macos.download(source.REPO, source.PROGRAM)
+            print('Installed.' if ok else 'Download did not finish. Check the connection and try again.')
+            pause(feedback=None if ok else 'error')
+        elif command == 'brew' and state == 'missing' and brew:
             print()
             result = macos.install(source.TAP)
             clt = result == 'clt'
             print()
+            if result == 'clt':
+                continue
             print('Installed.' if result == 'ok' else 'Installation did not finish. See the output above.')
             pause(feedback=None if result == 'ok' else 'error')
         elif command == 'u' and state == 'missing' and clt:

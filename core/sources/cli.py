@@ -2,13 +2,18 @@ import json
 import os
 import shutil
 from datetime import date, datetime
-from core import system
+from pathlib import Path
+from core import config, system
 
 TIMEOUT = 10
+BIN = Path(config.DATA_DIR) / 'bin'
 _PATHS = ('/opt/homebrew/bin', '/usr/local/bin')
 
 
 def which(program):
+    local = BIN / program
+    if local.is_file():
+        return str(local)
     return shutil.which(program) or shutil.which(program, path=os.pathsep.join(_PATHS))
 
 

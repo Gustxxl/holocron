@@ -6,6 +6,7 @@ NAME = 'Calendar'
 KEY = 'ekctl'
 KIND = 'events'
 PROGRAM = 'ekctl'
+REPO = 'schappim/ekctl'
 TAP = 'schappim/ekctl/ekctl'
 MACOS = 13
 ABOUT = 'Apple Calendar events'
