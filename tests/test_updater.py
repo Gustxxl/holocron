@@ -121,6 +121,37 @@ class Apply(Tmp):
         self.assertFalse(os.path.exists(os.path.join(self.app, 'core', 'b.py')))
         self.assertEqual(_read(self.app, 'data/user.json'), b'mine')
 
+    def test_rollback_keeps_names_never_moved(self):
+        real = shutil.move
+
+        def busy(src, dst):
+            if os.path.basename(src) == 'main.py' and '.holocron_bak_' in dst:
+                raise OSError('busy')
+            return real(src, dst)
+
+        with patch.object(updater.shutil, 'move', side_effect=busy):
+            with self.assertRaises(OSError):
+                updater._apply(self.src)
+        self.assertEqual(_read(self.app, 'main.py'), b'old')
+        self.assertEqual(_read(self.app, 'core/a.py'), b'old')
+        self.assertFalse(os.path.exists(os.path.join(self.app, 'core', 'b.py')))
+        self.assertEqual(_read(self.app, 'data/user.json'), b'mine')
+        self.assertFalse([n for n in os.listdir(self.tmp) if n.startswith('.holocron_bak_')])
+
+    def test_backup_kept_when_rollback_fails(self):
+        real = shutil.move
+
+        def stuck(src, dst):
+            if '.holocron_bak_' in src:
+                raise OSError('locked')
+            return real(src, dst)
+
+        with patch.object(updater.shutil, 'copy2', side_effect=OSError('disk full')), \
+                patch.object(updater.shutil, 'move', side_effect=stuck):
+            with self.assertRaises(updater.RollbackError):
+                updater._apply(self.src)
+        self.assertTrue([n for n in os.listdir(self.tmp) if n.startswith('.holocron_bak_')])
+
 
 class Update(unittest.TestCase):
     GOOD = {'main.py': b'good'}

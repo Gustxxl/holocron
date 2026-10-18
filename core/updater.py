@@ -161,14 +161,36 @@ def _verify(root, blobs):
                 raise RuntimeError(f'unexpected file in payload: {rel}')
 
 
+class RollbackError(RuntimeError):
+    pass
+
+def _rollback(names, existed, moved, backup):
+    failed = []
+    for name in names:
+        if name in existed and name not in moved:
+            continue
+        dst = os.path.join(APP_DIR, name)
+        try:
+            if os.path.isdir(dst) and not os.path.islink(dst):
+                shutil.rmtree(dst)
+            elif os.path.lexists(dst):
+                os.remove(dst)
+            if name in moved:
+                shutil.move(os.path.join(backup, name), dst)
+        except OSError:
+            failed.append(name)
+    return failed
+
+
 def _apply(src_root):
     names = [n for n in os.listdir(src_root) if n not in PRESERVE]
+    existed = [n for n in names if os.path.lexists(os.path.join(APP_DIR, n))]
     backup = tempfile.mkdtemp(prefix='.holocron_bak_', dir=os.path.dirname(APP_DIR))
+    moved = []
     try:
-        for name in names:
-            dst = os.path.join(APP_DIR, name)
-            if os.path.lexists(dst):
-                shutil.move(dst, os.path.join(backup, name))
+        for name in existed:
+            shutil.move(os.path.join(APP_DIR, name), os.path.join(backup, name))
+            moved.append(name)
         for name in names:
             src = os.path.join(src_root, name)
             dst = os.path.join(APP_DIR, name)
@@ -177,18 +199,12 @@ def _apply(src_root):
             else:
                 shutil.copy2(src, dst)
     except Exception:
-        for name in names:
-            dst = os.path.join(APP_DIR, name)
-            if os.path.isdir(dst) and not os.path.islink(dst):
-                shutil.rmtree(dst, ignore_errors=True)
-            elif os.path.lexists(dst):
-                os.remove(dst)
-            saved = os.path.join(backup, name)
-            if os.path.lexists(saved):
-                shutil.move(saved, os.path.join(APP_DIR, name))
-        raise
-    finally:
+        failed = _rollback(names, existed, moved, backup)
+        if failed:
+            raise RollbackError(f"{', '.join(failed)} not restored, previous build kept in {backup}")
         shutil.rmtree(backup, ignore_errors=True)
+        raise
+    shutil.rmtree(backup, ignore_errors=True)
 
 
 def _restart():
@@ -250,6 +266,9 @@ def update(restart=True):
 
         try:
             _apply(root)
+        except RollbackError as e:
+            print(f'Apply failed and the previous build could not be restored: {e}')
+            return False
         except Exception as e:
             print(f'Apply failed, rolled back to previous build: {e}')
             return False
