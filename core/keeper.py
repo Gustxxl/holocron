@@ -126,6 +126,20 @@ def status(conn):
     return 'ready', found
 
 
+def statuses(conns):
+    out = [None] * len(conns)
+
+    def check(i, conn):
+        out[i] = status(conn)
+
+    threads = [threading.Thread(target=check, args=(i, c), daemon=True) for i, c in enumerate(conns)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    return out
+
+
 def reset():
     _active.update(conn=None, at=0.0)
 

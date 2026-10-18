@@ -17,7 +17,7 @@ from core.settings import (
 )
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
-from ui.interface import clear_screen, dim, error, pause, read_command, red, show_menu
+from ui.interface import clear_screen, dim, error, num, pause, read_command, red, show_menu, wait
 from pathlib import Path
 from ui.clean_path import clean_input_path
 from core import system
@@ -66,11 +66,11 @@ def archive_screen():
         p3 = vault_path()
         p4 = keeper_model('server') or keeper_model('local')
         p5 = new_cases_path()
-        print(f'1) Excalidraw for Obsidian   {_mark(p1)}')
-        print(f'2) Excalidraw                {_mark(p2)}')
-        print(f'3) Vault                     {_mark(p3)}')
-        print(f'4) Keeper                    {dim("✓") if p4 else dim("—")}')
-        print(f'5) Notes                     {_mark(p5)}')
+        print(f'{num(1)}Excalidraw for Obsidian   {_mark(p1)}')
+        print(f'{num(2)}Excalidraw                {_mark(p2)}')
+        print(f'{num(3)}Vault                     {_mark(p3)}')
+        print(f'{num(4)}Keeper                    {dim("✓") if p4 else dim("—")}')
+        print(f'{num(5)}Notes                     {_mark(p5)}')
         print()
         print(dim('  [number] open section   [b] back   [q] quit'))
         print()
@@ -207,7 +207,7 @@ def vault_screen():
             col = max(len(n) for n, _ in rows)
             for i, (name, count) in enumerate(rows, 1):
                 info = dim('excluded') if count is None else dim(str(count)) if count else ''
-                print(f'  {dim(str(i).rjust(digits))} {name.ljust(col)}   {info}'.rstrip())
+                print(f'{num(i, digits)}{name.ljust(col)}   {info}'.rstrip())
         print()
         nav = '  [number] exclude / include   [a] exclude folder   ' if current else '  '
         print(dim(nav + '[enter path] set vault folder   [c] clear   [b] back'))
@@ -307,22 +307,17 @@ def _keeper_models_screen(slot):
         conn = keeper.connection(slot)
         if conn is None:
             return
-        state, found = keeper.status(conn)
         clear_screen()
         print(dim(f'Settings > Archive > Keeper > {_KEEPER_NAMES[slot]}'))
         print()
+        state, found = wait('Checking models', keeper.status, conn)
         if state == 'missing':
-            print('  Keeper runs on Ollama, a free app for AI models on this computer.')
-            print('  ' + _keeper_install_hint())
-            print('  Then open it and press Enter.')
-        elif state == 'stopped':
-            print('  Open the Ollama app, then press Enter.')
-        elif state == 'off':
-            print(f'  {conn["url"]} is not responding. Press Enter to check again.')
+            ...
         elif found:
+            digits = len(str(len(found)))
             for i, m in enumerate(found, 1):
                 mark = dim('  ✓') if m == conn['model'] else ''
-                print(f'  {i}) {m}{mark}')
+                print(f'{num(i, digits)}{m}{mark}')
         else:
             print('  No models yet.')
         print()
@@ -355,13 +350,13 @@ def keeper_screen():
         clear_screen()
         print(dim('Settings > Archive > Keeper'))
         print()
-        for i, conn in enumerate(rows, 1):
-            state, _ = keeper.status(conn)
+        states = wait('Checking Keeper', keeper.statuses, rows)
+        for i, (conn, (state, _)) in enumerate(zip(rows, states), 1):
             name = _KEEPER_NAMES[conn['slot']]
             model = conn['model'] or '—'
-            print(f'{i}) {name:<14} {model:<20} {dim(_KEEPER_STATUS[state])}')
+            print(f'{num(i)}{name:<14} {model:<20} {dim(_KEEPER_STATUS[state])}')
             if conn['slot'] == 'server':
-                print(dim(f'   {conn["url"].split("://", 1)[-1]}'))
+                print(dim(f'    {conn["url"].split("://", 1)[-1]}'))
         print()
         if has_server:
             print(dim('  Keeper uses the server when it is on, otherwise this computer.'))

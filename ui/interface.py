@@ -4,6 +4,7 @@ import sys
 import time
 import os
 import shutil
+import threading
 
 if not system.IS_WINDOWS:
     try:
@@ -22,6 +23,9 @@ def red(text):
 
 def bold(text):
     return f"\033[1m{text}\033[0m"
+
+def num(i, digits=1):
+    return f'  {dim(str(i).rjust(digits))} '
 
 
 def underline(text):
@@ -163,12 +167,47 @@ def confirm(question):
     return read_command(f'{question} [y/N] ').lower() == 'y'
 
 
+_SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+
+
+def wait(text, fn, *args):
+    if not sys.stdout.isatty():
+        return fn(*args)
+    result = {}
+
+    def run():
+        try:
+            result['value'] = fn(*args)
+        except BaseException as e:
+            result['error'] = e
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(0.15)
+    if worker.is_alive():
+        sys.stdout.write('\033[?25l')
+        try:
+            i = 0
+            while worker.is_alive():
+                sys.stdout.write(f'\r\033[2K  {dim(_SPIN[i % len(_SPIN)] + " " + text)}')
+                sys.stdout.flush()
+                worker.join(0.08)
+                i += 1
+        finally:
+            sys.stdout.write('\r\033[2K\033[?25h')
+            sys.stdout.flush()
+    if 'error' in result:
+        raise result['error']
+    return result['value']
+
+
 def show_menu(breadcrumb, options, footer='  [number] open section   [b] back   [q] quit'):
     clear_screen()
     print(dim(breadcrumb))
     print()
+    digits = len(str(len(options)))
     for i, item in enumerate(options, 1):
-        print(f'{i}) {item}')
+        print(f'{num(i, digits)}{item}')
     print()
     print(dim(footer))
     print()

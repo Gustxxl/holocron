@@ -5,7 +5,7 @@ from core import archives, tree
 from core.settings import archive_path, excalidraw_path, new_cases_path, vault_path
 from screens.help_screen import show_help
 from ui.format import plural
-from ui.interface import clear_screen, dim, read_command, nav_line
+from ui.interface import clear_screen, dim, num, read_command, nav_line
 from screens.search_screen import by_name, list_rows, open_case, search_screen
 
 PAGE = 15
@@ -105,7 +105,7 @@ def _entries(chunk, start, digits):
     names = [n['name'][:NAME_MAX] + ('/' if n['kind'] == 'folder' else '') for n in chunk]
     col = max((len(s) for s in names), default=0)
     cw = max((len(str(tree.count(n))) for n in chunk if n['kind'] == 'folder'), default=0)
-    return [f'  {dim(str(i).rjust(digits))} {name.ljust(col)}   {_info(node, cw)}'.rstrip()
+    return [f'{num(i, digits)}{name.ljust(col)}   {_info(node, cw)}'.rstrip()
             for i, (node, name) in enumerate(zip(chunk, names), start + 1)]
 
 
