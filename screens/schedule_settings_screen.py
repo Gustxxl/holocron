@@ -3,7 +3,7 @@ from core import clocks, schedule, zones
 from core.dates import DAYS, monday, parse_date, parse_periods
 from ui.format import date_span, day_runs, days_summary, periods, plural, week_span
 from core.system import copy_text
-from ui.interface import clear_screen, confirm, dim, error, is_back, pause, read_command, red, nav_line
+from ui.interface import clear_screen, confirm, dim, error, is_back, num, pause, read_command, red, nav_line
 import re
 
 
@@ -42,7 +42,7 @@ def _print_weeks(weeks, current=None):
     width = len(str(len(weeks)))
     for i, days in enumerate(weeks, 1):
         mark = dim('  ✓') if i - 1 == current else ''
-        print(f'{i:>{width}}) Week {i:<{width}}   {_value(days_summary(days))}{mark}')
+        print(f'{num(i, width)}Week {i:<{width}}   {_value(days_summary(days))}{mark}')
 
 
 def _hours_screen(index, picked):
@@ -86,7 +86,7 @@ def _week_screen(index):
         print(dim(f'Settings > Schedule > Weeks > Week {index + 1}'))
         print()
         for i, items in enumerate(weeks[index]):
-            print(f'{i + 1}) {DAYS[i]}   {_value(periods(items) if items else "")}')
+            print(f'{num(i + 1)}{DAYS[i]}   {_value(periods(items) if items else "")}')
         print()
         print(dim('  [number] set hours   [1-5] several days   [b] back'))
         print()
@@ -189,9 +189,9 @@ def _vacations_screen():
         if vacations:
             width = len(str(len(vacations)))
             for i, (a, b) in enumerate(vacations, 1):
-                line = f'{i:>{width}}) {date_span(a, b):<28}'
+                line = f'{date_span(a, b):<28}'
                 length = plural((b - a).days + 1, 'day')
-                print(dim(line + length) if b < today else line + dim(length))
+                print(num(i, width) + (dim(line + length) if b < today else line + dim(length)))
         else:
             print('No vacations.')
         print()
@@ -287,7 +287,7 @@ def _zone_rows(found, page, now):
     digits = len(str(len(found)))
     names = [n.replace('_', ' ') for n in chunk]
     col = max(len(n) for n in names)
-    return [f'  {dim(str(i).rjust(digits))} {name.ljust(col)}   '
+    return [f'{num(i, digits)}{name.ljust(col)}   '
             f'{dim(zones.utc(zones.offset(n, now)))}   {dim(zones.clock(n, now))}'
             for i, (n, name) in enumerate(zip(chunk, names), start + 1)]
 
@@ -299,7 +299,7 @@ def _clock_rows(items, now):
     for i, c in enumerate(items, 1):
         info = (f'{dim(zones.utc(zones.offset(c["zone"], now)))}   {dim(zones.clock(c["zone"], now))}'
                 if zones.get(c['zone']) else red('not found'))
-        rows.append(f'  {dim(str(i).rjust(digits))} {c["name"].ljust(col)}   {info}')
+        rows.append(f'{num(i, digits)}{c["name"].ljust(col)}   {info}')
     return rows
 
 
@@ -412,13 +412,13 @@ def schedule_settings():
         clear_screen()
         print(dim('Settings > Schedule'))
         print()
-        print(f'1) Weeks          {_value(str(n) if n else "")}')
-        print(f'2) Current week   {_value(f"{current + 1} of {n}" if current is not None else "")}')
-        print(f'3) Vacations      {_value(_vacations_value(sched))}')
-        print(f'4) Time zone      {_zone_value(sched)}')
-        print(f'5) Enabled        {dim("on" if sched.enabled else "off")}')
-        print('6) Share')
-        print('7) Import')
+        print(f'{num(1)}Weeks          {_value(str(n) if n else "")}')
+        print(f'{num(2)}Current week   {_value(f"{current + 1} of {n}" if current is not None else "")}')
+        print(f'{num(3)}Vacations      {_value(_vacations_value(sched))}')
+        print(f'{num(4)}Time zone      {_zone_value(sched)}')
+        print(f'{num(5)}Enabled        {dim("on" if sched.enabled else "off")}')
+        print(f'{num(6)}Share')
+        print(f'{num(7)}Import')
         print()
         print(dim('  [number] open section   [b] back'))
         print()

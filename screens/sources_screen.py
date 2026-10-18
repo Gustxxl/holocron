@@ -1,7 +1,7 @@
 import re
 from core import sources, system
 from core.sources import cli, macos
-from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, pause, read_command, nav_line
+from ui.interface import clear_screen, dim, error, haptic, is_back, num, pause, read_command, nav_line
 
 _DEFAULT_RE = re.compile(r'd\s*(\d+)')
 _STEPS = ['old_macos', 'missing', 'denied']
@@ -134,10 +134,11 @@ def lists_screen(source):
         shown = sources.option(source.KEY, 'shown', source.SHOWN)
         ahead = sources.option(source.KEY, 'ahead', source.AHEAD)
         lines = [dim(f'Settings > {source.NAME}'), '']
+        digits = len(str(len(lists)))
         for i, l in enumerate(lists, 1):
             mark = dim('  ✓') if l['id'] in chosen else ''
             mark += dim('  default') if l['id'] == main else ''
-            lines.append(f'{i}) {l["title"]}{mark}')
+            lines.append(f'{num(i, digits)}{l["title"]}{mark}')
         if not lists:
             lines.append(f'No {source.LISTS}')
         when = _AHEAD.get(ahead, f'next {ahead} days')
