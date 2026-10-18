@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 import urllib.parse
 import urllib.request
+import urllib.error
 import threading
 import ssl
 
@@ -19,7 +20,7 @@ BRANCH = 'main'
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEV_MARKER = os.path.join(APP_DIR, '.dev')
 
-PRESERVE = {'data', '.git', 'venv', '.venv', '__pycache__', '.dev'}
+PRESERVE = {'data', '.git', 'venv', '.venv', '__pycache__', '.dev', '.manifest'}
 
 API = f'https://api.github.com/repos/{REPO}/commits/{BRANCH}'
 TREE = f'https://api.github.com/repos/{REPO}/git/trees/{{sha}}?recursive=1'
@@ -157,7 +158,7 @@ def _installed():
 
 
 def _save_manifest(blobs):
-    tmp = _manifest() + '.tmp'
+    tmp = f'{_manifest()}.{os.getpid()}.{threading.get_ident()}.tmp'
     with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
         f.write(''.join(f'{p}\n' for p in sorted(e['path'] for e in blobs)))
     os.replace(tmp, _manifest())
@@ -168,7 +169,8 @@ def _local_files():
     for dirpath, dirnames, filenames in os.walk(APP_DIR):
         rel = os.path.relpath(dirpath, APP_DIR).replace(os.sep, '/')
         top = rel == '.'
-        dirnames[:] = [d for d in dirnames if d != '__pycache__' and not (top and d in PRESERVE)]
+        dirnames[:] = [d for d in dirnames if d != '__pycache__'
+                       and not (top and (d in PRESERVE or (d.startswith('.') and d != '.github')))]
         for name in filenames:
             if name == '.DS_Store' or name.endswith('.pyc') or (top and name in PRESERVE):
                 continue
@@ -176,12 +178,24 @@ def _local_files():
     return out
 
 
+_tracked = {}
+
+
 def _was_tracked(path):
-    try:
-        _api(BLOB.format(sha=_git_blob_sha(os.path.join(APP_DIR, path))))
-    except RuntimeError:
-        return False
-    return True
+    sha = _git_blob_sha(os.path.join(APP_DIR, path))
+    if sha not in _tracked:
+        req = urllib.request.Request(BLOB.format(sha=sha), headers={
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'holocron',
+        })
+        try:
+            with urllib.request.urlopen(req, timeout=15, context=_context()):
+                _tracked[sha] = True
+        except urllib.error.HTTPError as e:
+            _tracked[sha] = False if e.code == 404 else None
+        except Exception:
+            _tracked[sha] = None
+    return _tracked[sha]
 
 
 def _leftovers(paths):
@@ -189,7 +203,7 @@ def _leftovers(paths):
 
 
 def _adopt(blobs):
-    if os.path.exists(_manifest()):
+    if os.path.exists(_manifest()) or None in _tracked.values():
         return
     try:
         _save_manifest(blobs)
@@ -203,16 +217,6 @@ def _stale(blobs):
     if installed is None:
         installed = _leftovers(paths)
     return sorted(p for p in installed - paths if os.path.lexists(os.path.join(APP_DIR, p)))
-
-
-def _is_current(blobs):
-    if _stale(blobs):
-        return False
-    for entry in blobs:
-        target = os.path.join(APP_DIR, entry['path'])
-        if not os.path.isfile(target) or _git_blob_sha(target) != entry['sha']:
-            return False
-    return True
 
 
 def _is_current(blobs):
@@ -290,7 +294,7 @@ def _apply(src_root, blobs=None):
         shutil.rmtree(backup, ignore_errors=True)
         raise
     shutil.rmtree(backup, ignore_errors=True)
-    if blobs is not None:
+    if blobs is not None and None not in _tracked.values():
         try:
             _save_manifest(blobs)
         except OSError:

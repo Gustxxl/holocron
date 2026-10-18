@@ -312,15 +312,13 @@ def _keeper_models_screen(slot):
         print()
         state, found = wait('Checking models', keeper.status, conn)
         if state == 'missing':
-            ...
-        elif found:
-            digits = len(str(len(found)))
-            for i, m in enumerate(found, 1):
-                mark = dim('  ✓') if m == conn['model'] else ''
-                print(f'{num(i, digits)}{m}{mark}')
-        else:
-            print('  No models yet.')
-        print()
+            print('  Keeper runs on Ollama, a free app for AI models on this computer.')
+            print('  ' + _keeper_install_hint())
+            print('  Then open it and press Enter.')
+        elif state == 'stopped':
+            print('  Open the Ollama app, then press Enter.')
+        elif state == 'off':
+            print(f'  {conn["url"]} is not responding. Press Enter to check again.')
 
         needs_model = state in ('no_models', 'no_model', 'model_missing')
         can_download = needs_model and keeper.RECOMMENDED not in found

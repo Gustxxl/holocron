@@ -186,6 +186,14 @@ class Apply(Tmp):
         self.assertEqual(_read(self.app, 'mine.txt'), b'mine')
         self.assertEqual(_read(self.app, '.manifest'), b'core/a.py\ncore/b.py\nmain.py\n')
 
+    def test_apply_unsure_check_skips_manifest(self):
+        _make(self.app, {'config.example.json': b'{}'})
+        with patch.object(updater, '_tracked', {}), \
+                patch.object(updater, '_was_tracked', side_effect=lambda p: updater._tracked.setdefault(p)):
+            updater._apply(self.src, self._blobs())
+        self.assertTrue(os.path.exists(os.path.join(self.app, 'config.example.json')))
+        self.assertFalse(os.path.exists(os.path.join(self.app, '.manifest')))
+
 
 class Stale(Tmp):
     def setUp(self):
@@ -215,6 +223,19 @@ class Stale(Tmp):
         with patch.object(updater, '_was_tracked', side_effect=lambda p: p == 'old.py'):
             self.assertEqual(updater._stale(self.blobs), ['old.py'])
             self.assertFalse(updater._is_current(self.blobs))
+
+    def test_hidden_dirs_skipped(self):
+        _make(self.tmp, {'.idea/workspace.xml': b'x', '.github/workflows/t.yml': b'x'})
+        files = updater._local_files()
+        self.assertNotIn('.idea/workspace.xml', files)
+        self.assertIn('.github/workflows/t.yml', files)
+
+    def test_unsure_check_skips_manifest(self):
+        os.remove(os.path.join(self.tmp, '.manifest'))
+        os.remove(os.path.join(self.tmp, 'old.py'))
+        with patch.object(updater, '_tracked', {'x': None}):
+            updater._adopt(self.blobs)
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, '.manifest')))
 
 
 class Update(unittest.TestCase):
