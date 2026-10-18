@@ -125,7 +125,7 @@ On first launch Holocron creates its own virtual environment and installs what i
 
 Holocron checks for a new version in the background on launch, and the main screen tells you when there is one. Type `update` to install it. Every downloaded file is checked against GitHub's hashes before anything is replaced. If something goes wrong halfway, the previous version is restored. Your settings and data stay untouched.
 
-If GitHub is blocked on your network, updates come through mirrors. You can set your own with the `HOLOCRON_MIRROR` environment variable.
+If downloads from GitHub are slow or blocked on your network, the update archive comes through mirrors. The version check and the file hashes always come from api.github.com, so a mirror can't change what gets installed, and updates need api.github.com to be reachable. You can set your own mirrors with the `HOLOCRON_MIRROR` environment variable, separated by commas.
 
 ## Small things
 

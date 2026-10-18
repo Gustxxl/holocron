@@ -164,6 +164,7 @@ def _verify(root, blobs):
 class RollbackError(RuntimeError):
     pass
 
+
 def _rollback(names, existed, moved, backup):
     failed = []
     for name in names:
@@ -232,7 +233,7 @@ def update(restart=True):
     try:
         sha, blobs = _remote_tree()
     except Exception as e:
-        print(f'System unreachable: {e}')
+        print(f'System unreachable, api.github.com is needed to verify the update: {e}')
         return False
 
     if _is_current(blobs):

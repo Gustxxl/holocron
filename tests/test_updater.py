@@ -7,6 +7,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import urllib.parse
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
@@ -197,6 +198,43 @@ class Update(unittest.TestCase):
         self.assertFalse(result)
         download.assert_not_called()
         apply.assert_not_called()
+
+    def test_offline_names_api_host(self):
+        with patch.object(updater, '_is_dev', return_value=False), \
+             patch.object(updater, '_remote_tree', side_effect=RuntimeError('offline')), \
+             patch('builtins.print') as out:
+            self.assertFalse(updater.update(restart=False))
+        self.assertIn('api.github.com', out.call_args.args[0])
+
+
+class Sources(unittest.TestCase):
+    @staticmethod
+    def _hosts(urls):
+        return [urllib.parse.urlsplit(u).netloc for u in urls]
+
+    def test_hashes_never_come_from_mirrors(self):
+        with patch.dict(os.environ, {'HOLOCRON_MIRROR': 'https://m.example/'}), \
+                patch.object(updater, '_get', return_value={'sha': 'a' * 40, 'tree': []}) as get:
+            updater._latest_sha()
+            updater._tree('a' * 40)
+        self.assertEqual(get.call_count, 2)
+        for call in get.call_args_list:
+            self.assertEqual(self._hosts(call.args[0]), ['api.github.com'])
+
+    def test_archive_tries_github_before_mirrors(self):
+        with patch.dict(os.environ, {'HOLOCRON_MIRROR': 'https://m.example/'}), \
+                patch.object(updater, '_get', return_value=b'tar') as get:
+            updater._download('a' * 40)
+        urls = get.call_args.args[0]
+        self.assertEqual(self._hosts(urls), ['api.github.com', 'github.com', 'm.example'])
+        self.assertTrue(urls[-1].startswith('https://m.example/https://github.com/'))
+        self.assertTrue(get.call_args.kwargs['raw'])
+
+    def test_mirror_override(self):
+        with patch.dict(os.environ, {'HOLOCRON_MIRROR': ' https://a.example/ , https://b.example'}):
+            self.assertEqual(updater._mirrored('https://github.com/x'),
+                             ['https://a.example/https://github.com/x',
+                              'https://b.example/https://github.com/x'])
 
 
 class Get(unittest.TestCase):
