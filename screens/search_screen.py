@@ -17,7 +17,7 @@ _HL = '\033[38;2;116;167;254m'
 _MARK = '\033[38;2;20;20;20;48;2;116;167;254m'
 _RESET = '\033[0m'
 
-PAGE = 15
+PAGE = 10
 LIST_PAGE = 15
 MIN_QUERY = 3
 
@@ -404,9 +404,9 @@ def show_list(results, page, query, page_size=PAGE, note=None, exact=None):
         print()
 
     for n, row in enumerate(list_rows([c for _, c in chunk], start, total, width, query), start + 1):
+        if n > start + 1:
+            print()
         if exact and n == exact + 1:
-            if n > start + 1:
-                print()
             print(dim('  Similar'))
         print(row)
     print()

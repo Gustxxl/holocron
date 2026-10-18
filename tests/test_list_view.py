@@ -2,6 +2,8 @@ import os
 import re
 import unittest
 from unittest import mock
+import io
+from contextlib import redirect_stdout
 
 from screens import search_screen, tree_screen
 
@@ -50,8 +52,8 @@ class Same(unittest.TestCase):
 
     def test_no_blank_between_rows(self):
         printed = _printed([(0, c) for c in CASES])
-        first = next(i for i, ln in enumerate(printed) if 'Block 1' in ln)
-        self.assertTrue(all('Block' in ln for ln in printed[first:first + 12]))
+        block_lines = [ln for ln in printed if 'Block' in ln]
+        self.assertEqual(len(block_lines), 12)
 
     def test_board_head_count(self):
         self.assertEqual(_tree()[0], 'Work > Board   12 blocks')
@@ -102,6 +104,21 @@ class Order(unittest.TestCase):
              mock.patch('builtins.print'):
             tree_screen.tree_screen()
         self.assertEqual(opened[0]['text'], 'Alpha')
+
+
+class Gap(unittest.TestCase):
+    def test_blank_between_results(self):
+        cases = [(1, {'text': 'alpha', 'filepath': '/x/a.md'}),
+                 (1, {'text': 'bravo', 'filepath': '/x/b.md'})]
+        out = io.StringIO()
+        with mock.patch('screens.search_screen.clear_screen'), \
+             mock.patch('shutil.get_terminal_size', return_value=SIZE), \
+             redirect_stdout(out):
+            search_screen.show_list(cases, 0, '')
+        lines = [_ANSI.sub('', ln) for ln in out.getvalue().splitlines()]
+        i = next(n for n, line in enumerate(lines) if 'alpha' in line)
+        self.assertEqual(lines[i + 1].strip(), '')
+        self.assertIn('bravo', lines[i + 2])
 
 
 if __name__ == '__main__':
