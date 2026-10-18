@@ -80,7 +80,6 @@ def download(repo, program):
     tmp.write_bytes(blob)
     tmp.chmod(0o755)
     os.replace(tmp, target)
-    subprocess.call(['xattr', '-d', 'com.apple.quarantine', str(target)], stderr=subprocess.DEVNULL)
     return True
 
 

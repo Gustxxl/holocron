@@ -133,9 +133,9 @@ class Download(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.bin = Path(tmp.name) / 'bin'
-        for patch in [mock.patch.object(macos.cli, 'BIN', self.bin), mock.patch.object(macos.subprocess, 'call')]:
-            patch.start()
-            self.addCleanup(patch.stop)
+        patch = mock.patch.object(macos.cli, 'BIN', self.bin)
+        patch.start()
+        self.addCleanup(patch.stop)
 
     def serve(self, files):
         release = {'assets': [{'name': n, 'browser_download_url': f'https://x/{n}'} for n in files]}
