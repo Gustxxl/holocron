@@ -23,6 +23,7 @@ PRESERVE = {'data', '.git', 'venv', '.venv', '__pycache__', '.dev'}
 
 API = f'https://api.github.com/repos/{REPO}/commits/{BRANCH}'
 TREE = f'https://api.github.com/repos/{REPO}/git/trees/{{sha}}?recursive=1'
+BLOB = f'https://api.github.com/repos/{REPO}/git/blobs/{{sha}}'
 API_TARBALL = f'https://api.github.com/repos/{REPO}/tarball/{{sha}}'
 TARBALL = f'https://github.com/{REPO}/archive/{{sha}}.tar.gz'
 
@@ -144,7 +145,7 @@ def _installed():
         with open(_manifest(), encoding='utf-8') as f:
             paths = [ln.strip() for ln in f if ln.strip()]
     except OSError:
-        return set()
+        return None
     out = set()
     for path in paths:
         try:
@@ -157,14 +158,51 @@ def _installed():
 
 def _save_manifest(blobs):
     tmp = _manifest() + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
+    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
         f.write(''.join(f'{p}\n' for p in sorted(e['path'] for e in blobs)))
     os.replace(tmp, _manifest())
 
 
+def _local_files():
+    out = []
+    for dirpath, dirnames, filenames in os.walk(APP_DIR):
+        rel = os.path.relpath(dirpath, APP_DIR).replace(os.sep, '/')
+        top = rel == '.'
+        dirnames[:] = [d for d in dirnames if d != '__pycache__' and not (top and d in PRESERVE)]
+        for name in filenames:
+            if name == '.DS_Store' or name.endswith('.pyc') or (top and name in PRESERVE):
+                continue
+            out.append(name if top else f'{rel}/{name}')
+    return out
+
+
+def _was_tracked(path):
+    try:
+        _api(BLOB.format(sha=_git_blob_sha(os.path.join(APP_DIR, path))))
+    except RuntimeError:
+        return False
+    return True
+
+
+def _leftovers(paths):
+    return {p for p in _local_files() if p not in paths and _was_tracked(p)}
+
+
+def _adopt(blobs):
+    if os.path.exists(_manifest()):
+        return
+    try:
+        _save_manifest(blobs)
+    except OSError:
+        pass
+
+
 def _stale(blobs):
     paths = {e['path'] for e in blobs}
-    return sorted(p for p in _installed() - paths if os.path.lexists(os.path.join(APP_DIR, p)))
+    installed = _installed()
+    if installed is None:
+        installed = _leftovers(paths)
+    return sorted(p for p in installed - paths if os.path.lexists(os.path.join(APP_DIR, p)))
 
 
 def _is_current(blobs):
@@ -288,6 +326,7 @@ def update(restart=True):
         return False
 
     if _is_current(blobs):
+        _adopt(blobs)
         print(f'System is up to date — build {sha[:7]}.')
         return False
 
@@ -346,7 +385,10 @@ def update_available():
         sha, blobs = _remote_tree()
     except Exception:
         return None
-    return None if _is_current(blobs) else sha
+    if _is_current(blobs):
+        _adopt(blobs)
+        return None
+    return sha
 
 
 _update_sha = None

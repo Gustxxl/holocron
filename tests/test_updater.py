@@ -166,7 +166,7 @@ class Apply(Tmp):
         self.assertEqual(_read(self.app, 'data/user.json'), b'mine')
 
     def test_keeps_files_not_in_manifest(self):
-        _make(self.app, {'mine.txt': b'mine'})
+        _make(self.app, {'mine.txt': b'mine', '.manifest': b'main.py\ncore/a.py\n'})
         updater._apply(self.src, self._blobs())
         self.assertEqual(_read(self.app, 'mine.txt'), b'mine')
 
@@ -177,6 +177,14 @@ class Apply(Tmp):
                 updater._apply(self.src, self._blobs())
         self.assertEqual(_read(self.app, 'old.py'), b'old')
         self.assertEqual(_read(self.app, '.manifest'), b'main.py\nold.py\n')
+
+    def test_first_update_removes_tracked_leftovers(self):
+        _make(self.app, {'config.example.json': b'{}', 'mine.txt': b'mine'})
+        with patch.object(updater, '_was_tracked', side_effect=lambda p: p == 'config.example.json'):
+            updater._apply(self.src, self._blobs())
+        self.assertFalse(os.path.exists(os.path.join(self.app, 'config.example.json')))
+        self.assertEqual(_read(self.app, 'mine.txt'), b'mine')
+        self.assertEqual(_read(self.app, '.manifest'), b'core/a.py\ncore/b.py\nmain.py\n')
 
 
 class Stale(Tmp):
@@ -199,7 +207,14 @@ class Stale(Tmp):
 
     def test_no_manifest(self):
         os.remove(os.path.join(self.tmp, '.manifest'))
-        self.assertTrue(updater._is_current(self.blobs))
+        with patch.object(updater, '_was_tracked', return_value=False):
+            self.assertTrue(updater._is_current(self.blobs))
+
+    def test_no_manifest_finds_tracked_leftovers(self):
+        os.remove(os.path.join(self.tmp, '.manifest'))
+        with patch.object(updater, '_was_tracked', side_effect=lambda p: p == 'old.py'):
+            self.assertEqual(updater._stale(self.blobs), ['old.py'])
+            self.assertFalse(updater._is_current(self.blobs))
 
 
 class Update(unittest.TestCase):

@@ -27,7 +27,7 @@ def origin(program):
         return None
     if path == str(BIN / program):
         return 'holocron'
-    return 'homebrew' if '/Cellar/' in os.path.realpath(path) else 'system'
+    return 'homebrew' if 'Cellar' in Path(os.path.realpath(path)).parts else 'system'
 
 
 def shadowed(program):

@@ -86,7 +86,7 @@ def _remove_tools():
 
 def _brew_tools():
     paths = [Path(folder) / name for name in TOOL_NAMES for folder in BREW]
-    return sorted({p.name for p in paths if p.exists() and '/Cellar/' in os.path.realpath(p)})
+    return sorted({p.name for p in paths if p.exists() and 'Cellar' in Path(os.path.realpath(p)).parts})
 
 
 def remove():
