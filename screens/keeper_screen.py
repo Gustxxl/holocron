@@ -7,11 +7,12 @@ import threading
 from core import archives, keeper
 from core.commands import HELP_SECTIONS
 from screens.help_screen import render_help
-from screens.search_screen import open_case, first_line, highlight
-from ui.interface import clear_screen, dim, pause, read_command, haptic
+from screens.search_screen import open_case, first_line, highlight, highlight_links
+from ui.interface import clear_screen, dim, nav_line, num, pause, read_command, haptic
 
 MIN_QUESTION = 3
 GREETING_ROW = 3
+NAV_ROWS = 2
 
 LINES = {
     'connecting': 'Waking Keeper...',
@@ -56,7 +57,7 @@ def _fill(text):
 
 
 def _say(text):
-    print(_fill(text))
+    print(highlight_links(_fill(text)))
 
 
 def _aside(text):
@@ -66,16 +67,16 @@ def _aside(text):
 def _quote(line, terms):
     wrapped = textwrap.fill(line, width=_width(), initial_indent='  │ ', subsequent_indent='  │ ',
                             break_long_words=False, break_on_hyphens=False)
-    print(highlight(wrapped, terms))
+    print(highlight_links(highlight(wrapped, terms)))
 
 
-def _source(n, case):
+def _source(n, case, digits):
     archive = case.get('archive', '')
     title = first_line(case)
-    room = _width() - 12 - len(archive)
+    room = _width() - digits - 7 - len(archive)
     if len(title) > room:
         title = title[:max(room, 10) - 1] + '…'
-    print(f'    {n}) {title}  ' + dim(f'({archive})'))
+    print(f'{num(n, digits)}{title}  ' + dim(f'({archive})'))
 
 
 def _switch_note(via):
@@ -86,6 +87,22 @@ def _switch_note(via):
 
 def _drop_greeting(row, rows):
     sys.stdout.write(f'\0337\033[{row};1H\033[{rows}M\0338\033[{rows}A')
+    sys.stdout.flush()
+
+
+def _nav(turns, records):
+    nav = [('number', 'open record', '#', 'open')] if records else []
+    if turns:
+        nav.append(('c', 'clear'))
+    nav += [('b', 'back'), ('h', 'help')]
+    print(dim(nav_line(nav, _width())))
+    print()
+
+
+def _drop_nav(command):
+    cols = shutil.get_terminal_size().columns
+    up = (len('Keeper> ' + command) - 1) // cols + 1 + NAV_ROWS
+    sys.stdout.write(f'\033[{up}A\033[{NAV_ROWS}M\033[{up - NAV_ROWS}B')
     sys.stdout.flush()
 
 
@@ -160,7 +177,7 @@ def _print_answer(state):
             print()
             print(dim('  Link' if len(state['links']) == 1 else '  Links'))
             for url, label in state['links']:
-                print(f'    {label}  {dim(url)}' if label else f'    {dim(url)}')
+                print(f'    {label}  {highlight_links(url)}' if label else f'    {highlight_links(url)}')
         if state['lookup'] and not state['archive']:
             print()
             _aside(LINES['outside'])
@@ -175,21 +192,22 @@ def _print_answer(state):
     if sources:
         print()
         start, cited = state['start'], state['cited']
+        digits = len(str(start + len(sources) - 1))
         if cited:
             print(dim('  Source'))
             for n, c in enumerate(sources[:cited], start):
-                _source(n, c)
+                _source(n, c, digits)
             if len(sources) > cited:
                 print(dim('  Related'))
         for n, c in enumerate(sources[cited:], start + cited):
-            _source(n, c)
+            _source(n, c, digits)
     print()
 
 
 def _draw(turns, records, focus, pending, conn):
     print(dim('Keeper'))
     if focus:
-        print(dim(f'  1) {first_line(focus)}'[:_width()]))
+        print(num(1) + dim(first_line(focus)[:_width() - 4]))
     print()
     rows = 0
     if conn is None:
@@ -203,15 +221,13 @@ def _draw(turns, records, focus, pending, conn):
             print(dim('  ' + note))
             rows += 1
         print()
-    nav = '  [number] open record   ' if records else '  '
-    nav += '[c] clear   ' if turns else ''
-    print(dim(nav + '[b] back   [h] help'))
-    print()
     for turn in turns:
         print(f"Keeper> {turn['question']}")
         _print_answer(turn)
     if pending:
         print(f'Keeper> {pending}')
+    else:
+        _nav(turns, records)
     return rows
 
 
@@ -280,8 +296,10 @@ def keeper_screen(case=None):
                 continue
             command = new
             _redraw(turns, records, case, command)
-        elif greeting:
-            _drop_greeting(row, greeting)
+        else:
+            _drop_nav(command)
+            if greeting:
+                _drop_greeting(row, greeting)
         greeting = 0
 
         if len(command.strip()) < MIN_QUESTION and keeper.active() is None:
@@ -300,6 +318,7 @@ def keeper_screen(case=None):
         records.extend(state['sources'])
         turns.append(state)
         _print_answer(state)
+        _nav(turns, records)
 
         if state['archive']:
             haptic('confirm')

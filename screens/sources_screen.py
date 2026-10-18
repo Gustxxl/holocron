@@ -1,7 +1,7 @@
 import re
 from core import sources, system
 from core.sources import cli, macos
-from ui.interface import clear_screen, dim, error, haptic, is_back, num, pause, read_command, nav_line
+from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, num, pause, read_command, nav_line
 
 _DEFAULT_RE = re.compile(r'd\s*(\d+)')
 _STEPS = ['old_macos', 'missing', 'denied']
