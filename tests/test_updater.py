@@ -153,6 +153,54 @@ class Apply(Tmp):
                 updater._apply(self.src)
         self.assertTrue([n for n in os.listdir(self.tmp) if n.startswith('.holocron_bak_')])
 
+    def _blobs(self):
+        return [{'path': p, 'sha': ''} for p in ('main.py', 'core/a.py', 'core/b.py')]
+
+    def test_removes_files_deleted_upstream(self):
+        _make(self.app, {'old.py': b'old', 'tools/x.py': b'old', 'core/gone.py': b'old',
+                         '.manifest': b'main.py\nold.py\ntools/x.py\ncore/a.py\ncore/gone.py\n'})
+        updater._apply(self.src, self._blobs())
+        for path in ('old.py', 'tools', 'core/gone.py'):
+            self.assertFalse(os.path.exists(os.path.join(self.app, *path.split('/'))))
+        self.assertEqual(_read(self.app, '.manifest'), b'core/a.py\ncore/b.py\nmain.py\n')
+        self.assertEqual(_read(self.app, 'data/user.json'), b'mine')
+
+    def test_keeps_files_not_in_manifest(self):
+        _make(self.app, {'mine.txt': b'mine'})
+        updater._apply(self.src, self._blobs())
+        self.assertEqual(_read(self.app, 'mine.txt'), b'mine')
+
+    def test_rollback_restores_deleted(self):
+        _make(self.app, {'old.py': b'old', '.manifest': b'main.py\nold.py\n'})
+        with patch.object(updater.shutil, 'copy2', side_effect=OSError('disk full')):
+            with self.assertRaises(OSError):
+                updater._apply(self.src, self._blobs())
+        self.assertEqual(_read(self.app, 'old.py'), b'old')
+        self.assertEqual(_read(self.app, '.manifest'), b'main.py\nold.py\n')
+
+
+class Stale(Tmp):
+    def setUp(self):
+        super().setUp()
+        patcher = patch.object(updater, 'APP_DIR', self.tmp)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        _make(self.tmp, {'main.py': b'good', 'old.py': b'x',
+                         '.manifest': b'main.py\nold.py\ndata/user.json\n../evil\n'})
+        self.blobs = [{'path': 'main.py', 'sha': _sha(b'good')}]
+
+    def test_installed_skips_preserved_and_unsafe(self):
+        self.assertEqual(updater._installed(), {'main.py', 'old.py'})
+
+    def test_deleted_upstream_means_update(self):
+        self.assertFalse(updater._is_current(self.blobs))
+        os.remove(os.path.join(self.tmp, 'old.py'))
+        self.assertTrue(updater._is_current(self.blobs))
+
+    def test_no_manifest(self):
+        os.remove(os.path.join(self.tmp, '.manifest'))
+        self.assertTrue(updater._is_current(self.blobs))
+
 
 class Update(unittest.TestCase):
     GOOD = {'main.py': b'good'}

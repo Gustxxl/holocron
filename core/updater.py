@@ -135,7 +135,51 @@ def _git_blob_sha(path):
     return h.hexdigest()
 
 
+def _manifest():
+    return os.path.join(APP_DIR, '.manifest')
+
+
+def _installed():
+    try:
+        with open(_manifest(), encoding='utf-8') as f:
+            paths = [ln.strip() for ln in f if ln.strip()]
+    except OSError:
+        return set()
+    out = set()
+    for path in paths:
+        try:
+            if _check_path(path)[0] not in PRESERVE:
+                out.add(path)
+        except RuntimeError:
+            continue
+    return out
+
+
+def _save_manifest(blobs):
+    tmp = _manifest() + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        f.write(''.join(f'{p}\n' for p in sorted(e['path'] for e in blobs)))
+    os.replace(tmp, _manifest())
+
+
+def _stale(blobs):
+    paths = {e['path'] for e in blobs}
+    return sorted(p for p in _installed() - paths if os.path.lexists(os.path.join(APP_DIR, p)))
+
+
 def _is_current(blobs):
+    if _stale(blobs):
+        return False
+    for entry in blobs:
+        target = os.path.join(APP_DIR, entry['path'])
+        if not os.path.isfile(target) or _git_blob_sha(target) != entry['sha']:
+            return False
+    return True
+
+
+def _is_current(blobs):
+    if _stale(blobs):
+        return False
     for entry in blobs:
         target = os.path.join(APP_DIR, entry['path'])
         if not os.path.isfile(target) or _git_blob_sha(target) != entry['sha']:
@@ -183,9 +227,11 @@ def _rollback(names, existed, moved, backup):
     return failed
 
 
-def _apply(src_root):
+def _apply(src_root, blobs=None):
     names = [n for n in os.listdir(src_root) if n not in PRESERVE]
-    existed = [n for n in names if os.path.lexists(os.path.join(APP_DIR, n))]
+    gone = sorted({p.split('/')[0] for p in _stale(blobs)} - set(names)) if blobs is not None else []
+    targets = [*names, *gone]
+    existed = [n for n in targets if os.path.lexists(os.path.join(APP_DIR, n))]
     backup = tempfile.mkdtemp(prefix='.holocron_bak_', dir=os.path.dirname(APP_DIR))
     moved = []
     try:
@@ -200,12 +246,17 @@ def _apply(src_root):
             else:
                 shutil.copy2(src, dst)
     except Exception:
-        failed = _rollback(names, existed, moved, backup)
+        failed = _rollback(targets, existed, moved, backup)
         if failed:
             raise RollbackError(f"{', '.join(failed)} not restored, previous build kept in {backup}")
         shutil.rmtree(backup, ignore_errors=True)
         raise
     shutil.rmtree(backup, ignore_errors=True)
+    if blobs is not None:
+        try:
+            _save_manifest(blobs)
+        except OSError:
+            pass
 
 
 def _restart():
@@ -266,7 +317,7 @@ def update(restart=True):
         reqs_changed = _file_changed(old_reqs, new_reqs)
 
         try:
-            _apply(root)
+            _apply(root, blobs)
         except RollbackError as e:
             print(f'Apply failed and the previous build could not be restored: {e}')
             return False
