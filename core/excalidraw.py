@@ -155,7 +155,7 @@ def load_cases(path):
     for t in elements:
         if t.get('type') != 'text' or t.get('isDeleted'):
             continue
-        original = (t.get('originalText') or t.get('text') or '').strip()
+        original = (t.get('rawText') or t.get('originalText') or t.get('text') or '').strip()
         txt = strip_emoji(original).strip()
         if not txt:
             continue

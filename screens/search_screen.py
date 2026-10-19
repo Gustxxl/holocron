@@ -147,6 +147,11 @@ def _too_short(text):
     return not _parts(text) and text.lower() not in ('l', 'list')
 
 
+def _as_query(text):
+    sep = search_separator()
+    return text.replace(sep, ' ') if sep else text
+
+
 def _exact(results, query, list_mode):
     if list_mode or not query:
         return None
@@ -354,7 +359,10 @@ def open_case(results, number, query, rerun=True, trail=()):
         m = _JUMP_RE.fullmatch(low)
         if m:
             n = int(m.group(1)) if m.group(1) else (1 if len(jumps) == 1 else 0)
-            if 1 <= n <= len(jumps):
+            if 1 <= n <= len(jumps) and isinstance(jumps[n - 1], str):
+                search_screen(_as_query(jumps[n - 1]))
+                results = _refresh(results, query, False)
+            elif 1 <= n <= len(jumps):
                 target = [(0, c) for c in jumps[n - 1]]
                 new_query = open_case(target, 1, '', rerun=False, trail=(*trail, first_line(case)))
                 if new_query:
@@ -482,7 +490,8 @@ def show_case(case, query='', number=None, total=None, trail=()):
     archive = case.get('archive', '')
     pinned = favorites.is_pinned(case)
 
-    text, jumps = wikilinks.numbered(case.get('raw', case['text']).strip(), archives.cases(), _link_mark)
+    text, jumps = wikilinks.numbered(case.get('raw', case['text']).strip(), archives.cases(), _link_mark,
+                                     here=case.get('filepath'))
     lines = text.splitlines()
     first = next((ln.strip() for ln in lines if ln.strip()), '')
     if case.get('filename'):

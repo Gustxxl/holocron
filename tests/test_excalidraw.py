@@ -9,7 +9,7 @@ from core import backups
 
 from core.excalidraw import (
     strip_emoji, clean, decompress_from_base64, compress_to_base64,
-    update_text, SceneError, _validate_md, _backup,
+    update_text, load_cases, SceneError, _validate_md, _backup,
 )
 
 
@@ -121,3 +121,24 @@ class Backup(unittest.TestCase):
         found = list(Path(tmp.name).iterdir())
         self.assertEqual(len(found), 1)
         self.assertEqual(found[0].read_text(encoding='utf-8'), 'test content')
+
+
+def _scene_file(test, element):
+    tmp = tempfile.TemporaryDirectory()
+    test.addCleanup(tmp.cleanup)
+    path = Path(tmp.name) / 'Board.excalidraw.md'
+    scene = json.dumps({'type': 'excalidraw', 'elements': [element]}, ensure_ascii=False)
+    path.write_text(f'## Drawing\n```json\n{scene}\n```\n', encoding='utf-8')
+    return path
+
+
+class RawText(unittest.TestCase):
+    def test_raw_text_first(self):
+        path = _scene_file(self, {'id': 't1', 'type': 'text', 'text': 'See Target',
+                                  'originalText': 'See Target', 'rawText': 'See [[Target]]'})
+        self.assertEqual(load_cases(path)[0]['raw'], 'See [[Target]]')
+
+    def test_original_without_raw(self):
+        path = _scene_file(self, {'id': 't1', 'type': 'text', 'text': 'See Target',
+                                  'originalText': 'See [[Target]]'})
+        self.assertEqual(load_cases(path)[0]['raw'], 'See [[Target]]')
