@@ -171,3 +171,34 @@ class EditText(unittest.TestCase):
     def test_empty_cancels(self):
         self.assertIsNone(tasks.changes(self.TASK, '  \n\n'))
         self.assertEqual(tasks.changes(self.TASK, '\n\nonly notes'), {'title': 'only notes', 'notes': ''})
+
+
+class ListWithSpaces(unittest.TestCase):
+    LISTS = [{'id': 'L1', 'title': 'Home'}, {'id': 'L2', 'title': 'Home Office'}, {'id': 'L3', 'title': 'Work'}]
+
+    def _add(self, text):
+        return tasks.parse_add(text, self.LISTS, 'L3')
+
+    def _ok(self, text):
+        draft, problem = self._add(text)
+        self.assertIsNone(problem)
+        return draft['title'], draft['list']
+
+    def test_full_title(self):
+        self.assertEqual(self._ok('Buy chair #Home Office'), ('Buy chair', 'L2'))
+
+    def test_any_case(self):
+        self.assertEqual(self._ok('Buy chair #home office'), ('Buy chair', 'L2'))
+
+    def test_text_after_tag(self):
+        self.assertEqual(self._ok('#Home Office buy chair'), ('buy chair', 'L2'))
+
+    def test_longer_title_wins(self):
+        self.assertEqual(self._ok('Lamp #Home'), ('Lamp', 'L1'))
+        self.assertEqual(self._ok('Lamp #Home Office'), ('Lamp', 'L2'))
+
+    def test_word_boundary(self):
+        self.assertEqual(self._ok('Buy #Home officially'), ('Buy officially', 'L1'))
+
+    def test_two_lists(self):
+        self.assertEqual(self._add('Desk #Home Office #Work')[1], 'Use one #list')

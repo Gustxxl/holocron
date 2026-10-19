@@ -3,7 +3,7 @@ from core import dates, events, sources
 from screens.help_screen import show_help
 from screens.sources_screen import lists_screen, source_setup, unreadable
 from ui.format import day_label, time_range
-from ui.interface import clear_screen, dim, error, haptic, is_back, pause, read_command, nav_line, underline
+from ui.interface import clear_screen, dim, error, haptic, hyperlink, is_back, pause, read_command, nav_line, underline
 
 
 def events_screen(source):
@@ -50,10 +50,10 @@ def agenda(source, now=None):
     shown = [e for e in events.upcoming(found, chosen, now) if dates.within(e['start'], now, ahead)]
     lines = []
     for event in shown[:limit]:
-        lines.append(f'◇ {event["title"]}' + dim(f' · {_when(event, now)}'))
+        lines.append(f'◇ {event['title']}' + dim(f' · {_when(event, now)} #{event['list_name']}'))
         link = events.meeting(event)
         if link:
-            lines.append(f'  {dim(underline(link))}')
+            lines.append(f'  {dim(underline(hyperlink(link, 'link')))}')
     if len(shown) > limit:
         lines.append(dim(f'+{len(shown) - limit} more'))
     return lines
@@ -102,7 +102,7 @@ def _open(flat, number):
 
 
 def _card(event, number, total, now):
-    lines = [dim(f'── {number}/{total}  {event["list_name"]} ' + '─' * 20), '', event['title'], _when(event, now)]
+    lines = [dim(f'── {number}/{total}  #{event['list_name']} ' + '─' * 20), '', event['title'], _when(event, now)]
     if event['place']:
         lines.append(dim(event['place']))
     link = events.link(event)
@@ -133,7 +133,7 @@ def _add(source, text, lists, chosen):
         return
     name = next((l['title'] for l in lists if l['id'] == draft['list']), '')
     clear_screen()
-    print(dim(f'Added to {name} — hidden in settings'))
+    print(dim(f'Added to #{name} — hidden in settings'))
     pause()
 
 

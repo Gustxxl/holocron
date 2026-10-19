@@ -59,7 +59,7 @@ def summary(source, now=None):
     for task in shown:
         line = f'○ {_line(task, now)}'
         if task.get('list_name'):
-            line += dim(f' · {task["list_name"]}')
+            line += dim(f' #{task['list_name']}')
         lines.append(line)
     if rest:
         lines.append(dim(f'+{rest} more'))
@@ -75,12 +75,12 @@ def _frame(source, chosen, groups, now):
     digits = len(str(sum(len(items) for _, items in groups)))
     n = 0
     for title, items in groups:
-        lines.append(dim(title))
+        lines.append(dim(f'#{title}'))
         for task in items:
             n += 1
             lines.append(f'  {dim(str(n).rjust(digits))} ○ {_line(task, now)}')
         lines.append('')
-    nav = [('number', 'open', '#', 'open')] if n else []
+    nav = [('number', 'open', '#', 'open'), ('x number', 'done', 'x#', 'done')] if n else []
     nav += [('a', 'add'), ('s', 'lists'), ('b', 'back'), ('h', 'help')]
     lines += [dim(nav_line(nav)), '']
     return lines
@@ -112,7 +112,8 @@ def _open(source, flat, number):
 
 
 def _card(task, number, total, now, points):
-    lines = [dim(f'── {number}/{total}  {task.get("list_name", "")} ' + '─' * 20), '', task['title']]
+    tag = f'#{task['list_name']}' if task.get('list_name') else ''
+    lines = [dim(f'── {number}/{total}  {tag} ' + '─' * 20), '', task['title']]
     label = _label(task, now)
     if label:
         lines.append(label)
@@ -172,7 +173,7 @@ def _add(source, text, lists, chosen):
         return
     name = next((l['title'] for l in lists if l['id'] == draft['list']), '')
     clear_screen()
-    print(dim(f'Added to {name} — hidden in settings'))
+    print(dim(f'Added to #{name} — hidden in settings'))
     pause()
 
 

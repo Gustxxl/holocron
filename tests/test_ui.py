@@ -180,3 +180,26 @@ class Loading(unittest.TestCase):
         with redirect_stdout(io.StringIO()) as out:
             interface.progress('Downloading', 0, 0, 'pulling manifest')
         self.assertIn('·' * 20, out.getvalue())
+
+
+class Clip(unittest.TestCase):
+    def test_fits_unchanged(self):
+        line = interface.dim('Standup · today 10:00 #Work')
+        self.assertEqual(interface.clip(line, 40), line)
+
+    def test_whole_line_cut(self):
+        line = '◇ Standup' + interface.dim(' · today 10:00–11:00 #Work')
+        out = interface.clip(line, 12)
+        self.assertEqual(interface.visible(out), '◇ Standup ·…')
+        self.assertTrue(out.endswith('\033[0m'))
+
+    def test_wide_chars(self):
+        self.assertEqual(interface.visible(interface.clip('日本語テキスト', 7)), '日本語…')
+
+    def test_link_counts_text_not_url(self):
+        line = '  ' + interface.hyperlink('https://example.com/' + 'x' * 100, 'link')
+        self.assertEqual(interface.clip(line, 10), line)
+
+    def test_hyperlink(self):
+        self.assertEqual(interface.hyperlink('https://example.com', 'link'),
+                         '\033]8;;https://example.com\033\\link\033]8;;\033\\')

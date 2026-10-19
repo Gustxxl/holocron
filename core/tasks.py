@@ -33,9 +33,19 @@ def upcoming(items, selected, limit=3):
     return found[:limit], max(0, len(found) - limit)
 
 
+def split_tags(text, lists):
+    tags = []
+    for title in sorted((l['title'] for l in lists if l['title'].strip()), key=len, reverse=True):
+        found = re.compile(rf'(?<!\S)#{re.escape(title)}(?!\S)', re.IGNORECASE)
+        tags += [title] * len(found.findall(text))
+        text = found.sub(' ', text)
+    return tags + _TAG.findall(text), _TAG.sub(' ', text)
+
+
 def parse_add(text, lists, default, points=None):
-    tags, places = _TAG.findall(text), _PLACE.findall(text)
-    title = ' '.join(_PLACE.sub(' ', _TAG.sub(' ', text)).split())
+    tags, text = split_tags(text, lists)
+    places = _PLACE.findall(text)
+    title = ' '.join(_PLACE.sub(' ', text).split())
     if not title:
         return None, 'Type the reminder text'
     if len(tags) > 1:

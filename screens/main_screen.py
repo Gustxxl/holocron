@@ -11,7 +11,7 @@ from core.updater import pending_update
 from screens.schedule_screen import duty_line
 from screens.search_screen import search_screen
 from screens.tasks_screen import summary
-from ui.interface import clear_screen, dim, pause, read_command, Home
+from ui.interface import clear_screen, clip, dim, pause, read_command, Home
 
 APP_DIR = Path(__file__).resolve().parent.parent
 LOGO = APP_DIR / "ui" / "logo.txt"
@@ -50,7 +50,7 @@ def _handle(raw):
 
 
 def _frame():
-    lines = [*_logo(), dim(date.today().strftime("%a %b %d %Y"))]
+    lines = [dim(date.today().strftime('%a %b %d %Y'))]
     operator = operator_name()
     if operator:
         lines.append(f"Welcome back, {operator}")
@@ -69,7 +69,8 @@ def _frame():
     if pending_update():
         lines.append(dim("Update available — type 'update'"))
     lines.append('')
-    return lines
+    width = shutil.get_terminal_size().columns - 1
+    return [*_logo(), *(clip(line, width) for line in lines)]
 
 
 def _logo():

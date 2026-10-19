@@ -3,8 +3,10 @@ from ui.haptic import Holocron
 import sys
 import time
 import os
+import re
 import shutil
 import threading
+import unicodedata
 from colorama.ansitowin32 import StreamWrapper
 
 if not system.IS_WINDOWS:
@@ -31,6 +33,39 @@ def num(i, digits=1):
 
 def underline(text):
     return f'\033[4m{text}\033[24m'
+
+
+
+
+def hyperlink(url, text):
+    return f'\033]8;;{url}\033\\{text}\033]8;;\033\\'
+
+
+_ESC = re.compile(r'(\033\[[\d;]*m|\033\]8;;[^\033]*\033\\)')
+
+
+def visible(text):
+    return _ESC.sub('', text)
+
+
+def _cells(text):
+    return sum(0 if unicodedata.combining(c) else 2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in text)
+
+
+def clip(text, width):
+    if _cells(visible(text)) <= width:
+        return text
+    out, used = [], 1
+    for i, part in enumerate(_ESC.split(text)):
+        if i % 2:
+            out.append(part)
+            continue
+        for c in part:
+            used += _cells(c)
+            if used > width:
+                return ''.join(out) + '…\033[0m'
+            out.append(c)
+    return ''.join(out)
 
 
 class Home(BaseException):

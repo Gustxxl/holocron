@@ -1,7 +1,9 @@
+import os
 import unittest
 from unittest.mock import patch
 
 from screens import main_screen as main
+from ui.interface import visible
 
 
 class _Stop(Exception):
@@ -83,3 +85,19 @@ class Frame(unittest.TestCase):
             with self.assertRaises(_Stop):
                 main.main_screen()
         self.assertEqual(calls, ['frame', 'clear'])
+
+
+class Width(unittest.TestCase):
+    def test_lines_fit_terminal(self):
+        long = 'x' * 100
+        with patch.object(main, '_logo', return_value=[]), \
+             patch.object(main, 'operator_name', return_value=long), \
+             patch.object(main.archives, 'count', return_value=0), \
+             patch.object(main, 'duty_line', return_value=long), \
+             patch.object(main, 'agenda', return_value=[long]), \
+             patch.object(main, 'summary', return_value=[long]), \
+             patch.object(main, 'pending_update', return_value=False), \
+             patch('shutil.get_terminal_size', return_value=os.terminal_size((30, 24))):
+            lines = main._frame()
+        self.assertTrue(lines)
+        self.assertTrue(all(len(visible(line)) <= 29 for line in lines))

@@ -124,6 +124,11 @@ class ParseAdd(unittest.TestCase):
                 self.assertIsNone(draft)
                 self.assertTrue(problem)
 
+    def test_calendar_with_spaces(self):
+        lists = [*LISTS, {'id': 'C3', 'title': 'Team Sync'}]
+        draft, _ = events.parse_add('Retro 15:00 #Team Sync', lists, 'C1', TODAY)
+        self.assertEqual((draft['title'], draft['list']), ('Retro', 'C3'))
+
 
 class Upcoming(unittest.TestCase):
     def test_skips_finished_and_hidden(self):

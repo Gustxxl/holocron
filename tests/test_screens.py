@@ -5,6 +5,7 @@ from contextlib import ExitStack, redirect_stdout
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from ui.interface import visible
 
 from screens import (diagnostics_screen, events_screen, favorites_screen, help_screen, keeper_screen,
                      schedule_screen, schedule_settings_screen, settings_screen, sources_screen,
@@ -108,6 +109,8 @@ class Tasks(Screen):
         text = self.open(tasks_screen, lambda: tasks_screen.tasks_screen(source),
                          ['1', 'b', 's', 'b', 'b'], TASKS_PATCHES)
         self.assertIn('Buy milk', text)
+        self.assertIn('#Home', text)
+        self.assertRegex(text, r'x(#| number)')
         self.assertIn('Settings > Reminders', text)
 
     def test_stops_when_not_set_up(self):
@@ -115,6 +118,14 @@ class Tasks(Screen):
         self.open(tasks_screen, lambda: tasks_screen.tasks_screen(source), [],
                   {'screens.tasks_screen.source_setup': False})
         source.lists.assert_not_called()
+
+    def test_summary_tag(self):
+        task = {**TASK, 'list': 'l1', 'done': False}
+        source = SimpleNamespace(KEY='remindctl', SHOWN=3, AHEAD=0, available=lambda: True, items=lambda: [task])
+        with patch('core.sources.selected', return_value=['l1']), \
+             patch('core.sources.option', side_effect=lambda key, name, default: default):
+            lines = tasks_screen.summary(source)
+        self.assertEqual(visible(lines[0]), '○ Buy milk #Home')
 
 
 POINT = {'address': 'Main st 1', 'proximity': 'arriving', 'radius': 100}
@@ -214,6 +225,8 @@ class Calendar(Screen):
     def test_agenda_shows_link(self):
         lines = self._agenda(datetime(2030, 1, 1, 9))
         self.assertIn('Standup', lines[0])
+        self.assertTrue(visible(lines[0]).endswith(' #Work'))
+        self.assertEqual(visible(lines[1]).strip(), 'link')
         self.assertIn('https://meet.google.com/abc', lines[1])
 
     def test_agenda_tomorrow_counts(self):
