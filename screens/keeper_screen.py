@@ -10,7 +10,6 @@ from screens.search_screen import open_case, first_line, highlight, highlight_li
 from ui.interface import Spinner, clear_screen, dim, haptic, nav_line, num, pause, read_command, wait
 
 MIN_QUESTION = 3
-GREETING_ROW = 3
 NAV_ROWS = 2
 
 LINES = {
@@ -84,11 +83,6 @@ def _switch_note(via):
     return _SWITCH_NOTES[via]
 
 
-def _drop_greeting(row, rows):
-    sys.stdout.write(f'\0337\033[{row};1H\033[{rows}M\0338\033[{rows}A')
-    sys.stdout.flush()
-
-
 def _nav(turns, records):
     nav = [('number', 'open record', '#', 'open')] if records else []
     if turns:
@@ -98,11 +92,10 @@ def _nav(turns, records):
     print()
 
 
-def _drop_nav(command):
+def _drop_nav(command, greeting):
     cols = shutil.get_terminal_size().columns
-    up = (len('Keeper> ' + command) - 1) // cols + 1 + NAV_ROWS
-    sys.stdout.write(f'\033[{up}A\033[{NAV_ROWS}M\033[{up - NAV_ROWS}B')
-    sys.stdout.flush()
+    up = (len('Keeper> ' + command) - 1) // cols + 1 + NAV_ROWS + greeting
+    print(f'\033[{up}A\033[JKeeper> {command}')
 
 
 def _ask(question, turns, records, focus, thinking):
@@ -228,7 +221,6 @@ def _terms_for(turns, number):
 def keeper_screen(case=None):
     session = {'turns': [], 'records': [case]} if case else _SESSION
     turns, records = session['turns'], session['records']
-    row = GREETING_ROW + (1 if case else 0)
     via, greeting = _redraw(turns, records, case)
 
     while True:
@@ -267,10 +259,8 @@ def keeper_screen(case=None):
             command = new
             _redraw(turns, records, case, command)
         else:
-            _drop_nav(command)
-            if greeting:
-                _drop_greeting(row, greeting)
-        greeting = 0
+            _drop_nav(command, greeting)
+            greeting = 0
 
         if len(command.strip()) < MIN_QUESTION and keeper.active() is None:
             state = _short(command)

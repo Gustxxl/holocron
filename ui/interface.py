@@ -5,6 +5,7 @@ import time
 import os
 import shutil
 import threading
+from colorama.ansitowin32 import StreamWrapper
 
 if not system.IS_WINDOWS:
     try:
@@ -77,6 +78,11 @@ SPIN_DELAY = 0.15
 BAR = 20
 
 
+def _cursor(visible):
+    if not isinstance(sys.stdout, StreamWrapper):
+        sys.stdout.write('\033[?25h' if visible else '\033[?25l')
+
+
 class Spinner:
     def __init__(self, label=''):
         self.label = label
@@ -97,7 +103,7 @@ class Spinner:
     def _run(self):
         if self._stop.wait(SPIN_DELAY):
             return
-        sys.stdout.write('\033[?25l')
+        _cursor(False)
         i = 0
         while not self._stop.is_set():
             width = shutil.get_terminal_size().columns - 1
@@ -106,7 +112,8 @@ class Spinner:
             sys.stdout.flush()
             i += 1
             self._stop.wait(0.08)
-        sys.stdout.write('\r\033[2K\033[?25h')
+        sys.stdout.write('\r\033[2K')
+        _cursor(True)
         sys.stdout.flush()
 
 
