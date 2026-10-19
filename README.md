@@ -15,6 +15,7 @@ So drop everything on a board and don't worry about order or wording. Skip a wor
 - **Search everything.** Every text block on a board is its own result, alongside your regular Markdown notes.
 - **Several searches at once.** Type `nginx; ERR504` and each part gets its own group of results.
 - **Edit in place.** Fix text on a drawing, open a note in your editor, tick off a task with `x 3` or write a new note with `note`. Changes go straight to the file.
+- **Jump between records.** `[[Links]]` work in notes and board blocks alike. A link finds a block by its first line or a note by its name, and `j 2` takes you there.
 - **Ask your notes.** Keeper answers questions by quoting your notes. The model runs on your computer or your own server, so your notes stay private.
 - **Know your hours.** A regular 9 to 5 or a rotating cycle of up to 52 weeks, with night shifts, vacations and time zones.
 - **See what's coming.** The next reminders and calendar events are on the main screen, with meeting links pulled out of the invite.
@@ -40,13 +41,14 @@ Works with drawings from the Excalidraw plugin for Obsidian, compressed or not, 
 
 - **One block, one result.** A board with 40 sticky notes gives you 40 things to find, not one file to dig through.
 - **Sorted by name.** Blocks of a board are listed by their first line, the same way as in `l`. Browse a board with `tree`.
-- **Edit without opening the drawing.** Press `e`, change the text and save. The drawing itself is updated, so Excalidraw shows the change next time.
+- **Edit without opening the drawing.** Press `e`, change the text and save. The drawing itself is updated, so Excalidraw shows the change next time. If the block changed on disk while you were editing, for example through iCloud, nothing is overwritten and your text goes to the clipboard, so you can paste it again.
+- **Links between blocks.** Write `[[Block title]]` in any block to link to another one. Holocron looks on the same board first, then for a note with that name, then on other boards. If the title changed or several blocks fit, `j` opens a search instead of a dead end.
 
 ## Notes and vault
 
 Point Holocron to an Obsidian vault and every Markdown note becomes searchable next to the boards. Folders you don't need can be excluded in settings, where you also see how many notes each folder holds.
 
-- `[[Wikilinks]]` in a note get numbers. Type `j 2` to jump to the second one.
+- `[[Wikilinks]]` in a note get numbers. Type `j 2` to jump to the second one and `b` to come back.
 - Checkboxes like `- [ ]` can be ticked with `x 3` without leaving the note.
 - `note` opens your editor and saves a new note to the folder you chose. The first line becomes the file name.
 - `tree` browses the archive by folder.
