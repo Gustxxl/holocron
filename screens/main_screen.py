@@ -4,7 +4,7 @@ import shutil
 
 from core import archives
 from core.commands import lookup
-from core.settings import operator_name
+from core.settings import home_order, operator_name
 from core.sources import ekctl, remindctl
 from screens.events_screen import agenda
 from core.updater import pending_update
@@ -57,20 +57,24 @@ def _frame():
     total = archives.count()
     if total:
         lines.append(dim(f'{total} cases indexed'))
-    duty = duty_line()
-    meetings = agenda(ekctl)
-    if meetings:
-        lines += ['', *meetings]
-    if duty:
-        lines += ['', duty]
-    reminders = summary(remindctl)
-    if reminders:
-        lines += ['', *reminders]
+    for key in home_order():
+        block = _block(key)
+        if block:
+            lines += ['', *block]
     if pending_update():
         lines.append(dim("Update available — type 'update'"))
     lines.append('')
     width = shutil.get_terminal_size().columns - 1
     return [*_logo(), *(clip(line, width) for line in lines)]
+
+
+def _block(key):
+    if key == 'calendar':
+        return agenda(ekctl)
+    if key == 'reminders':
+        return summary(remindctl)
+    line = duty_line()
+    return [line] if line else []
 
 
 def _logo():

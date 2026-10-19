@@ -134,3 +134,27 @@ def update_search_separator(sep):
     cfg = load()
     cfg['search_separator'] = sep
     save(cfg)
+
+
+HOME_BLOCKS = ('calendar', 'schedule', 'reminders')
+
+
+def home_order():
+    items = load().get('home_order')
+    items = [b for b in items if b in HOME_BLOCKS] if isinstance(items, list) else []
+    items = list(dict.fromkeys(items))
+    return [*items, *(b for b in HOME_BLOCKS if b not in items)]
+
+
+def update_home_order(items):
+    cfg = load()
+    cfg['home_order'] = items
+    save(cfg)
+
+
+def reorder(items, text):
+    picks = text.replace(' ', '')
+    if not picks.isdigit() or len(set(picks)) != len(picks) or not all(1 <= int(c) <= len(items) for c in picks):
+        return None
+    first = [items[int(c) - 1] for c in picks]
+    return [*first, *(i for i in items if i not in first)]

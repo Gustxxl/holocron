@@ -75,12 +75,30 @@ SOURCE = SimpleNamespace(NAME='Reminders', TAP='steipete/tap/remindctl', PROGRAM
 class Settings(Screen):
     def test_sections(self):
         with patch.object(settings_screen, '_SOURCES', [SOURCE]), \
-             patch.object(settings_screen, 'schedule_settings') as schedule:
+             patch.object(settings_screen, 'schedule_settings') as schedule, \
+             patch.object(settings_screen, 'home_screen') as home:
             text = self.open(settings_screen, settings_screen.settings_screen,
-                             ['1', 'b', '2', 'b', '3', '4', 'b', 'b'])
+                             ['1', 'b', '2', '3', 'b', '4', '5', 'b', 'b'])
+        home.assert_called_once()
         schedule.assert_called_once()
         self.assertNotIn('no access', text.split('Settings > Reminders')[0])
         self.assertIn('Settings > Reminders', text)
+
+    def test_order(self):
+        sources = [SimpleNamespace(NAME=name, supported=lambda: True) for name in ('Calendar', 'Reminders')]
+        with patch.object(settings_screen, '_SOURCES', sources), \
+             patch.object(settings_screen, 'show_menu', side_effect=_Stop) as menu:
+            with self.assertRaises(_Stop):
+                settings_screen.settings_screen()
+        self.assertEqual(menu.call_args.args[1],
+                         ['User', 'Main screen', 'Archive', 'Schedule', 'Calendar', 'Reminders'])
+
+    def test_no_main_screen_without_sources(self):
+        with patch.object(settings_screen, '_SOURCES', []), \
+             patch.object(settings_screen, 'show_menu', side_effect=_Stop) as menu:
+            with self.assertRaises(_Stop):
+                settings_screen.settings_screen()
+        self.assertEqual(menu.call_args.args[1], ['User', 'Archive', 'Schedule'])
 
 
 LISTS = [{'id': 'l1', 'title': 'Home'}]

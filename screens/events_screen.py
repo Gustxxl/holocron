@@ -29,8 +29,7 @@ def events_screen(source):
         elif low in ('s', 'settings'):
             lists_screen(source)
         elif low == 'a':
-            print(dim('  Standup 10:00   Lunch tomorrow 12:30-13:30 #work'))
-            text = read_command('new event> ')
+            text = read_command('text> ')
             if text:
                 _add(source, text, lists, chosen)
         elif low.isdigit() and 1 <= int(low) <= len(flat):

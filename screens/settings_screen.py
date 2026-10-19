@@ -16,7 +16,10 @@ from core.settings import (
     update_vault_exclude,
     search_separator,
     update_search_separator,
-    SEARCH_SEPARATOR
+    SEARCH_SEPARATOR,
+    home_order,
+    update_home_order,
+    reorder
 )
 
 from core import archives, keeper
@@ -30,27 +33,29 @@ from core.sources import ekctl, remindctl
 from screens.sources_screen import lists_screen, source_setup
 
 
-_SOURCES = [remindctl, ekctl]
+_SOURCES = [ekctl, remindctl]
+_HOME_SOURCES = {'calendar': ekctl, 'reminders': remindctl}
 
 
 def settings_screen():
     while True:
         extra = [s for s in _SOURCES if s.supported()]
-        labels = [s.NAME for s in extra]
-        show_menu('Settings', ['User', 'Archive', 'Schedule', *labels])
+        items = [('User', user_screen)]
+        if extra:
+            items.append(('Main screen', home_screen))
+        items += [('Archive', archive_screen), ('Schedule', schedule_settings)]
+        items += [(s.NAME, lambda s=s: _open_source(s)) for s in extra]
+        show_menu('Settings', [name for name, _ in items])
         command = read_command('settings> ')
-        if command == '1':
-            user_screen()
-        elif command == '2':
-            archive_screen()
-        elif command == '3':
-            schedule_settings()
-        elif command.isdigit() and 4 <= int(command) < 4 + len(extra):
-            source = extra[int(command) - 4]
-            if source_setup(source):
-                lists_screen(source)
-        elif command == 'b':
+        if command == 'b':
             return
+        if command.isdigit() and 1 <= int(command) <= len(items):
+            items[int(command) - 1][1]()
+
+
+def _open_source(source):
+    if source_setup(source):
+        lists_screen(source)
 
 
 def _mark(path):
@@ -114,6 +119,35 @@ def user_screen():
             continue
         if command:
             update_operator_name(command)
+
+
+
+
+def home_screen():
+    while True:
+        order = home_order()
+        shown = [b for b in order if b not in _HOME_SOURCES or _HOME_SOURCES[b].supported()]
+        clear_screen()
+        print(dim('Settings > Main screen'))
+        print()
+        for i, key in enumerate(shown, 1):
+            name = _HOME_SOURCES[key].NAME if key in _HOME_SOURCES else 'Schedule'
+            print(f'{num(i)}{name}')
+        print()
+        print(dim('  Type the numbers in the new order. Blocks you skip keep their order.'))
+        print(dim(f'  [numbers] reorder, e.g. {len(shown)}1   [d] default   [b] back'))
+        print()
+        command = read_command('order> ')
+        if command == 'b':
+            return
+        if command == 'd':
+            update_home_order([])
+            continue
+        new = reorder(shown, command)
+        if new:
+            update_home_order([*new, *(b for b in order if b not in new)])
+        elif command:
+            error(f'Type block numbers, e.g. {len(shown)}1')
 
 
 def _print_path(p):

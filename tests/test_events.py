@@ -129,6 +129,10 @@ class ParseAdd(unittest.TestCase):
         draft, _ = events.parse_add('Retro 15:00 #Team Sync', lists, 'C1', TODAY)
         self.assertEqual((draft['title'], draft['list']), ('Retro', 'C3'))
 
+    def test_calendar_words(self):
+        self.assertEqual(self._add('Standup 10:00 #gym')[1], 'No calendar #gym')
+        self.assertEqual(events.parse_add('Standup 10:00', LISTS, None, TODAY)[1], 'Choose calendars in settings')
+
 
 class Upcoming(unittest.TestCase):
     def test_skips_finished_and_hidden(self):

@@ -56,7 +56,7 @@ def parse_add(text, lists, default, today=None):
     span = _span(when, day or today)
     if span is None:
         return None, f'No such time: {when}'
-    list_id, problem = tasks.pick_list(tags[0] if tags else None, lists, default)
+    list_id, problem = tasks.pick_list(tags[0] if tags else None, lists, default, 'calendar')
     if problem:
         return None, problem
     return {'title': ' '.join(words), 'list': list_id, 'start': span[0], 'end': span[1]}, None

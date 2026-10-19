@@ -80,16 +80,16 @@ def changes(task, text):
     return found
 
 
-def pick_list(tag, lists, default):
+def pick_list(tag, lists, default, kind='list'):
     if tag is None:
-        return (default, None) if default else (None, 'Choose lists in settings')
+        return (default, None) if default else (None, f'Choose {kind}s in settings')
     key = _key(tag)
     exact = [l for l in lists if _key(l['title']) == key]
     found = exact or [l for l in lists if key and _key(l['title']).startswith(key)]
     if not found:
-        return None, f'No list #{tag}'
+        return None, f'No {kind} #{tag}'
     if len(found) > 1:
-        return None, f'#{tag} matches several lists'
+        return None, f'#{tag} matches several {kind}s'
     return found[0]['id'], None
 
 

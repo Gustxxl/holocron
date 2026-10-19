@@ -101,3 +101,28 @@ class Width(unittest.TestCase):
             lines = main._frame()
         self.assertTrue(lines)
         self.assertTrue(all(len(visible(line)) <= 29 for line in lines))
+
+
+class Blocks(unittest.TestCase):
+    def _frame(self, order, duty='● ON DUTY'):
+        with patch.object(main, '_logo', return_value=[]), \
+             patch.object(main, 'operator_name', return_value=''), \
+             patch.object(main.archives, 'count', return_value=0), \
+             patch.object(main, 'pending_update', return_value=False), \
+             patch.object(main, 'home_order', return_value=order), \
+             patch.object(main, 'agenda', return_value=['◇ Standup']), \
+             patch.object(main, 'duty_line', return_value=duty), \
+             patch.object(main, 'summary', return_value=['○ Buy milk']):
+            return main._frame()[1:]
+
+    def test_default_order(self):
+        lines = self._frame(['calendar', 'schedule', 'reminders'])
+        self.assertEqual([l for l in lines if l], ['◇ Standup', '● ON DUTY', '○ Buy milk'])
+
+    def test_custom_order(self):
+        lines = self._frame(['schedule', 'reminders', 'calendar'])
+        self.assertEqual([l for l in lines if l], ['● ON DUTY', '○ Buy milk', '◇ Standup'])
+
+    def test_empty_block_no_gap(self):
+        lines = self._frame(['calendar', 'schedule', 'reminders'], duty='')
+        self.assertEqual(lines, ['', '◇ Standup', '', '○ Buy milk', ''])
