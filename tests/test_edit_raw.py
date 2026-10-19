@@ -32,6 +32,11 @@ BOARD = {'type': 'excalidraw', 'elements': [
 COMPRESSED = ('---\nexcalidraw-plugin: parsed\n---\n\n## Text Elements\n'
               f'{TEXT} ^a1\n\n🚀 Deploy ^b2\n\n%%\n## Drawing\n```compressed-json\n'
               + excalidraw.compress_to_base64(json.dumps(BOARD, ensure_ascii=False)) + '\n```\n%%\n')
+FENCE = 'Use\n\n```json\n{"a": 1}\n```'
+FENCED = ('## Text Elements\n' f'{FENCE} ^a1\n\n%%\n## Drawing\n```json\n'
+          + json.dumps({'type': 'excalidraw', 'elements': [
+              {'id': 'a1', 'type': 'text', 'x': 0, 'y': 0, 'text': FENCE, 'originalText': FENCE}]})
+          + '\n```\n%%\n')
 
 
 def _temp(test, suffix, text):
@@ -85,6 +90,20 @@ class Edit(unittest.TestCase):
         self.edit(path, lambda t: t)
         self.assertEqual(path.read_text(encoding='utf-8'), before)
 
+    def test_conflict_keeps_disk_and_copies_text(self):
+        path = _temp(self, '.md', DRAWING)
+
+        def change(_):
+            excalidraw.update_text_obsidian(str(path), 'a1', 'from elsewhere')
+            return 'mine'
+
+        with mock.patch.object(search_screen, 'error') as err, \
+             mock.patch.object(search_screen, 'copy_text', return_value=True) as copy:
+            self.edit(path, change)
+        self.assertEqual(load_cases(path)[0]['raw'], 'from elsewhere')
+        copy.assert_called_once_with('mine')
+        self.assertIn('copied', err.call_args[0][0])
+
 
 class Compressed(unittest.TestCase):
     def test_utf16_pairs(self):
@@ -103,6 +122,71 @@ class Compressed(unittest.TestCase):
         path = _temp(self, '.md', COMPRESSED)
         excalidraw.update_text_obsidian(str(path), 'a1', '🔥 Prod up')
         self.assertEqual([c['raw'] for c in load_cases(path)], ['🔥 Prod up', '🚀 Deploy'])
+
+    def test_paragraphs_do_not_grow(self):
+        path = _temp(self, '.md', COMPRESSED)
+        excalidraw.update_text_obsidian(str(path), 'a1', 'Title\n\nBody one')
+        excalidraw.update_text_obsidian(str(path), 'a1', 'Title\n\nBody two')
+        md = path.read_text(encoding='utf-8')
+        self.assertEqual(md.count('Title'), 1)
+        self.assertIn('Title\n\nBody two ^a1\n\n🚀 Deploy ^b2', md)
+        self.assertEqual([c['raw'] for c in load_cases(path)], ['Title\n\nBody two', '🚀 Deploy'])
+
+    def test_paragraphs_in_second_block(self):
+        path = _temp(self, '.md', COMPRESSED)
+        excalidraw.update_text_obsidian(str(path), 'b2', 'Head\n\nOne')
+        excalidraw.update_text_obsidian(str(path), 'b2', 'Head\n\nTwo')
+        md = path.read_text(encoding='utf-8')
+        self.assertIn(f'{TEXT} ^a1\n\nHead\n\nTwo ^b2', md)
+        self.assertEqual(md.count('Head'), 1)
+
+    def test_similar_id_untouched(self):
+        md = '## Text Elements\nfirst ^a12\n\nsecond ^a1\n\n## Drawing\n'
+        out = excalidraw._replace_text_element(md, 'a1', 'new')
+        self.assertEqual(out, '## Text Elements\nfirst ^a12\n\nnew ^a1\n\n## Drawing\n')
+
+
+class Safety(unittest.TestCase):
+    def test_expected_matches(self):
+        path = _temp(self, '.md', COMPRESSED)
+        excalidraw.update_text_obsidian(str(path), 'a1', 'new', expected=TEXT)
+        self.assertEqual(load_cases(path)[0]['raw'], 'new')
+
+    def test_changed_on_disk(self):
+        path = _temp(self, '.md', COMPRESSED)
+        excalidraw.update_text_obsidian(str(path), 'a1', 'other')
+        with self.assertRaises(ValueError):
+            excalidraw.update_text_obsidian(str(path), 'a1', 'mine', expected=TEXT)
+        self.assertEqual(load_cases(path)[0]['raw'], 'other')
+        self.assertIn('other ^a1', path.read_text(encoding='utf-8'))
+
+    def test_plain_changed_on_disk(self):
+        path = _temp(self, '.excalidraw', json.dumps(SCENE, ensure_ascii=False))
+        excalidraw.update_text(str(path), 'a1', 'other')
+        with self.assertRaises(ValueError):
+            excalidraw.update_text(str(path), 'a1', 'mine', expected=TEXT)
+        self.assertEqual(json.loads(path.read_text(encoding='utf-8'))['elements'][0]['text'], 'other')
+
+    def test_no_temp_left(self):
+        path = _temp(self, '.md', COMPRESSED)
+        excalidraw.update_text_obsidian(str(path), 'a1', 'new')
+        self.assertFalse(path.with_name(f'.{path.name}.tmp').exists())
+
+    def test_failed_write_keeps_file(self):
+        path = _temp(self, '.md', COMPRESSED)
+        before = path.read_text(encoding='utf-8')
+        with mock.patch.object(excalidraw.os, 'replace', side_effect=OSError):
+            with self.assertRaises(OSError):
+                excalidraw.update_text_obsidian(str(path), 'a1', 'new')
+        self.assertEqual(path.read_text(encoding='utf-8'), before)
+        self.assertFalse(path.with_name(f'.{path.name}.tmp').exists())
+
+    def test_json_fence_in_block(self):
+        path = _temp(self, '.md', FENCED)
+        self.assertEqual(load_cases(path)[0]['raw'], FENCE)
+        excalidraw.update_text_obsidian(str(path), 'a1', 'Use\n\nplain')
+        self.assertEqual(load_cases(path)[0]['raw'], 'Use\n\nplain')
+        self.assertNotIn('{"a": 1}', path.read_text(encoding='utf-8'))
 
 
 if __name__ == '__main__':

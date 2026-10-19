@@ -6,6 +6,7 @@ from core import archives, search, excalidraw, favorites, checklist, editor, wik
 from core.archives.vault import Vault, save_note, create_note, read_note
 from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path, search_separator
+from core.system import copy_text
 from screens.help_screen import render_help
 from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
@@ -293,9 +294,9 @@ def _save(case, text):
             raise ValueError('the note changed on disk, open it again')
         save_note(fp, text)
     elif fp.endswith('.md'):
-        excalidraw.update_text_obsidian(fp, eid, text)
+        excalidraw.update_text_obsidian(fp, eid, text, case.get('raw'))
     else:
-        excalidraw.update_text(fp, eid, text)
+        excalidraw.update_text(fp, eid, text, case.get('raw'))
     case['text'] = text
     if 'raw' in case:
         case['raw'], case['text'] = text, excalidraw.strip_emoji(text).strip()
@@ -332,7 +333,8 @@ def open_case(results, number, query, rerun=True, trail=()):
                 _save(case, edited)
                 haptic('success')
             except Exception as e:
-                error(f'Could not save: {e}')
+                kept = ' — your text is copied' if copy_text(edited) else ''
+                error(f'Could not save: {e}{kept}')
             results = _refresh(results, query, False)
             continue
 

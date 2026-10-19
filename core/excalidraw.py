@@ -1,5 +1,6 @@
 import re
 import json
+import os
 import unicodedata
 from pathlib import Path
 import lzstring
@@ -8,6 +9,9 @@ from core import backups
 _lz = lzstring.LZString()
 
 _KEY_B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
+_JSON_RE = re.compile(r'```json\s*\n(.*?)\n```', re.S)
+_COMP_RE = re.compile(r'```compressed-json\s*\n(.*?)\n```', re.S)
+_FIELDS = ('text', 'rawText', 'originalText')
 
 
 def _from_utf16(s):
@@ -130,23 +134,36 @@ def clean(s: str) -> str:
     return s.encode('utf-8', 'replace').decode('utf-8')
 
 
+def _drawing(md):
+    at = max(md.find('## Drawing'), 0)
+    return _COMP_RE.search(md, at), _JSON_RE.search(md, at)
+
+
+_JSON_RE = re.compile(r'```json\s*\n(.*?)\n```', re.S)
+_COMP_RE = re.compile(r'```compressed-json\s*\n(.*?)\n```', re.S)
+_FIELDS = ('text', 'rawText', 'originalText')
+
+
+def _drawing(md):
+    at = max(md.find('## Drawing'), 0)
+    return _COMP_RE.search(md, at), _JSON_RE.search(md, at)
+
+
 def load_cases(path):
     path = Path(path)
     md = path.read_text(encoding='utf-8')
 
-
-    m = re.search(r'```compressed-json\s*\n(.*?)\n```', md, re.S)
-    if m:
-        raw = re.sub(r'\s+', '', m.group(1))
+    m_comp, m_json = _drawing(md)
+    if m_comp:
+        raw = re.sub(r'\s+', '', m_comp.group(1))
         text = decompress_from_base64(raw)
         if not text or '{' not in text:
             raise SceneError(f'could not decompress scene: {path}')
         scene = json.loads(clean(text[text.index('{'):]))
+    elif m_json:
+        scene = json.loads(clean(m_json.group(1)))
     else:
-        m = re.search(r'```json\s*\n(.*?)\n```', md, re.S)
-        if not m:
-            raise SceneError(f'no drawing data found: {path}')
-        scene = json.loads(clean(m.group(1)))
+        raise SceneError(f'no drawing data found: {path}')
 
     elements = scene.get('elements', [])
     rects = {e['id']: e for e in elements
@@ -191,24 +208,33 @@ def _reindex(cases):
     return cases
 
 
-def update_text(filepath, element_id, new_text):
-    _backup(filepath)
-    path = Path(filepath)
-    raw = path.read_text(encoding='utf-8')
-    scene = json.loads(raw)
-
-    found = False
+def _apply(scene, element_id, new_text, expected, fields):
     for el in scene.get('elements', []):
         if el.get('id') == element_id and el.get('type') == 'text':
-            el['text'] = new_text
-            el['originalText'] = new_text
-            found = True
-            break
+            current = (el.get('rawText') or el.get('originalText') or el.get('text') or '').strip()
+            if expected is not None and current != expected.strip():
+                raise ValueError('the block changed on disk, open it again')
+            for field in fields:
+                el[field] = new_text
+            return
+    raise ValueError('Element not found')
 
-    if not found:
-        raise ValueError('Element not found')
 
-    path.write_text(json.dumps(scene, ensure_ascii=False, indent=2), encoding='utf-8')
+def _write(path, text):
+    tmp = path.with_name(f'.{path.name}.tmp')
+    try:
+        tmp.write_text(text, encoding='utf-8')
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def update_text(filepath, element_id, new_text, expected=None):
+    _backup(filepath)
+    path = Path(filepath)
+    scene = json.loads(path.read_text(encoding='utf-8'))
+    _apply(scene, element_id, new_text, expected, ('text', 'originalText'))
+    _write(path, json.dumps(scene, ensure_ascii=False, indent=2))
 
 
 def _backup(filepath):
@@ -222,41 +248,34 @@ def _validate_md(md):
         raise SceneError('File structure broken: drawing data missing')
 
 
-def update_text_obsidian(filepath, element_id, new_text):
+_REF_RE = re.compile(r'[ \t]\^([\w-]+)[ \t]*$', re.M)
+
+
+def _replace_text_element(md, element_id, new_text):
+    start = md.find('## Text Elements')
+    if start == -1:
+        return md
+    body = md.find('\n', start) + 1
+    end = md.find('## Drawing', body)
+    prev = body
+    for m in _REF_RE.finditer(md, body, end if end != -1 else len(md)):
+        if m.group(1) == element_id:
+            head = md[prev:m.start()]
+            lead = len(head) - len(head.lstrip('\n'))
+            return md[:prev + lead] + new_text + md[m.start():]
+        prev = m.end()
+    return md
+
+
+def update_text_obsidian(filepath, element_id, new_text, expected=None):
     _backup(filepath)
     path = Path(filepath)
-    md = path.read_text(encoding='utf-8')
-
-    marker = f'^{element_id}'
-    te_start = md.find('## Text Elements')
-    if te_start != -1:
-        marker_pos = md.find(marker, te_start)
-        if marker_pos != -1:
-            search_zone = md[te_start:marker_pos]
-            blank = search_zone.rfind('\n\n')
-            if blank != -1:
-                block_start = te_start + blank + 2
-            else:
-                block_start = md.find('\n', te_start) + 1
-            block_end = marker_pos + len(marker)
-            new_block = new_text + ' ' + marker
-            md = md[:block_start] + new_block + md[block_end:]
-
-    m_json = re.search(r'```json\s*\n(.*?)\n```', md, re.S)
-    m_comp = re.search(r'```compressed-json\s*\n(.*?)\n```', md, re.S)
+    md = _replace_text_element(path.read_text(encoding='utf-8'), element_id, new_text)
+    m_comp, m_json = _drawing(md)
 
     if m_json:
         scene = json.loads(clean(m_json.group(1)))
-        found = False
-        for el in scene.get('elements', []):
-            if el.get('id') == element_id and el.get('type') == 'text':
-                el['text'] = new_text
-                el['rawText'] = new_text
-                el['originalText'] = new_text
-                found = True
-                break
-        if not found:
-            raise ValueError('Element not found')
+        _apply(scene, element_id, new_text, expected, _FIELDS)
         new_drawing = json.dumps(scene, ensure_ascii=False, indent='\t')
         md = md[:m_json.start(1)] + new_drawing + '\n' + md[m_json.end(1):]
 
@@ -267,19 +286,9 @@ def update_text_obsidian(filepath, element_id, new_text):
             raise SceneError('could not decompress scene')
         prefix = text[:text.index('{')]
         scene = json.loads(clean(text[text.index('{'):]))
-        found = False
-        for el in scene.get('elements', []):
-            if el.get('id') == element_id and el.get('type') == 'text':
-                el['text'] = new_text
-                el['rawText'] = new_text
-                el['originalText'] = new_text
-                found = True
-                break
-        if not found:
-            raise ValueError('Element not found')
+        _apply(scene, element_id, new_text, expected, _FIELDS)
         new_json = prefix + json.dumps(scene, ensure_ascii=False, separators=(',', ':'))
-        compressed = compress_to_base64(new_json)
-        md = md[:m_comp.start(1)] + compressed + md[m_comp.end(1):]
+        md = md[:m_comp.start(1)] + compress_to_base64(new_json) + md[m_comp.end(1):]
 
     _validate_md(md)
-    path.write_text(md, encoding='utf-8')
+    _write(path, md)
