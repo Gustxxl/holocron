@@ -13,6 +13,7 @@ So drop everything on a board and don't worry about order or wording. Skip a wor
 ## What's inside
 
 - **Search everything.** Every text block on a board is its own result, alongside your regular Markdown notes.
+- **Several searches at once.** Type `nginx; ERR504` and each part gets its own group of results.
 - **Edit in place.** Fix text on a drawing, open a note in your editor, tick off a task with `x 3` or write a new note with `note`. Changes go straight to the file.
 - **Ask your notes.** Keeper answers questions by quoting your notes. The model runs on your computer or your own server, so your notes stay private.
 - **Know your hours.** A regular 9 to 5 or a rotating cycle of up to 52 weeks, with night shifts, vacations and time zones.
@@ -30,6 +31,8 @@ You don't need to remember how you wrote something. Holocron catches:
 - `ё` and `е`, hyphens and underscores, all treated the same
 
 Codes and short words are matched exactly, so `ERR504` won't turn up `ERR503`. Hits in a block's title rank higher, and an exact phrase goes to the top. If nothing matches, Holocron suggests a corrected query from words that are actually in your archive.
+
+To look for several things at once, put `;` between them: `nginx; ERR504`. Each part is searched on its own and gets its own group, and every group starts on the first page. A record that matches more than one part shows up once. If `;` gets in the way of what you paste, change the symbol or turn it off in settings (`s` > Archive > Search separator).
 
 ## Excalidraw from the terminal
 
@@ -75,8 +78,6 @@ Then choose which lists and calendars to show, which one is the default, how man
 
 Settings also show which copy of the tool Holocron uses, the one it downloaded or the one from Homebrew. Press `i` to see where it is and delete it.
 
-Settings also show which copy of the tool Holocron uses, the one it downloaded or the one from Homebrew. Press `i` to see where it is and remove it.
-
 - **Reminders.** View, tick off (`x 2`) and edit reminders. Add one with `a`: `Call the vendor #work @office`. `#list` and `@waypoint` are optional.
 - **Waypoints.** Save an address under a short name like `office` once, then use `@office` in any reminder. Choose whether it fires on arrival or when you leave, and set the radius (100 m by default).
 - **Calendar.** Upcoming events grouped by day. Add one with `a`: `Standup 10:00` or `Lunch tomorrow 12:30-13:30 #work`.
@@ -88,22 +89,23 @@ On Windows and Linux everything else works today. Reminders and calendar for the
 
 Type `h` in Holocron for the full list. The main ones:
 
-| Command           | What it does                                         |
-| ----------------- | ---------------------------------------------------- |
-| any words         | search the archive                                   |
-| `l`               | browse all records                                   |
-| `k`, `keeper`     | ask Keeper                                           |
-| `sch`, `schedule` | shift schedule                                       |
-| `c`, `calendar`   | Apple Calendar events                                |
-| `r`, `reminders`  | Apple Reminders                                      |
-| `wp`, `waypoints` | places for location reminders                        |
-| `f`, `favorites`  | pinned records                                       |
-| `tree`            | browse by folder                                     |
-| `note`            | write a new note                                     |
-| `s`, `settings`   | name, archive, schedule, Keeper, reminders, calendar |
-| `check`           | run diagnostics and tests                            |
-| `update`          | install a pending update                             |
-| `b` / `w` / `q`   | back / main screen / quit                            |
+| Command             | What it does                                         |
+| ------------------- | ---------------------------------------------------- |
+| any words           | search the archive                                   |
+| `words; more words` | several searches at once                             |
+| `l`                 | browse all records                                   |
+| `k`, `keeper`       | ask Keeper                                           |
+| `sch`, `schedule`   | shift schedule                                       |
+| `c`, `calendar`     | Apple Calendar events                                |
+| `r`, `reminders`    | Apple Reminders                                      |
+| `wp`, `waypoints`   | places for location reminders                        |
+| `f`, `favorites`    | pinned records                                       |
+| `tree`              | browse by folder                                     |
+| `note`              | write a new note                                     |
+| `s`, `settings`     | name, archive, schedule, Keeper, reminders, calendar |
+| `check`             | run diagnostics and tests                            |
+| `update`            | install a pending update                             |
+| `b` / `w` / `q`     | back / main screen / quit                            |
 
 ## Get started
 
@@ -143,7 +145,7 @@ If downloads from GitHub are slow or blocked on your network, the update archive
 python3 install.py --remove
 ```
 
-This removes the `holo` command and the reminders and calendar tools Holocron downloaded. Tools installed with Homebrew stay, Holocron prints the command to remove them. This removes the `holo` command and the reminders and calendar tools Holocron downloaded. Tools installed with Homebrew stay, Holocron prints the command to remove them. Then delete the Holocron folder.
+This removes the `holo` command and the reminders and calendar tools Holocron downloaded. Tools installed with Homebrew stay, Holocron prints the command to remove them. Then delete the Holocron folder.
 
 ---
 

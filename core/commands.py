@@ -146,6 +146,7 @@ COMMANDS = [
 HELP_SECTIONS = [
     ('Search', [
         HelpEntry('type word(s)', 'search the archive (approximate matching)'),
+        HelpEntry('a; b',         'search for several things at once (s > Archive > Search separator)'),
         HelpEntry('[number]',     'open a case from the current list'),
         HelpEntry('n / p',        'next / previous page or case'),
         HelpEntry('l / list',     'browse all cases'),

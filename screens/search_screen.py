@@ -5,7 +5,7 @@ from pathlib import Path
 from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks, keeper
 from core.archives.vault import Vault, save_note, create_note, read_note
 from core.commands import HELP_SECTIONS
-from core.settings import new_cases_path
+from core.settings import new_cases_path, search_separator
 from screens.help_screen import render_help
 from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
@@ -46,16 +46,20 @@ def _hl_match(qw, tw):
     return search.word_match(qw, tw) > 0
 
 
-def _phrase_re(query):
-    parts = [re.escape(p) for p in re.split(r'[\s_]+', query.lower().replace('ё', 'е')) if p]
-    if not parts:
+def _phrase_re(queries):
+    patterns = []
+    for query in queries:
+        parts = [re.escape(p) for p in re.split(r'[\s_]+', query.lower().replace('ё', 'е')) if p]
+        if parts:
+            patterns.append(r'[ \t_]+'.join(parts).replace('е', '[её]'))
+    if not patterns:
         return None
-    pattern = r'[ \t_]+'.join(parts).replace('е', '[её]')
-    return re.compile(rf'(?<!\w){pattern}(?!\w)', re.IGNORECASE)
+    patterns.sort(key=len, reverse=True)
+    return re.compile(rf'(?<!\w)(?:{"|".join(patterns)})(?!\w)', re.IGNORECASE)
 
 
-def highlight(text, query):
-    terms = search._norm_words(query)
+def highlight(text, *queries):
+    terms = [t for q in queries for t in search._norm_words(q)]
     if not terms:
         return text
 
@@ -77,7 +81,7 @@ def highlight(text, query):
         out.append(soft(text[pos:]))
         return ''.join(out)
 
-    phrase = _phrase_re(query)
+    phrase = _phrase_re(queries)
     if not phrase:
         return soft_no_urls(text)
     out, pos = [], 0
@@ -95,14 +99,52 @@ def _all(cases):
     return [(0, c) for c in [*pinned, *by_name(c for c in cases if id(c) not in ids)]]
 
 
+def _parts(query):
+    return [p for p in search.split(query, search_separator()) if len(p) >= MIN_QUERY]
+
+
+def _find(cases, query):
+    parts = _parts(query)
+    if len(parts) < 2:
+        return search.search(cases, parts[0] if parts else query), None
+    groups, missing = search.search_many(cases, parts)
+    named = [(p, g, sum(1 for s, _ in g if search.is_exact(s))) for p, g in zip(parts, groups) if g]
+    share = max(PAGE // len(named), 1) if named else 0
+    results, layout, taken = [], [], [0] * len(named)
+    while any(taken[i] < len(g) for i, (_, g, _) in enumerate(named)):
+        for i, (part, group, top) in enumerate(named):
+            chunk = group[taken[i]:taken[i] + share]
+            if not chunk:
+                continue
+            if layout and layout[-1][0] == part:
+                last = layout[-1]
+                layout[-1] = (part, last[1], last[2] + len(chunk), *last[3:])
+            else:
+                layout.append((part, len(results), len(chunk), taken[i], len(group), top))
+            results += chunk
+            taken[i] += len(chunk)
+    return results, (layout, missing)
+
+
+def _group_at(layout, i):
+    return next((g for g in layout if g[1] <= i < g[1] + g[2]), None)
+
+
+def _suggest(cases, query):
+    parts = _parts(query)
+    fixed = [(search.suggest(cases, p) or [p])[0] for p in parts]
+    return [f'{search_separator()} '.join(fixed)] if fixed != parts else []
+
+
 def _run(cases, text):
     if text.lower() in ('l', 'list'):
-        return _all(cases), '', True
-    return search.search(cases, text), text, False
+        return _all(cases), None, '', True
+    results, groups = _find(cases, text)
+    return results, groups, text, False
 
 
 def _too_short(text):
-    return len(text) < MIN_QUERY and text.lower() not in ('l', 'list')
+    return not _parts(text) and text.lower() not in ('l', 'list')
 
 
 def _exact(results, query, list_mode):
@@ -121,24 +163,21 @@ def search_screen(initial_query=None):
             print('No archive set — add a path in settings.')
         pause()
         return
-
     query = (initial_query or '').strip()
-    results, list_mode, page = [], False, 0
+    results, groups, list_mode, page = [], None, False, 0
     exact, exact_for = None, None
-
     if query and _too_short(query):
         clear_screen()
         print(f'Type at least {MIN_QUERY} characters.')
         pause()
         return
     if query:
-        results, query, list_mode = _run(cases, query)
-
+        results, groups, query, list_mode = _run(cases, query)
     while True:
         if query and not results:
             clear_screen()
             print(f"Nothing found for '{query}'.")
-            tips = search.suggest(cases, query)
+            tips = _suggest(cases, query)
             if tips:
                 print(dim('Maybe: ' + ', '.join(tips)))
             print()
@@ -149,14 +188,13 @@ def search_screen(initial_query=None):
             if exact_for is not results:
                 exact, exact_for = _exact(results, query, list_mode), results
             ps = LIST_PAGE if list_mode else PAGE
-            page = show_list(results, page, query, ps, exact=exact)
+            page = show_list(results, page, query, ps, exact=exact, groups=groups)
         else:
             clear_screen()
             print(dim('Search the archive'))
             print()
             print(dim('  [type] search   [b] back'))
             print()
-
         command = read_command('search> ')
         low = command.lower()
         if low in ('h', 'help'):
@@ -170,7 +208,7 @@ def search_screen(initial_query=None):
             archives.load()
             cases = archives.cases()
             if query:
-                results = search.search(cases, query)
+                results, groups = _find(cases, query)
             continue
         if low in ('b', 'back'):
             return
@@ -180,7 +218,7 @@ def search_screen(initial_query=None):
             archives.load(force=True)
             cases = archives.cases()
             if query:
-                results = search.search(cases, query)
+                results, groups = _find(cases, query)
             continue
         if low == 'n' and results:
             page += 1
@@ -193,19 +231,17 @@ def search_screen(initial_query=None):
             if new_query:
                 archives.load()
                 cases = archives.cases()
-                results, query, list_mode = _run(cases, new_query)
+                results, groups, query, list_mode = _run(cases, new_query)
                 page = 0
             continue
-
         if _too_short(command):
             clear_screen()
             print(f'Type at least {MIN_QUERY} characters.')
             pause()
             continue
-
         archives.load()
         cases = archives.cases()
-        results, query, list_mode = _run(cases, command)
+        results, groups, query, list_mode = _run(cases, command)
         page = 0
 
 
@@ -236,7 +272,7 @@ def _refresh(results, query, rerun, force=False):
     archives.load(force)
     cases = archives.cases()
     if rerun and query:
-        return search.search(cases, query)
+        return _find(cases, query)[0]
     fresh = {(c.get('filepath'), c.get('element_id')): c for c in cases}
     return [(s, fresh.get((c.get('filepath'), c.get('element_id')), c)) for s, c in results]
 
@@ -361,32 +397,32 @@ def open_case(results, number, query, rerun=True, trail=()):
             continue
 
         q = command.strip()
-        if len(q) >= MIN_QUERY:
+        if _parts(q):
             return q
-
     return None
 
 
 def list_rows(cases, start, total, width, query=''):
     digits = len(str(total))
     pad = ' ' * (digits + 3)
+    terms = _parts(query)
     rows = []
     for i, case in enumerate(cases, start + 1):
         wrapped = textwrap.fill(first_line(case), width=width, initial_indent=pad, subsequent_indent=pad,
                                 break_long_words=False, break_on_hyphens=False)
-        rows.append(f'  {dim(str(i).rjust(digits))} {highlight(wrapped[len(pad):], query)}')
+        rows.append(f'  {dim(str(i).rjust(digits))} {highlight(wrapped[len(pad):], *terms)}')
     return rows
 
 
-def show_list(results, page, query, page_size=PAGE, note=None, exact=None):
+def show_list(results, page, query, page_size=PAGE, note=None, exact=None, groups=None):
     clear_screen()
     total = len(results)
     pages = max(1, (total + page_size - 1) // page_size)
     page = max(0, min(page, pages - 1))
     start = page * page_size
     chunk = results[start: start + page_size]
-
     width = shutil.get_terminal_size().columns - 1
+    layout, missing = groups or ((), ())
     count = plural(total, 'result') if query else plural(total, 'case')
     count += f'   {page + 1}/{pages}' if pages > 1 else ''
     if note:
@@ -399,18 +435,29 @@ def show_list(results, page, query, page_size=PAGE, note=None, exact=None):
     else:
         print(dim(count))
     print()
-    if exact == 0:
+    for part in missing:
+        print(f"Nothing found for '{part}'.")
+    if missing:
+        print()
+    if exact == 0 and not layout:
         print('No exact matches — showing similar cases.')
         print()
-
     for n, row in enumerate(list_rows([c for _, c in chunk], start, total, width, query), start + 1):
         if n > start + 1:
             print()
-        if exact and n == exact + 1:
+        group = _group_at(layout, n - 1)
+        head = group and n - 1 in (group[1], start)
+        if head:
+            print(dim(f'  {group[0]} · {plural(group[4], "result")}'))
+        if group:
+            at, top = group[3] + n - 1 - group[1], group[5]
+            similar = head and at >= top or bool(top) and at == top
+        else:
+            similar = exact and n == exact + 1
+        if similar:
             print(dim('  Similar'))
         print(row)
     print()
-
     nav = [('number', 'open', '#', 'open')]
     if page + 1 < pages:
         nav.append(('n', 'next'))
@@ -459,14 +506,15 @@ def show_case(case, query='', number=None, total=None, trail=()):
         short = str(Path(*parts[-3:])) if len(parts) > 3 else fp
         print(dim(f'   {short}'))
     print()
-    print(_marks(highlight_links(highlight(_wrap(links(title), width), query))))
+    terms = _parts(query)
+    print(_marks(highlight_links(highlight(_wrap(links(title), width), *terms))))
     if body:
         if case.get('filename'):
             rendered = render_note(body, width)
         else:
             rendered = render_tables(_wrap(code_blocks(links(body)), width), width)
         print()
-        print(_marks(highlight_links(paint_code(highlight(rendered, query)))))
+        print(_marks(highlight_links(paint_code(highlight(rendered, *terms)))))
     print()
     nav = []
     if editor.available():

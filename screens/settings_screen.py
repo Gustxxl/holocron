@@ -13,8 +13,12 @@ from core.settings import (
     update_keeper_server,
     update_keeper_model,
     vault_exclude,
-    update_vault_exclude
+    update_vault_exclude,
+    search_separator,
+    update_search_separator,
+    SEARCH_SEPARATOR
 )
+
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
 from ui.interface import clear_line, clear_screen, dim, error, num, pause, progress, read_command, red, show_menu, wait
@@ -65,11 +69,13 @@ def archive_screen():
         p3 = vault_path()
         p4 = keeper_model('server') or keeper_model('local')
         p5 = new_cases_path()
+        p6 = search_separator()
         print(f'{num(1)}Excalidraw for Obsidian   {_mark(p1)}')
         print(f'{num(2)}Excalidraw                {_mark(p2)}')
         print(f'{num(3)}Vault                     {_mark(p3)}')
         print(f'{num(4)}Keeper                    {dim("✓") if p4 else dim("—")}')
         print(f'{num(5)}Notes                     {_mark(p5)}')
+        print(f'{num(6)}Search separator          {dim(p6) if p6 else dim("off")}')
         print()
         print(dim('  [number] open section   [b] back   [q] quit'))
         print()
@@ -84,6 +90,8 @@ def archive_screen():
             keeper_screen()
         elif command == '5':
             notes_screen()
+        elif command == '6':
+            separator_screen()
         elif command == 'b':
             return
 
@@ -248,6 +256,33 @@ def vault_screen():
 
 def notes_screen():
     _folder_screen('Notes', new_cases_path, update_new_cases_path, 'set folder for new notes')
+
+
+def separator_screen():
+    while True:
+        clear_screen()
+        print(dim('Settings > Archive > Search separator'))
+        print()
+        sep = search_separator()
+        if sep:
+            print(f'Several searches at once: {sep}')
+            print(dim(f'  Put it between queries to search for each, e.g. nginx{sep} ERR504'))
+        else:
+            print('Several searches at once: off')
+        print()
+        print(dim(f'  [type] new symbol   [d] default {SEARCH_SEPARATOR}   [c] turn off   [b] back'))
+        print()
+        command = read_command('separator> ')
+        if command == 'b':
+            return
+        if command == 'd':
+            update_search_separator(SEARCH_SEPARATOR)
+        elif command == 'c':
+            update_search_separator('')
+        elif command and not any(ch.isalnum() or ch.isspace() for ch in command):
+            update_search_separator(command)
+        elif command:
+            error('Use symbols only, like ; or |')
 
 
 _KEEPER_STATUS = {

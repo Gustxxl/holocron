@@ -271,3 +271,23 @@ def suggest(cases, q):
     if search(cases, candidate):
         return [candidate]
     return []
+
+
+def split(query, sep):
+    parts = {}
+    for part in query.split(sep) if sep else [query]:
+        part = part.strip()
+        if part:
+            parts.setdefault(part.casefold(), part)
+    return list(parts.values())
+
+
+def search_many(cases, queries):
+    found = [search(cases, q) for q in queries]
+    best = {}
+    for i, results in enumerate(found):
+        for score, case in results:
+            if score > best.get(id(case), (0, 0))[0]:
+                best[id(case)] = (score, i)
+    groups = [[(s, c) for s, c in results if best[id(c)][1] == i] for i, results in enumerate(found)]
+    return groups, [q for q, results in zip(queries, found) if not results]

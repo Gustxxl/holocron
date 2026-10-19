@@ -120,3 +120,17 @@ def update_keeper_model(slot, model):
     cfg = load()
     cfg[f'keeper_{slot}_model'] = model
     save(cfg)
+
+
+SEARCH_SEPARATOR = ';'
+
+
+def search_separator():
+    sep = load().get('search_separator')
+    return sep if isinstance(sep, str) else SEARCH_SEPARATOR
+
+
+def update_search_separator(sep):
+    cfg = load()
+    cfg['search_separator'] = sep
+    save(cfg)
