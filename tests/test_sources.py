@@ -2,10 +2,11 @@ import copy
 import subprocess
 import unittest
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from core import sources
-from core.sources import cli, remindctl
+from core import settings, sources
+from core.sources import cli, registry, remindctl
 
 LISTS = [
     {'id': 'L1', 'overdueCount': 0, 'reminderCount': 3, 'title': 'Work'},
@@ -238,3 +239,56 @@ class RemindersStatus(unittest.TestCase):
 
     def test_ready(self):
         self.assertEqual(self._status(tools=('remindctl',), authorized=True), 'ready')
+
+
+class Registry(unittest.TestCase):
+    def _all(self, *found):
+        return patch.object(registry, 'ALL', [SimpleNamespace(KIND=kind, NAME=name, supported=lambda ok=ok: ok)
+                                              for kind, name, ok in found])
+
+    def test_active_by_kind(self):
+        with self._all(('events', 'Calendar', True), ('tasks', 'Reminders', True)):
+            self.assertEqual(registry.active('events').NAME, 'Calendar')
+            self.assertEqual(registry.active('tasks').NAME, 'Reminders')
+
+    def test_first_supported_wins(self):
+        with self._all(('events', 'Calendar', True), ('events', 'Link', True)):
+            self.assertEqual(registry.active('events').NAME, 'Calendar')
+
+    def test_skips_unsupported(self):
+        with self._all(('events', 'Calendar', False), ('events', 'Link', True)):
+            self.assertEqual(registry.active('events').NAME, 'Link')
+
+    def test_none_when_nothing_fits(self):
+        with self._all(('events', 'Calendar', False), ('tasks', 'Reminders', True)):
+            self.assertIsNone(registry.active('events'))
+            self.assertIsNone(registry.active('notes'))
+
+    def test_supported_keeps_order(self):
+        with self._all(('tasks', 'Reminders', True), ('events', 'Calendar', False), ('events', 'Link', True)):
+            self.assertEqual([s.NAME for s in registry.supported()], ['Reminders', 'Link'])
+
+    def test_nothing_supported(self):
+        with self._all(('events', 'Calendar', False)):
+            self.assertEqual(registry.supported(), [])
+
+    def test_block(self):
+        with self._all(('events', 'Calendar', True)):
+            self.assertEqual(registry.block('calendar').NAME, 'Calendar')
+            self.assertIsNone(registry.block('reminders'))
+            self.assertIsNone(registry.block('schedule'))
+            self.assertIsNone(registry.block('weather'))
+
+    def test_blocks_cover_main_screen(self):
+        self.assertEqual({*registry.BLOCKS, 'schedule'}, set(settings.HOME_BLOCKS))
+
+    def test_real_sources(self):
+        keys = [s.KEY for s in registry.ALL]
+        self.assertEqual(len(keys), len(set(keys)))
+        for source in registry.ALL:
+            with self.subTest(source.NAME):
+                self.assertIn(source.KIND, registry.BLOCKS.values())
+                for name in ('NAME', 'KEY', 'SETUP', 'LISTS', 'HINT', 'SHOWN', 'AHEAD'):
+                    self.assertTrue(hasattr(source, name), name)
+                for name in ('supported', 'available', 'authorized', 'lists', 'items'):
+                    self.assertTrue(callable(getattr(source, name, None)), name)

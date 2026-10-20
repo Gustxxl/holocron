@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from core import diagnostics
@@ -76,3 +77,30 @@ class Reason(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(diagnostics.reason(''), '')
+
+
+class Tool(unittest.TestCase):
+    def _source(self, ready=True, **extra):
+        return SimpleNamespace(NAME='Calendar link', available=lambda: ready, **extra)
+
+    def test_no_source(self):
+        self.assertIsNone(diagnostics._tool(None))
+
+    def test_not_ready(self):
+        self.assertIsNone(diagnostics._tool(self._source(ready=False, PROGRAM='ekctl')))
+
+    def test_program_shown(self):
+        self.assertEqual(diagnostics._tool(self._source(PROGRAM='ekctl')), 'ekctl')
+
+    def test_name_without_program(self):
+        self.assertEqual(diagnostics._tool(self._source()), 'Calendar link')
+
+    def test_rows_follow_registry(self):
+        found = {'events': self._source(PROGRAM='ekctl'), 'tasks': None}
+        with patch('core.sources.registry.active', side_effect=found.get), \
+             patch('core.keeper.active', return_value=None), \
+             patch('core.archives.is_loaded', return_value=False):
+            _, rows = diagnostics.system_info()
+        rows = dict(rows)
+        self.assertEqual(rows['Calendar'], 'ekctl')
+        self.assertIsNone(rows['Reminders'])

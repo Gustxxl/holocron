@@ -67,14 +67,14 @@ class Schedule(Screen):
         self.assertIn('back', frame)
 
 
-SOURCE = SimpleNamespace(NAME='Reminders', TAP='steipete/tap/remindctl', PROGRAM='remindctl', MACOS=14,
-                         ABOUT='Apple Reminders', PRIVACY='Reminders', supported=lambda: True,
+SOURCE = SimpleNamespace(NAME='Reminders', SETUP='macos', TAP='steipete/tap/remindctl', PROGRAM='remindctl',
+                         MACOS=14, ABOUT='Apple Reminders', PRIVACY='Reminders', supported=lambda: True,
                          status=lambda: 'denied', authorize=lambda: False)
 
 
 class Settings(Screen):
     def test_sections(self):
-        with patch.object(settings_screen, '_SOURCES', [SOURCE]), \
+        with patch.object(settings_screen.registry, 'ALL', [SOURCE]), \
              patch.object(settings_screen, 'schedule_settings') as schedule, \
              patch.object(settings_screen, 'home_screen') as home:
             text = self.open(settings_screen, settings_screen.settings_screen,
@@ -86,15 +86,24 @@ class Settings(Screen):
 
     def test_order(self):
         sources = [SimpleNamespace(NAME=name, supported=lambda: True) for name in ('Calendar', 'Reminders')]
-        with patch.object(settings_screen, '_SOURCES', sources), \
+        with patch.object(settings_screen.registry, 'ALL', sources), \
              patch.object(settings_screen, 'show_menu', side_effect=_Stop) as menu:
             with self.assertRaises(_Stop):
                 settings_screen.settings_screen()
         self.assertEqual(menu.call_args.args[1],
                          ['User', 'Main screen', 'Archive', 'Schedule', 'Calendar', 'Reminders'])
 
+    def test_unsupported_source_hidden(self):
+        sources = [SimpleNamespace(NAME='Calendar', supported=lambda: False),
+                   SimpleNamespace(NAME='Reminders', supported=lambda: True)]
+        with patch.object(settings_screen.registry, 'ALL', sources), \
+             patch.object(settings_screen, 'show_menu', side_effect=_Stop) as menu:
+            with self.assertRaises(_Stop):
+                settings_screen.settings_screen()
+        self.assertEqual(menu.call_args.args[1], ['User', 'Main screen', 'Archive', 'Schedule', 'Reminders'])
+
     def test_no_main_screen_without_sources(self):
-        with patch.object(settings_screen, '_SOURCES', []), \
+        with patch.object(settings_screen.registry, 'ALL', []), \
              patch.object(settings_screen, 'show_menu', side_effect=_Stop) as menu:
             with self.assertRaises(_Stop):
                 settings_screen.settings_screen()
@@ -123,7 +132,7 @@ class Tasks(Screen):
     def test_list_card_and_lists(self):
         source = SimpleNamespace(KEY='remindctl', NAME='Reminders', LISTS='lists', PROGRAM='remindctl',
                                  TAP='steipete/tap/remindctl', lists=lambda: LISTS, items=lambda: [TASK],
-                                 SHOWN=3, AHEAD=0)
+                                 SHOWN=3, AHEAD=0, available=lambda: True)
         text = self.open(tasks_screen, lambda: tasks_screen.tasks_screen(source),
                          ['1', 'b', 's', 'b', 'b'], TASKS_PATCHES)
         self.assertIn('Buy milk', text)
@@ -206,6 +215,15 @@ CALENDARS = [{'id': 'c1', 'title': 'Work'}]
 EVENT = {'id': 'e1', 'title': 'Standup', 'start': datetime(2030, 1, 1, 10), 'end': datetime(2030, 1, 1, 11),
          'all_day': False, 'list': 'c1', 'list_name': 'Work', 'place': '', 'notes': '',
          'url': 'https://meet.google.com/abc'}
+EVENTS_PATCHES = {
+    'screens.events_screen.source_setup': True,
+    'core.sources.selected': ['c1'],
+    'core.sources.default': 'c1',
+    'core.sources.option': 2,
+    'core.sources.cli.origin': 'holocron',
+    'core.sources.cli.which': '/x/ekctl',
+    'core.sources.cli.shadowed': None,
+}
 
 
 class Calendar(Screen):
@@ -221,24 +239,41 @@ class Calendar(Screen):
              patch('core.sources.option', side_effect=lambda key, name, default: default):
             return events_screen.agenda(source, now)
 
+    def _typed(self, source):
+        with patch.object(events_screen, '_add') as add:
+            self.open(events_screen, lambda: events_screen.events_screen(source),
+                      ['a', 'Lunch 12:00', 'b'], EVENTS_PATCHES)
+        return add
+
     def test_list_card_and_calendars(self):
         with patch('core.sources.set_option') as set_option:
             text = self.open(events_screen, lambda: events_screen.events_screen(self._source()),
-                             ['1', 'b', 's', 'm 1', 't 3', 'b', 'b'], {
-                                 'screens.events_screen.source_setup': True,
-                                 'core.sources.selected': ['c1'],
-                                 'core.sources.default': 'c1',
-                                 'core.sources.option': 2,
-                                 'core.sources.cli.origin': 'holocron',
-                                 'core.sources.cli.which': '/x/ekctl',
-                                 'core.sources.cli.shadowed': None,
-                             })
+                             ['1', 'b', 's', 'm 1', 't 3', 'b', 'b'], EVENTS_PATCHES)
         self.assertIn('Standup', text)
         self.assertIn('meet.google.com', text)
         self.assertIn('Settings > Calendar', text)
         self.assertIn('today and tomorrow', text)
         self.assertEqual([c.args for c in set_option.call_args_list],
                          [('ekctl', 'shown', 1), ('ekctl', 'ahead', 3)])
+
+    def test_add_asks_for_text(self):
+        source = self._source()
+        source.add = lambda *args: True
+        add = self._typed(source)
+        add.assert_called_once()
+        self.assertEqual(add.call_args.args[:2], (source, 'Lunch 12:00'))
+
+    def test_read_only_ignores_add(self):
+        self._typed(self._source()).assert_not_called()
+
+    def test_read_only_hides_add(self):
+        now = datetime(2030, 1, 1, 9)
+        source = self._source()
+        frame = '\n'.join(events_screen._frame(source, ['c1'], [], now))
+        self.assertNotIn('add', frame)
+        self.assertIn('calendars', frame)
+        source.add = lambda *args: True
+        self.assertIn('add', '\n'.join(events_screen._frame(source, ['c1'], [], now)))
 
     def test_agenda_shows_link(self):
         lines = self._agenda(datetime(2030, 1, 1, 9))

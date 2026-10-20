@@ -13,6 +13,10 @@ _REMOVABLE = ('holocron', 'homebrew')
 
 
 def source_setup(source):
+    return _SETUPS[source.SETUP](source)
+
+
+def _macos_setup(source):
     clt = False
     while True:
         state = source.status()
@@ -88,6 +92,9 @@ def source_setup(source):
             macos.open_url(source.PRIVACY_URL)
 
 
+_SETUPS = {'macos': _macos_setup}
+
+
 def tool_screen(source):
     while True:
         where = cli.origin(source.PROGRAM)
@@ -125,8 +132,9 @@ def lists_screen(source):
     if lists is None:
         unreadable(source)
         return
+    tool = hasattr(source, 'PROGRAM')
     while True:
-        if not cli.available(source.PROGRAM):
+        if not source.available():
             return
         chosen = sources.selected(source.KEY)
         main = sources.default(source.KEY, lists)
@@ -143,8 +151,9 @@ def lists_screen(source):
         when = _AHEAD.get(ahead, f'next {ahead} days')
         lines += ['', f'Main screen   {dim(f"{shown} · {when}" if shown else "hidden")}']
         nav = [('number', 'show/hide', '#', 'show/hide'), ('d number', 'default', 'd#', 'default'),
-               ('m number', 'main screen', 'm#', 'main'), ('t number', 'days', 't#', 'days'),
-               ('i', 'info'), ('b', 'back')]
+               ('m number', 'main screen', 'm#', 'main'), ('t number', 'days', 't#', 'days')]
+        nav += [('i', 'info')] if tool else []
+        nav.append(('b', 'back'))
         lines += ['', dim(nav_line(nav)), '']
         frame = '\n'.join(lines)
         clear_screen()
@@ -155,7 +164,7 @@ def lists_screen(source):
         days = _AHEAD_RE.fullmatch(command)
         if is_back(command):
             return
-        if command == 'i':
+        if command == 'i' and tool:
             tool_screen(source)
         elif pick and 1 <= int(pick.group(1)) <= len(lists):
             sources.set_default(source.KEY, lists[int(pick.group(1)) - 1]['id'])

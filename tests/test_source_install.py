@@ -56,13 +56,13 @@ class Install(unittest.TestCase):
 
 class _Source:
     NAME = 'Sample'
+    SETUP = 'macos'
     PROGRAM = 'sampletool'
     TAP = 'sample/tap/sampletool'
     REPO = 'sample/sampletool'
     ABOUT = 'sample items'
     PRIVACY = 'Sample'
     MACOS = 14
-
 
     def status(self):
         return 'missing'

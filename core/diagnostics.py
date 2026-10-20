@@ -58,9 +58,15 @@ def run(progress=lambda done, total, name: None):
     }
 
 
+def _tool(source):
+    if source is None or not source.available():
+        return None
+    return getattr(source, 'PROGRAM', source.NAME)
+
+
 def system_info():
     from core import archives, keeper, system
-    from core.sources import ekctl, remindctl
+    from core.sources import registry
     editor = system.editor()
     clipboard = next((name for name, *_ in system.CLIPBOARDS if shutil.which(name)), None)
     conn = keeper.active(refresh=True)
@@ -68,8 +74,8 @@ def system_info():
         ('Editor', Path(editor[0]).stem if editor else None),
         ('Clipboard', clipboard),
         ('Hyperspace', 'curses' if system.CURSES else None),
-        ('Reminders', remindctl.PROGRAM if remindctl.available() else None),
-        ('Calendar', ekctl.PROGRAM if ekctl.available() else None),
+        ('Reminders', _tool(registry.active('tasks'))),
+        ('Calendar', _tool(registry.active('events'))),
         ('Keeper', {'server': 'server', 'local': 'this computer'}.get(conn['slot']) if conn else None),
         ('Archive', f'{archives.count()} cases' if archives.is_loaded() else None),
     ]

@@ -29,17 +29,13 @@ from pathlib import Path
 from ui.clean_path import clean_input_path
 from core import system
 from core.archives.vault import folders, relative
-from core.sources import ekctl, remindctl
+from core.sources import registry
 from screens.sources_screen import lists_screen, source_setup
-
-
-_SOURCES = [ekctl, remindctl]
-_HOME_SOURCES = {'calendar': ekctl, 'reminders': remindctl}
 
 
 def settings_screen():
     while True:
-        extra = [s for s in _SOURCES if s.supported()]
+        extra = registry.supported()
         items = [('User', user_screen)]
         if extra:
             items.append(('Main screen', home_screen))
@@ -126,12 +122,12 @@ def user_screen():
 def home_screen():
     while True:
         order = home_order()
-        shown = [b for b in order if b not in _HOME_SOURCES or _HOME_SOURCES[b].supported()]
+        shown = [b for b in order if b not in registry.BLOCKS or registry.block(b)]
         clear_screen()
         print(dim('Settings > Main screen'))
         print()
         for i, key in enumerate(shown, 1):
-            name = _HOME_SOURCES[key].NAME if key in _HOME_SOURCES else 'Schedule'
+            name = registry.block(key).NAME if key in registry.BLOCKS else 'Schedule'
             print(f'{num(i)}{name}')
         print()
         print(dim('  Type the numbers in the new order. Blocks you skip keep their order.'))

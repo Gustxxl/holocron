@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from core import commands
@@ -46,3 +47,79 @@ class Hyperspace(unittest.TestCase):
     def test_available_with_curses(self):
         with patch.object(commands, 'HAS_CURSES', True):
             self.assertEqual(commands.lookup('hy').name, 'hyperspace')
+
+
+def _entry(section, name):
+    return next(e for title, entries in commands.HELP_SECTIONS if title == section for e in entries if e.name == name)
+
+
+class Sources(unittest.TestCase):
+    def _source(self, ready=True, add=True):
+        source = SimpleNamespace(available=lambda: ready)
+        if add:
+            source.add = lambda *args: True
+        return source
+
+    def _active(self, events=None, tasks=None):
+        return patch.object(commands.registry, 'active', side_effect={'events': events, 'tasks': tasks}.get)
+
+    def test_calendar_with_source(self):
+        with self._active(events=self._source()):
+            self.assertEqual(commands.lookup('c').name, 'calendar')
+            self.assertEqual(commands.lookup('cal').name, 'calendar')
+
+    def test_calendar_hidden_without_source(self):
+        with self._active(tasks=self._source()):
+            self.assertIsNone(commands.lookup('c'))
+
+    def test_calendar_hidden_when_not_ready(self):
+        with self._active(events=self._source(ready=False)):
+            self.assertIsNone(commands.lookup('calendar'))
+
+    def test_reminders_with_source(self):
+        with self._active(tasks=self._source()):
+            self.assertEqual(commands.lookup('r').name, 'reminders')
+
+    def test_reminders_hidden_when_not_ready(self):
+        with self._active(events=self._source(), tasks=self._source(ready=False)):
+            self.assertIsNone(commands.lookup('reminders'))
+
+    def test_calendar_opens_active_source(self):
+        source = self._source()
+        with self._active(events=source), patch('screens.events_screen.events_screen') as screen:
+            commands.lookup('c').run('c')
+        screen.assert_called_once_with(source)
+
+    def test_reminders_open_active_source(self):
+        source = self._source()
+        with self._active(tasks=source), patch('screens.tasks_screen.tasks_screen') as screen:
+            commands.lookup('r').run('r')
+        screen.assert_called_once_with(source)
+
+    def test_read_only_calendar_hides_add_help(self):
+        with self._active(events=self._source(add=False)):
+            self.assertTrue(_entry('Calendar', '[number]').when())
+            self.assertFalse(_entry('Calendar', 'a').when())
+        with self._active(events=self._source()):
+            self.assertTrue(_entry('Calendar', 'a').when())
+
+    def test_calendar_help_hidden_without_source(self):
+        with self._active():
+            self.assertFalse(_entry('Calendar', '[number]').when())
+            self.assertFalse(_entry('Calendar', 'a').when())
+
+    def test_reminder_help_follows_source(self):
+        for ready in (True, False):
+            with self.subTest(ready), self._active(tasks=self._source(ready=ready)):
+                for name in ('[number]', 'x number', 'a'):
+                    self.assertEqual(_entry('Reminders', name).when(), ready)
+
+    def test_edit_reminder_needs_editor(self):
+        for has_editor in (True, False):
+            with self.subTest(has_editor), self._active(tasks=self._source()), \
+                 patch.object(commands.editor, 'available', return_value=has_editor):
+                self.assertEqual(_entry('Reminders', 'e').when(), has_editor)
+
+    def test_waypoints_stay_with_apple_reminders(self):
+        with self._active(tasks=self._source()), patch.object(commands.remindctl.system, 'IS_MACOS', False):
+            self.assertIsNone(commands.lookup('wp'))

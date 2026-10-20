@@ -5,7 +5,7 @@ import shutil
 from core import archives
 from core.commands import lookup
 from core.settings import home_order, operator_name
-from core.sources import ekctl, remindctl
+from core.sources import registry
 from screens.events_screen import agenda
 from core.updater import pending_update
 from screens.schedule_screen import duty_line
@@ -69,12 +69,13 @@ def _frame():
 
 
 def _block(key):
-    if key == 'calendar':
-        return agenda(ekctl)
-    if key == 'reminders':
-        return summary(remindctl)
-    line = duty_line()
-    return [line] if line else []
+    if key not in registry.BLOCKS:
+        line = duty_line()
+        return [line] if line else []
+    source = registry.block(key)
+    if source is None:
+        return []
+    return agenda(source) if source.KIND == 'events' else summary(source)
 
 
 def _logo():

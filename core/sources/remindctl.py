@@ -4,6 +4,7 @@ from . import cli, macos
 NAME = 'Reminders'
 KEY = 'remindctl'
 KIND = 'tasks'
+SETUP = 'macos'
 PROGRAM = 'remindctl'
 REPO = 'openclaw/remindctl'
 TAP = 'steipete/tap/remindctl'

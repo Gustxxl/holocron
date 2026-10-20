@@ -28,7 +28,7 @@ def events_screen(source):
             show_help()
         elif low in ('s', 'settings'):
             lists_screen(source)
-        elif low == 'a':
+        elif low == 'a' and hasattr(source, 'add'):
             text = read_command('text> ')
             if text:
                 _add(source, text, lists, chosen)
@@ -76,7 +76,8 @@ def _frame(source, chosen, flat, now):
                 lines.append(f'  {" " * digits} {" " * 11}  {dim(underline(link))}')
         lines.append('')
     nav = [('number', 'open', '#', 'open')] if n else []
-    nav += [('a', 'add'), ('s', source.LISTS), ('b', 'back'), ('h', 'help')]
+    nav += [('a', 'add')] if hasattr(source, 'add') else []
+    nav += [('s', source.LISTS), ('b', 'back'), ('h', 'help')]
     lines += [dim(nav_line(nav)), '']
     return lines
 

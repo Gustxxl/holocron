@@ -18,7 +18,7 @@ def tasks_screen(source):
         if found is None:
             unreadable(source)
             return
-        chosen = sources.selected(source. KEY)
+        chosen = sources.selected(source.KEY)
         groups = [(title, items) for title, items in tasks.group(found, lists, chosen) if items]
         flat = tasks.numbered(groups)
         frame = '\n'.join(_frame(source, chosen, groups, datetime.now()))

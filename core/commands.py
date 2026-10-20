@@ -7,7 +7,7 @@ from core.updater import update
 from screens.help_screen import render_help
 from screens.settings_screen import settings_screen
 from ui.interface import clear_screen, pause
-from core.sources import ekctl, remindctl
+from core.sources import registry, remindctl
 from core import keeper
 
 
@@ -41,8 +41,25 @@ def _can_write_note():
     return bool(folder) and Path(folder).is_dir() and editor.available()
 
 
+def _ready(kind):
+    source = registry.active(kind)
+    return source is not None and source.available()
+
+
+def _has_calendar():
+    return _ready('events')
+
+
+def _has_reminders():
+    return _ready('tasks')
+
+
+def _can_add_event():
+    return _has_calendar() and hasattr(registry.active('events'), 'add')
+
+
 def _can_edit_reminder():
-    return remindctl.available() and editor.available()
+    return _has_reminders() and editor.available()
 
 
 def _cmd_settings(raw):
@@ -106,12 +123,12 @@ def _cmd_hyperspace(raw):
 
 def _cmd_calendar(raw):
     from screens.events_screen import events_screen
-    events_screen(ekctl)
+    events_screen(registry.active('events'))
 
 
 def _cmd_reminders(raw):
     from screens.tasks_screen import tasks_screen
-    tasks_screen(remindctl)
+    tasks_screen(registry.active('tasks'))
 
 
 def _cmd_waypoints(raw):
@@ -128,8 +145,8 @@ def _cmd_check(raw):
 COMMANDS = [
     Command('keeper',     _cmd_keeper,     ('k', 'keep'), 'ask the archive in your own words'),
     Command('schedule',   _cmd_schedule,   ('sch',),      'shift schedule, week by week'),
-    Command('calendar',   _cmd_calendar,   ('c', 'cal'),  'events from Apple Calendar', ekctl.available),
-    Command('reminders',  _cmd_reminders,  ('r',),        'tasks from Apple Reminders', remindctl.available),
+    Command('calendar',   _cmd_calendar,   ('c', 'cal'),  'upcoming calendar events', _has_calendar),
+    Command('reminders',  _cmd_reminders,  ('r',),        'open reminders', _has_reminders),
     Command('waypoints',  _cmd_waypoints,  ('wp',),       'places for location reminders', remindctl.available),
     Command('favorites',  _cmd_favorites,  ('f', 'fav'),  'pinned records'),
     Command('tree',       _cmd_tree,       (),            'browse the archive by folder', archives.is_loaded),
@@ -163,14 +180,14 @@ HELP_SECTIONS = [
         HelpEntry('type a date',  'open the week of that date, e.g. 14-11'),
     ]),
     ('Calendar', [
-        HelpEntry('[number]', 'open an event', ekctl.available),
-        HelpEntry('a',        'add an event: title, time, optional date and #calendar', ekctl.available),
+        HelpEntry('[number]', 'open an event', _has_calendar),
+        HelpEntry('a',        'add an event: title, time, optional date and #calendar', _can_add_event),
     ]),
     ('Reminders', [
-        HelpEntry('[number]',     'open a reminder', remindctl.available),
-        HelpEntry('x number',     'mark a reminder done', remindctl.available),
+        HelpEntry('[number]',     'open a reminder', _has_reminders),
+        HelpEntry('x number',     'mark a reminder done', _has_reminders),
         HelpEntry('e',            'edit the open reminder', _can_edit_reminder),
-        HelpEntry('a',            'add a reminder; #list and @place are optional', remindctl.available),
+        HelpEntry('a',            'add a reminder; #list and @place are optional', _has_reminders),
     ]),
     ('Waypoints', [
         HelpEntry('a',              'add a waypoint', remindctl.available),

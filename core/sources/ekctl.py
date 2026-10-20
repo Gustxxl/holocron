@@ -5,6 +5,7 @@ from . import cli, macos
 NAME = 'Calendar'
 KEY = 'ekctl'
 KIND = 'events'
+SETUP = 'macos'
 PROGRAM = 'ekctl'
 REPO = 'schappim/ekctl'
 TAP = 'schappim/ekctl/ekctl'
