@@ -47,7 +47,7 @@ def _get(urls, raw=False):
     errors = []
     for candidate in urls:
         try:
-            req = urllib.request. Request(candidate, headers={
+            req = urllib.request.Request(candidate, headers={
                 'Accept': '*/*' if raw else 'application/vnd.github+json',
                 'User-Agent': 'holocron',
             })

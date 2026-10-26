@@ -35,6 +35,14 @@ class SourceSetupScreen(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(out, '')
 
+    def test_back_word_closes(self):
+        for word in ('b', 'back', 'B', 'Back'):
+            with self.subTest(word), \
+                 mock.patch.object(sources_screen, 'clear_screen'), \
+                 mock.patch.object(sources_screen, 'read_command', side_effect=[word]), \
+                 redirect_stdout(io.StringIO()):
+                self.assertFalse(sources_screen.source_setup(self._source('denied')))
+
 
 class Setups(unittest.TestCase):
     def test_every_source_has_setup(self):

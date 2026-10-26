@@ -67,7 +67,7 @@ def _macos_setup(source):
         print()
 
         command = read_command(f'{source.NAME.lower()}> ').lower()
-        if command == 'b':
+        if is_back(command):
             return False
         if command == 'i' and state == 'missing':
             print()

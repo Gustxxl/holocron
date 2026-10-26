@@ -85,7 +85,7 @@ Settings also show which copy of the tool Holocron uses, the one it downloaded o
 - **Calendar.** Upcoming events grouped by day. Add one with `a`: `Standup 10:00` or `Lunch tomorrow 12:30-13:30 #work`.
 - **Meeting links.** Holocron looks for links in the event URL, location, notes and invitees and shows the meeting link right under the event: Zoom, Google Meet, Teams, Webex, Whereby, Jitsi and Telemost.
 
-On Windows and Linux everything else works today. Reminders and calendar for them are coming next. If you'd like a particular service, [open an issue](https://github.com/Gustxxl/holocron/issues).
+On Windows and Linux everything else works the same, only reminders and calendar are macOS-only. If you need them on another system, [open an issue](https://github.com/Gustxxl/holocron/issues).
 
 ## Commands
 

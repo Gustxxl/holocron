@@ -154,6 +154,20 @@ class Tasks(Screen):
             lines = tasks_screen.summary(source)
         self.assertEqual(visible(lines[0]), '○ Buy milk #Home')
 
+    def test_card_ignores_wrong_number(self):
+        found = [{**TASK, 'list': 'l1', 'done': False}, {**TASK, 'id': 't2', 'title': 'Call vendor', 'list': 'l1', 'done': False}]
+        with patch.object(tasks_screen, 'clear_screen'), \
+             patch.object(tasks_screen, 'read_command', side_effect=['99', '0', '2', 'b']) as read, \
+             patch('core.waypoints.load', return_value={}), \
+             patch('core.editor.available', return_value=False), \
+             redirect_stdout(io.StringIO()) as out:
+            tasks_screen._open(SimpleNamespace(), found, 1)
+        text = visible(out.getvalue())
+        self.assertEqual(read.call_count, 4)
+        self.assertEqual(text.count('── 1/2'), 3)
+        self.assertEqual(text.count('── 2/2'), 1)
+        self.assertIn('Call vendor', text)
+
 
 POINT = {'address': 'Main st 1', 'proximity': 'arriving', 'radius': 100}
 
@@ -303,3 +317,15 @@ class Calendar(Screen):
             with self.subTest(name):
                 text = '\n'.join(events_screen._card(event, 1, 1, now))
                 self.assertIn('Standup', text)
+
+    def test_card_ignores_wrong_number(self):
+        events = [EVENT, {**EVENT, 'id': 'e2', 'title': 'Retro'}]
+        with patch.object(events_screen, 'clear_screen'), \
+             patch.object(events_screen, 'read_command', side_effect=['99', '0', '2', 'b']) as read, \
+             redirect_stdout(io.StringIO()) as out:
+            events_screen._open(events, 1)
+        text = visible(out.getvalue())
+        self.assertEqual(read.call_count, 4)
+        self.assertEqual(text.count('── 1/2'), 3)
+        self.assertEqual(text.count('── 2/2'), 1)
+        self.assertIn('Retro', text)
