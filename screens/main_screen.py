@@ -18,7 +18,13 @@ LOGO = APP_DIR / "ui" / "logo.txt"
 LOGO_TEXT = "HOLOCRON"
 
 
-def main_screen(first=None):
+def main_screen(first=None, query=None):
+    if query:
+        first = None
+        try:
+            _handle(query)
+        except Home:
+            pass
     while True:
         frame = first or main_frame()
         first = None

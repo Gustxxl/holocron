@@ -10,10 +10,10 @@ import colorama
 colorama.init()
 
 
+import os
 from core import archives
-from pathlib import Path
+from core import launch
 from core.settings import update_archive_path
-from ui.clean_path import clean_input_path
 from screens.main_screen import main_frame, main_screen
 from ui.interface import Spinner, clear_screen, disconnect, pause
 from core import updater
@@ -21,21 +21,26 @@ from core import config
 
 
 def start():
+    action, value = launch.parse(sys.argv[1:], os.environ.get('HOLO_CWD'))
+    if action == 'help':
+        print(launch.USAGE)
+        return
+    if action == 'unknown':
+        sys.exit(f'Unknown option {value}. Run holo --help')
     updater.check_update_async()
-    if len(sys.argv) > 1:
-        p = clean_input_path(sys.argv[1])
-        if p and Path(p).exists():
-            update_archive_path(p)
+    if action == 'board':
+        update_archive_path(value)
+    query = value if action == 'search' else None
     try:
         clear_screen()
         with Spinner('Accessing the archives'):
             archives.load()
             updater.pending_update(5)
-            first = None if config.broken else main_frame()
+            first = None if config.broken or query else main_frame()
         if config.broken:
             print(f'Settings could not be read, defaults are used. A copy is in {config.broken}')
             pause()
-        main_screen(first)
+        main_screen(first, query)
     except (KeyboardInterrupt, EOFError):
         disconnect()
 

@@ -1,3 +1,6 @@
+import os
+import stat
+import sys
 import io
 import tempfile
 import unittest
@@ -57,6 +60,37 @@ class Remove(unittest.TestCase):
 
     def test_nothing_to_remove(self):
         self.assertIn('Nothing to remove.', self.run_remove())
+
+
+class Launcher(unittest.TestCase):
+    @unittest.skipIf(os.name == 'nt', 'POSIX launcher')
+    def test_posix_keeps_start_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / 'bin' / 'holo'
+            with mock.patch.object(install, '_posix_target', return_value=target):
+                path, _ = install._install_posix()
+            self.assertEqual(path, target)
+            self.assertEqual(target.read_text(encoding='utf-8').split('\n'), [
+                '#!/bin/sh',
+                'export HOLO_CWD="$PWD"',
+                f'cd "{install.APP_DIR}" && exec "{sys.executable}" "{install.MAIN}" "$@"',
+                '',
+            ])
+            self.assertTrue(target.stat().st_mode & stat.S_IXUSR)
+
+    def test_windows_keeps_start_folder(self):
+        target = mock.Mock()
+        with mock.patch.object(install, '_windows_target', return_value=target):
+            self.assertEqual(install._install_windows(), (target, True))
+        self.assertEqual(target.write_text.call_args.args[0].split('\r\n'), [
+            '@echo off',
+            'setlocal',
+            'set "HOLO_CWD=%CD%"',
+            f'cd /d "{install.APP_DIR}"',
+            f'"{sys.executable}" "{install.MAIN}" %*',
+            '',
+        ])
+        self.assertEqual(target.write_text.call_args.kwargs, {'encoding': 'oem'})
 
 
 if __name__ == '__main__':

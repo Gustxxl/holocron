@@ -16,19 +16,56 @@ def _source(key):
 
 
 class Dispatch(unittest.TestCase):
-    def _run(self, *inputs, loaded=True):
+    def _run(self, *inputs, loaded=True, query=None):
         with patch.object(main, '_frame', return_value=[]), \
              patch.object(main, 'clear_screen'), \
              patch('builtins.print'), \
              patch.object(main, 'pause'), \
              patch.object(main.archives, 'is_loaded', return_value=loaded), \
              patch.object(main.archives, 'missing', return_value=[]), \
-             patch.object(main, 'read_command', side_effect=[*inputs, _Stop()]), \
+             patch.object(main, 'read_command', side_effect=[*inputs, _Stop()]) as self.read, \
              patch.object(main, 'search_screen') as search, \
              patch('core.commands.settings_screen') as settings:
             with self.assertRaises(_Stop):
-                main.main_screen()
+                main.main_screen(query=query)
         return search, settings
+
+    def test_start_query_searches_first(self):
+        search, settings = self._run(query='nginx timeout')
+        search.assert_called_once_with('nginx timeout')
+        settings.assert_not_called()
+        self.assertEqual(self.read.call_count, 1)
+
+    def test_start_query_then_prompt(self):
+        search, _ = self._run('redis', query='nginx')
+        self.assertEqual([c.args for c in search.call_args_list], [('nginx',), ('redis',)])
+
+    def test_start_command(self):
+        search, settings = self._run(query='s')
+        settings.assert_called_once()
+        search.assert_not_called()
+
+    def test_start_query_without_archive(self):
+        search, _ = self._run(query='nginx', loaded=False)
+        search.assert_not_called()
+
+    def test_no_start_query(self):
+        for query in (None, ''):
+            with self.subTest(repr(query)):
+                search, settings = self._run(query=query)
+                search.assert_not_called()
+                settings.assert_not_called()
+
+    def test_home_from_start_query(self):
+        with patch.object(main, '_frame', return_value=[]), \
+             patch.object(main, 'clear_screen'), \
+             patch('builtins.print'), \
+             patch.object(main.archives, 'is_loaded', return_value=True), \
+             patch.object(main, 'read_command', side_effect=['redis', _Stop()]), \
+             patch.object(main, 'search_screen', side_effect=[main.Home(), None]) as search:
+            with self.assertRaises(_Stop):
+                main.main_screen(query='nginx')
+        self.assertEqual([c.args for c in search.call_args_list], [('nginx',), ('redis',)])
 
     def test_query_goes_to_search(self):
         search, settings = self._run('nginx')
@@ -90,6 +127,18 @@ class Frame(unittest.TestCase):
             with self.assertRaises(_Stop):
                 main.main_screen()
         self.assertEqual(calls, ['frame', 'clear'])
+
+    def test_start_query_draws_fresh_frame(self):
+        with patch.object(main, '_frame', return_value=['fresh']) as frame, \
+             patch.object(main, 'clear_screen'), \
+             patch('builtins.print') as out, \
+             patch.object(main.archives, 'is_loaded', return_value=True), \
+             patch.object(main, 'search_screen'), \
+             patch.object(main, 'read_command', side_effect=_Stop()):
+            with self.assertRaises(_Stop):
+                main.main_screen('stale', 'nginx')
+        frame.assert_called_once()
+        self.assertEqual([c.args for c in out.call_args_list], [('fresh',)])
 
 
 class Width(unittest.TestCase):
