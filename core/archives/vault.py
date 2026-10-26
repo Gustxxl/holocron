@@ -2,7 +2,8 @@ import re
 from pathlib import Path
 from core.settings import vault_path, new_cases_path, vault_exclude
 from .base import Archive
-from core import backups
+from core import backups, kanban
+from core.excalidraw import strip_emoji
 
 NAME_MAX = 80
 _UNSAFE = re.compile(r'[\\/:*?"<>|#^\[\]]')
@@ -81,6 +82,39 @@ def _roots():
     return [p for p in (vault_path(), new_cases_path()) if p and Path(p).is_dir()]
 
 
+def _cards(f, text):
+    lanes = kanban.parse(text)
+    titles = [lane['title'] for lane in lanes]
+    cases, seen = [{
+        'text': '\n'.join(titles),
+        'lanes': titles,
+        'source': f.name,
+        'filepath': str(f),
+        'element_id': f.stem,
+        'filename': f.stem,
+        'x': 0,
+        'y': 0,
+    }], {}
+    for lane in lanes:
+        for card in lane['cards']:
+            plain = strip_emoji(card['text']).strip()
+            if not plain:
+                continue
+            key = card['block'] or card['text'].split('\n', 1)[0]
+            seen[key] = seen.get(key, 0) + 1
+            cases.append({
+                'text': plain,
+                'raw': card['text'],
+                'lane': lane['title'],
+                'source': f.name,
+                'filepath': str(f),
+                'element_id': key if seen[key] == 1 else f'{key} {seen[key]}',
+                'x': 0,
+                'y': 0,
+            })
+    return cases
+
+
 def _note(f):
     try:
         text = f.read_text(encoding='utf-8').strip()
@@ -88,6 +122,8 @@ def _note(f):
         return []
     if '## Drawing' in text or 'excalidraw-plugin' in text:
         return []
+    if kanban.is_board(text):
+        return _cards(f, text)
     return [{
         'text': text,
         'source': f.name,

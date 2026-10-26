@@ -15,6 +15,14 @@ def _folder(name):
     return {'name': name, 'kind': 'folder', 'folders': {}, 'files': {}}
 
 
+def _kanban(name, filepath):
+    return {'name': name, 'kind': 'kanban', 'filepath': filepath, 'folders': {}, 'files': {}}
+
+
+def _lane(board, title):
+    return board['files'].setdefault(title, {'name': title, 'kind': 'lane', 'filepath': board['filepath'], 'cases': []})
+
+
 def _parts(path, bases, flat):
     for base in bases:
         if path.is_relative_to(base):
@@ -38,19 +46,45 @@ def build(cases, vault=None, folders=()):
         node = root
         for part in parts[:-1]:
             node = node['folders'].setdefault(part, _folder(part))
-        kind = 'note' if case.get('filename') else 'board'
-        leaf = node['files'].setdefault(str(path), {'name': _name(path), 'kind': kind, 'cases': []})
+        if 'lanes' in case:
+            board = node['files'].setdefault(str(path), _kanban(_name(path), fp))
+            for title in case['lanes']:
+                _lane(board, title)
+            continue
+        if 'lane' in case:
+            board = node['files'].setdefault(str(path), _kanban(_name(path), fp))
+            leaf = _lane(board, case['lane'])
+        else:
+            kind = 'note' if case.get('filename') else 'board'
+            leaf = node['files'].setdefault(str(path), {'name': _name(path), 'kind': kind, 'cases': []})
         leaf['cases'].append(case)
     return root
 
 
+def is_branch(node):
+    return node['kind'] in ('folder', 'kanban')
+
+
 def entries(node):
+    if node['kind'] == 'kanban':
+        return list(node['files'].values())
     folders = sorted(node['folders'].values(), key=lambda n: n['name'].casefold())
     files = sorted(node['files'].values(), key=lambda n: n['name'].casefold())
     return [*folders, *files]
 
 
 def count(node):
-    if node['kind'] != 'folder':
+    if not is_branch(node):
         return len(node['cases'])
     return sum(count(n) for n in entries(node))
+
+
+def trail(node, filepath):
+    for child in entries(node):
+        if child['kind'] == 'kanban' and child['filepath'] == filepath:
+            return [child['name']]
+        if child['kind'] == 'folder':
+            found = trail(child, filepath)
+            if found:
+                return [child['name'], *found]
+    return None

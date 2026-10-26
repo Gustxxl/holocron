@@ -68,7 +68,7 @@ def numbered(text, cases, mark, here=None):
 
     def pick(target):
         if target.startswith('#'):
-            board = here in files and not files[here][0].get('filename')
+            board = here in files and not all(c.get('filename') for c in files[here])
             return board and (_block(blocks, target[1:], here) or target[1:])
         own = here and _block(blocks, target, here)
         if own:

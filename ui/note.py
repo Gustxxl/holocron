@@ -47,7 +47,7 @@ def _inline(text):
     return _BLOCK_ID_RE.sub('', text)
 
 
-def _plain(text):
+def plain(text):
     return _inline(text).replace(_B_ON, '').replace(_B_OFF, '')
 
 
@@ -74,12 +74,12 @@ def _line(ln, width):
         return dim('─' * min(width, 40))
     m = _HEADING_RE.match(ln)
     if m:
-        return bold(_fill(_plain(m.group(1)), width, '', ''))
+        return bold(_fill(plain(m.group(1)), width, '', ''))
     m = _QUOTE_RE.match(ln)
     if m:
         callout = _CALLOUT_RE.match(m.group(1))
         if callout:
-            return '│ ' + bold(_plain(callout.group(2)) or callout.group(1).capitalize())
+            return '│ ' + bold(plain(callout.group(2)) or callout.group(1).capitalize())
         return _fill(_inline(m.group(1)), width, '│ ', '│ ')
     m = _BULLET_RE.match(ln)
     if m:
@@ -101,7 +101,7 @@ def render_note(text, width):
     out, table, n = [], [], 0
     for ln in lines + ['']:
         if not is_code(ln) and ln.lstrip().startswith('|'):
-            table.append(_plain(ln.expandtabs(2)))
+            table.append(plain(ln.expandtabs(2)))
             continue
         if table:
             out.extend(render_tables('\n'.join(table), width).splitlines())

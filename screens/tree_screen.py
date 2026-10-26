@@ -1,12 +1,12 @@
 import shutil
 from pathlib import Path
 
-from core import archives, tree
+from core import archives, editor, tree
 from core.settings import archive_path, excalidraw_path, new_cases_path, vault_path
 from screens.help_screen import show_help
 from ui.format import plural
 from ui.interface import clear_screen, dim, num, read_command, nav_line
-from screens.search_screen import by_name, list_rows, open_case, search_screen
+from screens.search_screen import add_card, by_name, list_rows, open_case, search_screen
 
 PAGE = 15
 NAME_MAX = 40
@@ -25,27 +25,29 @@ def _walk(root, trail):
     stack = [root]
     for name in trail:
         node = stack[-1]
-        found = next((n for n in tree.entries(node) if n['name'] == name), None) if node['kind'] == 'folder' else None
+        found = next((n for n in tree.entries(node) if n['name'] == name), None) if tree.is_branch(node) else None
         if found is None:
             break
         stack.append(found)
     return stack
 
 
-def tree_screen():
-    root, trail, page = _build(), [], 0
+def tree_screen(start=None):
+    root, page = _build(), 0
+    trail = (tree.trail(root, start) if start else None) or []
+    top = len(trail)
     while True:
         stack = _walk(root, trail)
         trail = [n['name'] for n in stack[1:]]
         node = stack[-1]
-        items = tree.entries(node) if node['kind'] == 'folder' else by_name(node['cases'])
+        items = tree.entries(node) if tree.is_branch(node) else _cases(node)
         frame, page = _frame(stack, items, page)
         clear_screen()
         print(frame)
         command = read_command('tree> ')
         low = command.lower()
         if low in ('b', 'back'):
-            if not trail:
+            if len(trail) <= top:
                 return
             trail.pop()
             page = 0
@@ -55,12 +57,16 @@ def tree_screen():
             page += 1
         elif low == 'p':
             page -= 1
+        elif low == 'a' and node['kind'] == 'lane' and editor.available():
+            add_card(node['filepath'], node['name'])
+            archives.load()
+            root = _build()
         elif command == '':
             archives.load(force=True)
             root = _build()
         elif command.isdigit() and 1 <= int(command) <= len(items):
             item = items[int(command) - 1]
-            if node['kind'] != 'folder':
+            if not tree.is_branch(node):
                 _read(items, int(command))
                 root = _build()
             elif item['kind'] == 'note':
@@ -69,6 +75,10 @@ def tree_screen():
             else:
                 trail.append(item['name'])
                 page = 0
+
+
+def _cases(node):
+    return node['cases'] if node['kind'] == 'lane' else by_name(node['cases'])
 
 
 def _read(cases, number):
@@ -83,15 +93,17 @@ def _frame(stack, items, page):
     page = max(0, min(page, pages - 1))
     start = page * PAGE
     chunk = items[start:start + PAGE]
-    folder = stack[-1]['kind'] == 'folder'
+    folder = tree.is_branch(stack[-1])
     head = ' > '.join(n['name'] for n in stack)
     if not folder:
-        head += '   ' + plural(len(items), 'block')
+        head += '   ' + plural(len(items), 'card' if stack[-1]['kind'] == 'lane' else 'block')
     head += f'   {page + 1}/{pages}' if pages > 1 else ''
     digits = len(str(len(items)))
     rows = _entries(chunk, start, digits) if folder else list_rows(chunk, start, len(items), width)
     lines = [dim(head), '', *(rows or [dim('  Nothing indexed')])]
     nav = [('number', 'open', '#', 'open')] if items else []
+    if stack[-1]['kind'] == 'lane' and editor.available():
+        nav.append(('a', 'add card', 'a', 'add'))
     if page + 1 < pages:
         nav.append(('n', 'next'))
     if page > 0:
@@ -112,6 +124,10 @@ def _entries(chunk, start, digits):
 def _info(node, cw):
     if node['kind'] == 'folder':
         return dim(str(tree.count(node)).rjust(cw))
+    if node['kind'] == 'kanban':
+        return dim(f'kanban · {plural(tree.count(node), "card")}')
+    if node['kind'] == 'lane':
+        return dim(plural(len(node['cases']), 'card'))
     if node['kind'] == 'board':
         n = len(node['cases'])
         return dim(f'board · {n} block' + ('' if n == 1 else 's'))

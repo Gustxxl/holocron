@@ -170,6 +170,8 @@ HELP_SECTIONS = [
         HelpEntry('e',            'edit the open case', editor.available),
         HelpEntry('f',            'pin / unpin the open case'),
         HelpEntry('x number',     'check / uncheck a task in the open note'),
+        HelpEntry('m',            'move the open kanban card to another list'),
+        HelpEntry('a',            'add a card to the open kanban list or to the list of the open card', editor.available),
         HelpEntry('k', 'ask Keeper about this record', lambda: bool(keeper.configured())),
         HelpEntry('j number', 'jump to a linked note'),
     ]),

@@ -76,6 +76,16 @@ class FirstLine(unittest.TestCase):
     def test_whitespace_only(self):
         self.assertEqual(first_line({'text': '   \n   '}), '(empty)')
 
+    def test_card_markdown_stripped(self):
+        case = {'text': '**Alpha** and [[Beta]]\n**Score:** 9', 'lane': 'Todo'}
+        self.assertEqual(first_line(case), 'Alpha and Beta')
+
+    def test_card_without_markdown(self):
+        self.assertEqual(first_line({'text': 'Alpha', 'lane': 'Todo'}), 'Alpha')
+
+    def test_block_keeps_text(self):
+        self.assertEqual(first_line({'text': '**x** y'}), '**x** y')
+
 
 class CleanPath(unittest.TestCase):
     def test_basic(self):

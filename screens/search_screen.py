@@ -2,15 +2,15 @@ import re
 import shutil
 import textwrap
 from pathlib import Path
-from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks, keeper
+from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks, keeper, kanban
 from core.archives.vault import Vault, save_note, create_note, read_note
 from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path, search_separator
 from core.system import copy_text
 from screens.help_screen import render_help
-from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line
+from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line, num
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
-from ui.note import render_note
+from ui.note import plain, render_note
 from ui.format import plural
 
 
@@ -289,7 +289,12 @@ def _confirm(prompt):
 
 def _save(case, text):
     fp, eid = case.get('filepath'), case.get('element_id')
-    if case.get('archive') == Vault.name:
+    if 'lane' in case:
+        board = kanban.replace(read_note(fp), case['lane'], case['raw'], text)
+        if board is None:
+            raise ValueError('the card changed on disk, open it again')
+        save_note(fp, board)
+    elif case.get('archive') == Vault.name:
         if read_note(fp) != case['text']:
             raise ValueError('the note changed on disk, open it again')
         save_note(fp, text)
@@ -302,9 +307,61 @@ def _save(case, text):
         case['raw'], case['text'] = text, excalidraw.strip_emoji(text).strip()
 
 
+def _move(case):
+    fp = case['filepath']
+    try:
+        text = read_note(fp)
+    except (OSError, UnicodeDecodeError) as e:
+        error(f'Could not read the board: {e}')
+        return
+    lanes = kanban.titles(text)
+    digits = len(str(len(lanes)))
+    print()
+    for i, title in enumerate(lanes, 1):
+        here = dim('  · here') if title == case['lane'] else ''
+        print(f'{num(i, digits)}{title}{here}')
+    print()
+    choice = read_command('move to> ')
+    if not choice.isdigit() or not 1 <= int(choice) <= len(lanes):
+        return
+    board = kanban.move(text, case['lane'], case['raw'], int(choice) - 1)
+    if board == text:
+        return
+    try:
+        if board is None:
+            raise ValueError('the card changed on disk, open it again')
+        save_note(fp, board)
+        haptic('success')
+    except Exception as e:
+        error(f'Could not move: {e}')
+
+
+def add_card(filepath, lane):
+    text = editor.edit_text('')
+    if text is None:
+        error('Could not open the editor')
+        return
+    text = text.strip()
+    if not text:
+        return
+    try:
+        board = kanban.add(read_note(filepath), lane, text)
+        if board is None:
+            raise ValueError('the list is gone, open the board again')
+        save_note(filepath, board)
+        haptic('success')
+    except Exception as e:
+        kept = ' — your text is copied' if copy_text(text) else ''
+        error(f'Could not save: {e}{kept}')
+
+
 def open_case(results, number, query, rerun=True, trail=()):
     while 1 <= number <= len(results):
         case = results[number - 1][1]
+        if 'lanes' in case:
+            from screens.tree_screen import tree_screen
+            tree_screen(case['filepath'])
+            return None
         jumps = show_case(case, query, number, len(results), trail)
         command = read_command('case> ')
         low = command.lower()
@@ -324,7 +381,7 @@ def open_case(results, number, query, rerun=True, trail=()):
             edited = edited.strip()
             if edited == source.strip():
                 continue
-            if not edited and case.get('archive') != Vault.name:
+            if not edited and not case.get('filename'):
                 error('Empty text — edit cancelled')
                 continue
             if not edited and not _confirm('Clear the note?'):
@@ -342,6 +399,14 @@ def open_case(results, number, query, rerun=True, trail=()):
             if case.get('filepath'):
                 favorites.toggle(case)
                 haptic('toggle')
+            continue
+        if low == 'm' and 'lane' in case:
+            _move(case)
+            results = _refresh(results, query, False)
+            continue
+        if low == 'a' and 'lane' in case and editor.available():
+            add_card(case['filepath'], case['lane'])
+            results = _refresh(results, query, False)
             continue
         m = _CHECK_RE.fullmatch(low)
         if m and case.get('filename'):
@@ -488,7 +553,7 @@ def show_case(case, query='', number=None, total=None, trail=()):
             name = name[:-len(suffix)]
             break
     if case.get('filepath'):
-        name = ''
+        name = case.get('lane', '')
     archive = case.get('archive', '')
     pinned = favorites.is_pinned(case)
 
@@ -501,7 +566,7 @@ def show_case(case, query='', number=None, total=None, trail=()):
     elif first.startswith('|'):
         title, body = name, text
     else:
-        title = first or '(untitled)'
+        title = (plain(first) if 'lane' in case else first) or '(untitled)'
         body = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ''
 
     width = shutil.get_terminal_size().columns - 1
@@ -520,7 +585,7 @@ def show_case(case, query='', number=None, total=None, trail=()):
     terms = _parts(query)
     print(_marks(highlight_links(highlight(_wrap(links(title), width), *terms))))
     if body:
-        if case.get('filename'):
+        if case.get('filename') or 'lane' in case:
             rendered = render_note(body, width)
         else:
             rendered = render_tables(_wrap(code_blocks(links(body)), width), width)
@@ -530,6 +595,10 @@ def show_case(case, query='', number=None, total=None, trail=()):
     nav = []
     if editor.available():
         nav.append(('e', 'edit', 'e', 'edit'))
+    if 'lane' in case:
+        nav.append(('m', 'move', 'm', 'move'))
+        if editor.available():
+            nav.append(('a', 'add card', 'a', 'add'))
     if case.get('filename') and checklist.count(case['text']):
         nav.append(('x number', 'check', 'x#', 'check'))
     if jumps:
@@ -559,6 +628,8 @@ def first_line(case):
         ln = ln.strip()
         if not ln:
             continue
+        if 'lane' in case:
+            return plain(ln)
         if ln.startswith('|'):
             return '  '.join(c for c in table_cells(links(ln)) if c)
         return links(ln)
