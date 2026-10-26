@@ -107,6 +107,10 @@ def _open(source, flat, number):
             number += 1
         elif command == 'p' and number > 1:
             number -= 1
+        elif command == 'nn':
+            number = len(flat)
+        elif command == 'pp':
+            number = 1
         elif command.isdigit() and 1 <= int(command) <= len(flat):
             number = int(command)
 

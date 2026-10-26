@@ -5,7 +5,7 @@ from pathlib import Path
 from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks, keeper, kanban
 from core.archives.vault import Vault, save_note, create_note, read_note
 from core.commands import HELP_SECTIONS
-from core.settings import new_cases_path, search_separator
+from core.settings import new_cases_path, page_rows, search_separator
 from core.system import copy_text
 from screens.help_screen import render_help
 from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line, num
@@ -19,7 +19,6 @@ _MARK = '\033[38;2;20;20;20;48;2;116;167;254m'
 _RESET = '\033[0m'
 
 PAGE = 10
-LIST_PAGE = 15
 MIN_QUERY = 3
 
 _URL_RE = re.compile(r'https?://\S+')
@@ -193,8 +192,8 @@ def search_screen(initial_query=None):
         elif results:
             if exact_for is not results:
                 exact, exact_for = _exact(results, query, list_mode), results
-            ps = LIST_PAGE if list_mode else PAGE
-            page = show_list(results, page, query, ps, exact=exact, groups=groups)
+            ps = page_rows() if list_mode else PAGE
+            page = show_list(results, page, query, ps, exact=exact, groups=groups, compact=list_mode)
         else:
             clear_screen()
             print(dim('Search the archive'))
@@ -231,6 +230,12 @@ def search_screen(initial_query=None):
             continue
         if low == 'p' and results:
             page -= 1
+            continue
+        if low == 'nn' and results:
+            page = len(results)
+            continue
+        if low == 'pp' and results:
+            page = 0
             continue
         if command.isdigit() and results:
             new_query = open_case(results, int(command), query)
@@ -360,8 +365,14 @@ def open_case(results, number, query, rerun=True, trail=()):
         case = results[number - 1][1]
         if 'lanes' in case:
             from screens.tree_screen import tree_screen
-            tree_screen(case['filepath'])
-            return None
+            step = tree_screen(case['filepath'], number > 1, number < len(results))
+            if step == 'n':
+                number += 1
+            elif step == 'p':
+                number -= 1
+            else:
+                return None
+            continue
         jumps = show_case(case, query, number, len(results), trail)
         command = read_command('case> ')
         low = command.lower()
@@ -467,6 +478,12 @@ def open_case(results, number, query, rerun=True, trail=()):
             if number > 1:
                 number -= 1
             continue
+        if low == 'nn':
+            number = len(results)
+            continue
+        if low == 'pp':
+            number = 1
+            continue
         if command.isdigit():
             number = int(command)
             continue
@@ -489,7 +506,7 @@ def list_rows(cases, start, total, width, query=''):
     return rows
 
 
-def show_list(results, page, query, page_size=PAGE, note=None, exact=None, groups=None):
+def show_list(results, page, query, page_size=PAGE, note=None, exact=None, groups=None, compact=False):
     clear_screen()
     total = len(results)
     pages = max(1, (total + page_size - 1) // page_size)
@@ -518,7 +535,7 @@ def show_list(results, page, query, page_size=PAGE, note=None, exact=None, group
         print('No exact matches — showing similar cases.')
         print()
     for n, row in enumerate(list_rows([c for _, c in chunk], start, total, width, query), start + 1):
-        if n > start + 1:
+        if n > start + 1 and not compact:
             print()
         group = _group_at(layout, n - 1)
         head = group and n - 1 in (group[1], start)

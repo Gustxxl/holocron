@@ -412,10 +412,20 @@ class Screen(unittest.TestCase):
     def test_board_opens_lists(self):
         board = vault_mod._cards(self.path, BOARD)[0]
         with mock.patch('screens.tree_screen.tree_screen') as tree, \
-             mock.patch.object(search_screen, 'show_case') as show:
+            mock.patch.object(search_screen, 'show_case') as show:
             self.assertIsNone(search_screen.open_case([(0, board)], 1, ''))
-        tree.assert_called_once_with(str(self.path))
+        tree.assert_called_once_with(str(self.path), False, False)
         show.assert_not_called()
+
+    def test_board_steps_to_neighbours(self):
+        board = vault_mod._cards(self.path, BOARD)[0]
+        first, last = {'filename': 'first', 'text': 'x'}, {'filename': 'last', 'text': 'y'}
+        with mock.patch('screens.tree_screen.tree_screen', side_effect=['n', None]) as tree, \
+             mock.patch.object(search_screen, 'show_case', return_value=[]) as show, \
+             mock.patch.object(search_screen, 'read_command', side_effect=['p']):
+            self.assertIsNone(search_screen.open_case([(0, first), (0, board), (0, last)], 2, ''))
+        self.assertEqual([c.args[0]['filename'] for c in show.call_args_list], ['last'])
+        self.assertEqual(tree.call_args_list, [mock.call(str(self.path), True, True)] * 2)
 
     def test_card_header_and_nav(self):
         out = self.show(self.card('Alpha'))

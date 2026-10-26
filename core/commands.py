@@ -166,6 +166,7 @@ HELP_SECTIONS = [
         HelpEntry('a; b',         'search for several things at once (s > Archive > Search separator)'),
         HelpEntry('[number]',     'open a case from the current list'),
         HelpEntry('n / p',        'next / previous page or case'),
+        HelpEntry('nn / pp',      'last / first page or case'),
         HelpEntry('l / list',     'browse all cases'),
         HelpEntry('e',            'edit the open case', editor.available),
         HelpEntry('f',            'pin / unpin the open case'),

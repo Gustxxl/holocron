@@ -136,6 +136,21 @@ def update_search_separator(sep):
     save(cfg)
 
 
+PAGE_ROWS = 15
+PAGE_MIN, PAGE_MAX = 5, 99
+
+
+def page_rows():
+    rows = load().get('page_rows')
+    return rows if type(rows) is int and PAGE_MIN <= rows <= PAGE_MAX else PAGE_ROWS
+
+
+def update_page_rows(rows):
+    cfg = load()
+    cfg['page_rows'] = rows
+    save(cfg)
+
+
 HOME_BLOCKS = ('calendar', 'schedule', 'reminders')
 
 

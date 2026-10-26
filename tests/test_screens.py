@@ -76,11 +76,14 @@ class Settings(Screen):
     def test_sections(self):
         with patch.object(settings_screen.registry, 'ALL', [SOURCE]), \
              patch.object(settings_screen, 'schedule_settings') as schedule, \
-             patch.object(settings_screen, 'home_screen') as home:
+             patch.object(settings_screen, 'home_screen') as home, \
+             patch.object(settings_screen, 'page_rows', return_value=15):
             text = self.open(settings_screen, settings_screen.settings_screen,
-                             ['1', 'b', '2', '3', 'b', '4', '5', 'b', 'b'])
+                             ['1', 'b', '2', '3', 'b', '4', 'b', '5', '6', 'b', 'b'])
         home.assert_called_once()
         schedule.assert_called_once()
+        self.assertIn('Settings > Lists', text)
+        self.assertIn('Rows per page: 15', text)
         self.assertNotIn('no access', text.split('Settings > Reminders')[0])
         self.assertIn('Settings > Reminders', text)
 
@@ -91,7 +94,7 @@ class Settings(Screen):
             with self.assertRaises(_Stop):
                 settings_screen.settings_screen()
         self.assertEqual(menu.call_args.args[1],
-                         ['User', 'Main screen', 'Archive', 'Schedule', 'Calendar', 'Reminders'])
+                         ['User', 'Main screen', 'Lists', 'Archive', 'Schedule', 'Calendar', 'Reminders'])
 
     def test_unsupported_source_hidden(self):
         sources = [SimpleNamespace(NAME='Calendar', supported=lambda: False),
@@ -100,14 +103,14 @@ class Settings(Screen):
              patch.object(settings_screen, 'show_menu', side_effect=_Stop) as menu:
             with self.assertRaises(_Stop):
                 settings_screen.settings_screen()
-        self.assertEqual(menu.call_args.args[1], ['User', 'Main screen', 'Archive', 'Schedule', 'Reminders'])
+        self.assertEqual(menu.call_args.args[1], ['User', 'Main screen', 'Lists', 'Archive', 'Schedule', 'Reminders'])
 
     def test_no_main_screen_without_sources(self):
         with patch.object(settings_screen.registry, 'ALL', []), \
              patch.object(settings_screen, 'show_menu', side_effect=_Stop) as menu:
             with self.assertRaises(_Stop):
                 settings_screen.settings_screen()
-        self.assertEqual(menu.call_args.args[1], ['User', 'Archive', 'Schedule'])
+        self.assertEqual(menu.call_args.args[1], ['User', 'Lists', 'Archive', 'Schedule'])
 
 
 LISTS = [{'id': 'l1', 'title': 'Home'}]

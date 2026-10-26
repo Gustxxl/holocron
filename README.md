@@ -12,7 +12,7 @@ So drop everything on a board and don't worry about order or wording. Skip a wor
 
 ## What's inside
 
-- **Search everything.** Every text block on a board is its own result, alongside your regular Markdown notes.
+- **Search everything.** Every text block on a drawing and every card on a kanban board is its own result, alongside your regular Markdown notes.
 - **Several searches at once.** Type `nginx; ERR504` and each part gets its own group of results.
 - **Edit in place.** Fix text on a drawing, open a note in your editor, tick off a task with `x 3` or write a new note with `note`. Changes go straight to the file.
 - **Jump between records.** `[[Links]]` work in notes and board blocks alike. A link finds a block by its first line or a note by its name, and `j 2` takes you there.
@@ -51,8 +51,17 @@ Point Holocron to an Obsidian vault and every Markdown note becomes searchable n
 - `[[Wikilinks]]` in a note get numbers. Type `j 2` to jump to the second one and `b` to come back.
 - Checkboxes like `- [ ]` can be ticked with `x 3` without leaving the note.
 - `note` opens your editor and saves a new note to the folder you chose. The first line becomes the file name.
-- `tree` browses the archive by folder.
-- `f` pins the open record to favorites.
+- `tree` browses the archive by folder and opens kanban boards list by list.
+- `f` pins the open record to favorites, or the board you're browsing in `tree`.
+
+## Kanban boards
+
+Boards made with the Kanban plugin for Obsidian are read as boards, not as plain notes.
+
+- **One card, one result.** Search finds each card on its own and the board itself by its name. Cards in a done list are shown like any other, nothing is hidden or dimmed, so a board you keep as a record with notes on each card works as well as a to-do list.
+- **Lists in `tree`.** A board opens as its lists, in the same order as in Obsidian, empty ones included. Cards keep their order within a list. If you open a board from search or `l`, `n` and `p` move on to the neighbouring records once the board's pages run out.
+- **Add, edit, move.** `a` adds a card to the open list or to the list of the open card, `e` edits a card and `m` moves it to another list. A card moved into a done list gets ticked, and one moved out gets unticked. Changes go straight to the file. If the card changed on disk in the meantime, nothing is overwritten.
+- **Pin a board.** Press `f` on a board in `tree` to open it from favorites.
 
 ## Keeper
 
@@ -102,11 +111,12 @@ Type `h` in Holocron for the full list. The main ones:
 | `r`, `reminders`    | Apple Reminders                                      |
 | `wp`, `waypoints`   | places for location reminders                        |
 | `f`, `favorites`    | pinned records                                       |
-| `tree`              | browse by folder                                     |
+| `tree`              | browse by folder and board                           |
 | `note`              | write a new note                                     |
 | `s`, `settings`     | name, archive, schedule, Keeper, reminders, calendar |
 | `check`             | run diagnostics and tests                            |
 | `update`            | install a pending update                             |
+| `nn` / `pp`         | last / first page or record                          |
 | `b` / `w` / `q`     | back / main screen / quit                            |
 
 ## Get started
@@ -140,6 +150,7 @@ If downloads from GitHub are slow or blocked on your network, the update archive
 ## Small things
 
 - `check` runs the built-in tests and shows what's connected: editor, clipboard, reminders, calendar, Keeper and the size of your archive.
+- `s` > Lists sets how many rows `l`, `tree` and boards show per page: from 5 to 99, 15 by default.
 - On a MacBook, the trackpad gives a light tap when you toggle something and a different pattern for success or error.
 - `hyperspace`. Try it. Any key brings you back.
 

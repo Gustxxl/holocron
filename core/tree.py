@@ -48,6 +48,7 @@ def build(cases, vault=None, folders=()):
             node = node['folders'].setdefault(part, _folder(part))
         if 'lanes' in case:
             board = node['files'].setdefault(str(path), _kanban(_name(path), fp))
+            board['case'] = case
             for title in case['lanes']:
                 _lane(board, title)
             continue

@@ -133,6 +133,7 @@ class KanbanScreen(unittest.TestCase):
              mock.patch.object(tree_screen, 'clear_screen'), \
              mock.patch.object(tree_screen.archives, 'load'), \
              mock.patch.object(tree_screen.editor, 'available', return_value=True), \
+             mock.patch.object(tree_screen.favorites, 'is_pinned', return_value=False), \
              mock.patch.object(tree_screen, 'add_card') as add, \
              redirect_stdout(io.StringIO()) as out:
             tree_screen.tree_screen('/v/board.md')
@@ -154,6 +155,73 @@ class KanbanScreen(unittest.TestCase):
         _, add, out = self.screen(['a', 'b'])
         add.assert_not_called()
         self.assertNotIn('[a] add card', out)
+
+    def edge(self, commands, before=False, after=False, rows=15, pinned=False):
+        with mock.patch.object(tree_screen, '_build', return_value=self.root), \
+             mock.patch.object(tree_screen, 'read_command', side_effect=commands) as read, \
+             mock.patch.object(tree_screen, 'clear_screen'), \
+             mock.patch.object(tree_screen, 'page_rows', return_value=rows), \
+             mock.patch.object(tree_screen.editor, 'available', return_value=True), \
+             mock.patch.object(tree_screen.favorites, 'is_pinned', return_value=pinned) as is_pinned, \
+             mock.patch.object(tree_screen.favorites, 'toggle') as toggle, \
+             mock.patch.object(tree_screen, 'haptic') as hap, \
+             redirect_stdout(io.StringIO()) as out:
+            step = tree_screen.tree_screen('/v/board.md', before, after)
+        self.is_pinned, self.toggle, self.hap = is_pinned, toggle, hap
+        return step, read.call_count, out.getvalue()
+
+    def test_board_keeps_its_record(self):
+        self.assertIs(self.kanban['case'], self.BOARD)
+        self.assertNotIn('case', tree.entries(self.kanban)[0])
+
+    def test_pin_board(self):
+        _, _, out = self.edge(['f', 'b'])
+        self.toggle.assert_called_once_with(self.BOARD)
+        self.hap.assert_called_once_with('toggle')
+        self.assertIn('[f] pin', out)
+        self.is_pinned.assert_called_with(self.BOARD)
+
+    def test_pinned_board_shown(self):
+        _, _, out = self.edge(['b'], pinned=True)
+        self.assertIn(dim('Archive > board · pinned'), out)
+        self.assertIn('[f] unpin', out)
+
+    def test_pin_ignored_in_lane(self):
+        _, _, out = self.edge(['1', 'f', 'b', 'b'])
+        self.toggle.assert_not_called()
+        self.assertNotIn(dim('Archive > board > Todo · pinned'), out)
+
+    def test_next_leaves_board(self):
+        step, count, out = self.edge(['n'], after=True)
+        self.assertEqual((step, count), ('n', 1))
+        self.assertIn('[n] next', out)
+        self.assertNotIn('[p] prev', out)
+
+    def test_prev_leaves_board(self):
+        step, count, out = self.edge(['p'], before=True)
+        self.assertEqual((step, count), ('p', 1))
+        self.assertIn('[p] prev', out)
+
+    def test_no_neighbours_stays(self):
+        step, count, out = self.edge(['n', 'p', 'b'])
+        self.assertEqual((step, count), (None, 3))
+        self.assertNotIn('[n] next', out)
+        self.assertNotIn('[p] prev', out)
+
+    def test_pages_before_leaving(self):
+        step, count, out = self.edge(['n', 'n'], after=True, rows=2)
+        self.assertEqual((step, count), ('n', 2))
+        self.assertIn('2/2', out)
+        step, count, _ = self.edge(['n', 'p', 'p'], before=True, rows=2)
+        self.assertEqual((step, count), ('p', 3))
+
+    def test_ends_stay_on_board(self):
+        step, count, _ = self.edge(['nn', 'pp', 'b'], before=True, after=True)
+        self.assertEqual((step, count), (None, 3))
+
+    def test_lane_pages_not_leaves(self):
+        step, count, _ = self.edge(['1', 'n', 'p', 'b', 'b'], before=True, after=True)
+        self.assertEqual((step, count), (None, 5))
 
     def test_walk_into_lane(self):
         stack = tree_screen._walk(self.root, ['board', 'Done'])

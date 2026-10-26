@@ -37,6 +37,10 @@ def favorites_screen():
             page += 1
         elif command == 'p':
             page -= 1
+        elif command == 'nn':
+            page = len(results)
+        elif command == 'pp':
+            page = 0
         elif command.isdigit() and 1 <= int(command) <= len(results):
             if _open(results, int(command)):
                 return

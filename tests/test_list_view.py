@@ -22,14 +22,15 @@ def _plain(text):
 
 def _printed(results, **kw):
     with mock.patch('shutil.get_terminal_size', return_value=SIZE), \
-         mock.patch.object(search_screen, 'clear_screen'), \
-         mock.patch('builtins.print') as out:
-        search_screen.show_list(results, 0, kw.pop('query', ''), search_screen.LIST_PAGE, **kw)
+        mock.patch.object(search_screen, 'clear_screen'), \
+        mock.patch('builtins.print') as out:
+        search_screen.show_list(results, 0, kw.pop('query', ''), 15, **kw)
     return [_plain(str(c.args[0])) if c.args else '' for c in out.call_args_list]
 
 
-def _tree():
-    with mock.patch('shutil.get_terminal_size', return_value=SIZE):
+def _tree(rows=15):
+    with mock.patch('shutil.get_terminal_size', return_value=SIZE), \
+         mock.patch.object(tree_screen, 'page_rows', return_value=rows):
         frame, _ = tree_screen._frame(STACK, CASES, 0)
     return _plain(frame).split('\n')
 
@@ -47,13 +48,23 @@ class Rows(unittest.TestCase):
 
 class Same(unittest.TestCase):
     def test_tree_board_matches_list(self):
-        listed = [ln for ln in _printed([(0, c) for c in CASES]) if 'Block' in ln]
+        listed = [ln for ln in _printed([(0, c) for c in CASES], compact=True) if 'Block' in ln]
         self.assertEqual([ln for ln in _tree() if 'Block' in ln], listed)
 
     def test_no_blank_between_rows(self):
-        printed = _printed([(0, c) for c in CASES])
-        block_lines = [ln for ln in printed if 'Block' in ln]
-        self.assertEqual(len(block_lines), 12)
+        printed = _printed([(0, c) for c in CASES], compact=True)
+        first = next(i for i, ln in enumerate(printed) if 'Block' in ln)
+        self.assertEqual(printed[first:first + 12], [f'  {n:>2} Block {n}' for n in range(1, 13)])
+
+    def test_blank_between_rows_without_compact(self):
+        printed = _printed([(0, c) for c in CASES[:2]])
+        first = next(i for i, ln in enumerate(printed) if 'Block' in ln)
+        self.assertEqual(printed[first:first + 3], ['  1 Block 1', '', '  2 Block 2'])
+
+    def test_tree_rows_from_settings(self):
+        lines = _tree(rows=5)
+        self.assertEqual(lines[0], 'Work > Board   12 blocks   1/3')
+        self.assertEqual([ln for ln in lines if 'Block' in ln], [f'  {n:>2} Block {n}' for n in range(1, 6)])
 
     def test_board_head_count(self):
         self.assertEqual(_tree()[0], 'Work > Board   12 blocks')
@@ -87,7 +98,7 @@ class Order(unittest.TestCase):
     def test_tree_board_by_name(self):
         seen = []
         with mock.patch.object(tree_screen, '_build', return_value=tree_screen.tree.build(MIXED, '/v')), \
-             mock.patch.object(tree_screen, '_frame', side_effect=lambda s, items, p: (seen.append(items), ('', p))[1]), \
+             mock.patch.object(tree_screen, '_frame', side_effect=lambda s, items, p, *a: (seen.append(items), ('', p))[1]), \
              mock.patch.object(tree_screen, 'clear_screen'), \
              mock.patch.object(tree_screen, 'read_command', side_effect=['1', 'b', 'b']), \
              mock.patch('builtins.print'):
@@ -97,7 +108,7 @@ class Order(unittest.TestCase):
     def test_tree_opens_same_record(self):
         opened = []
         with mock.patch.object(tree_screen, '_build', return_value=tree_screen.tree.build(MIXED, '/v')), \
-             mock.patch.object(tree_screen, '_frame', side_effect=lambda s, items, p: ('', p)), \
+             mock.patch.object(tree_screen, '_frame', side_effect=lambda s, items, p, *a: ('', p)), \
              mock.patch.object(tree_screen, 'clear_screen'), \
              mock.patch.object(tree_screen, 'read_command', side_effect=['1', '1', 'b', 'b']), \
              mock.patch.object(tree_screen, 'open_case', side_effect=lambda r, n, *a, **k: opened.append(r[n - 1][1])), \

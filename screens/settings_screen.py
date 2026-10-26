@@ -19,7 +19,12 @@ from core.settings import (
     SEARCH_SEPARATOR,
     home_order,
     update_home_order,
-    reorder
+    reorder,
+    page_rows,
+    update_page_rows,
+    PAGE_ROWS,
+    PAGE_MIN,
+    PAGE_MAX
 )
 
 from core import archives, keeper
@@ -39,7 +44,7 @@ def settings_screen():
         items = [('User', user_screen)]
         if extra:
             items.append(('Main screen', home_screen))
-        items += [('Archive', archive_screen), ('Schedule', schedule_settings)]
+        items += [('Lists', rows_screen), ('Archive', archive_screen), ('Schedule', schedule_settings)]
         items += [(s.NAME, lambda s=s: _open_source(s)) for s in extra]
         show_menu('Settings', [name for name, _ in items])
         command = read_command('settings> ')
@@ -144,6 +149,27 @@ def home_screen():
             update_home_order([*new, *(b for b in order if b not in new)])
         elif command:
             error(f'Type block numbers, e.g. {len(shown)}1')
+
+
+def rows_screen():
+    while True:
+        clear_screen()
+        print(dim('Settings > Lists'))
+        print()
+        print(f'Rows per page: {page_rows()}')
+        print(dim('  For l, tree and kanban boards'))
+        print()
+        print(dim(f'  [type] {PAGE_MIN} to {PAGE_MAX}   [d] default {PAGE_ROWS}   [b] back'))
+        print()
+        command = read_command('rows> ')
+        if command == 'b':
+            return
+        if command == 'd':
+            update_page_rows(PAGE_ROWS)
+        elif command.isascii() and command.isdigit() and PAGE_MIN <= int(command) <= PAGE_MAX:
+            update_page_rows(int(command))
+        elif command:
+            error(f'Type a number from {PAGE_MIN} to {PAGE_MAX}')
 
 
 def _print_path(p):
