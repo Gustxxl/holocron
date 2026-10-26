@@ -10,10 +10,8 @@ import colorama
 colorama.init()
 
 
-import os
 from core import archives
 from core import launch
-from core.settings import update_archive_path
 from screens.main_screen import main_frame, main_screen
 from ui.interface import Spinner, clear_screen, disconnect, pause
 from core import updater
@@ -21,15 +19,14 @@ from core import config
 
 
 def start():
-    action, value = launch.parse(sys.argv[1:], os.environ.get('HOLO_CWD'))
+    action, value = launch.parse(sys.argv[1:])
     if action == 'help':
         print(launch.USAGE)
         return
     if action == 'unknown':
-        sys.exit(f'Unknown option {value}. Run holo --help')
+        print(f'Unknown option {value}. Run holo --help', file=sys.stderr)
+        sys.exit(2)
     updater.check_update_async()
-    if action == 'board':
-        update_archive_path(value)
     query = value if action == 'search' else None
     try:
         clear_screen()

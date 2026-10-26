@@ -28,7 +28,7 @@ def _posix_target():
 def _install_windows():
     target = _windows_target()
     target.write_text(
-        f'@echo off\r\nsetlocal\r\nset "HOLO_CWD=%CD%"\r\ncd /d "{APP_DIR}"\r\n"{sys.executable}" "{MAIN}" %*\r\n',
+        f'@echo off\r\nsetlocal\r\ncd /d "{APP_DIR}"\r\n"{sys.executable}" "{MAIN}" %*\r\n',
         encoding='oem',
     )
     return target, True
@@ -38,7 +38,7 @@ def _install_posix():
     target = _posix_target()
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
-        f'#!/bin/sh\nexport HOLO_CWD="$PWD"\ncd "{APP_DIR}" && exec "{sys.executable}" "{MAIN}" "$@"\n',
+        f'#!/bin/sh\ncd "{APP_DIR}" && exec "{sys.executable}" "{MAIN}" "$@"\n',
         encoding='utf-8',
     )
     target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)

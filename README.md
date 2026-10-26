@@ -127,13 +127,15 @@ Open a new terminal and run:
 holo
 ```
 
-On first launch Holocron creates its own virtual environment and installs what it needs, so your system Python stays clean. Point it to your board, vault or drawings in settings (`s`). You can also open a board directly with `holo path/to/board.md`. Anything else after `holo` is a search, so `holo nginx timeout` opens the results right away. Commands work the same way: `holo schedule`, `holo update`. Put several searches in quotes, since the shell splits on `;`: `holo "nginx; ERR504"`. Only an existing `.md` file changes the board, a folder or a word never does.
+On first launch Holocron creates its own virtual environment and installs what it needs, so your system Python stays clean. Point it to your board, vault or drawings in settings (`s`).
+
+Words after `holo` go straight to search: `holo nginx timeout` opens the results, and `b` takes you to the main screen. Commands work the same way: `holo schedule`, `holo update`. Put several searches in quotes, since the shell splits on `;`: `holo "nginx; ERR504"`. To search for something that starts with a dash, put `--` first: `holo -- -bash: command not found`. That makes `holo` easy to use from aliases and scripts. `holo --help` lists all of this.
 
 ## Updates
 
 Holocron checks for a new version in the background on launch, and the main screen tells you when there is one. Type `update` to install it. Every downloaded file is checked against GitHub's hashes before anything is replaced. If something goes wrong halfway, the previous version is restored. Your settings and data stay untouched.
 
-If downloads from GitHub are slow or blocked on your network, the update archive comes through mirrors. The version check and the file hashes always come from api.github.com, so a mirror can't change what gets installed, and updates need api.github.com to be reachable. You can set your own mirrors with the `HOLOCRON_MIRROR` environment variable, separated by commas. `update` doesn't touch the `holo` command itself. When a new version changes it, run `python3 install.py` again.
+If downloads from GitHub are slow or blocked on your network, the update archive comes through mirrors. The version check and the file hashes always come from api.github.com, so a mirror can't change what gets installed, and updates need api.github.com to be reachable. You can set your own mirrors with the `HOLOCRON_MIRROR` environment variable, separated by commas.
 
 ## Small things
 

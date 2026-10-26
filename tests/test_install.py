@@ -64,7 +64,7 @@ class Remove(unittest.TestCase):
 
 class Launcher(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt', 'POSIX launcher')
-    def test_posix_keeps_start_folder(self):
+    def test_posix_passes_args(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / 'bin' / 'holo'
             with mock.patch.object(install, '_posix_target', return_value=target):
@@ -72,20 +72,18 @@ class Launcher(unittest.TestCase):
             self.assertEqual(path, target)
             self.assertEqual(target.read_text(encoding='utf-8').split('\n'), [
                 '#!/bin/sh',
-                'export HOLO_CWD="$PWD"',
                 f'cd "{install.APP_DIR}" && exec "{sys.executable}" "{install.MAIN}" "$@"',
                 '',
             ])
             self.assertTrue(target.stat().st_mode & stat.S_IXUSR)
 
-    def test_windows_keeps_start_folder(self):
+    def test_windows_passes_args(self):
         target = mock.Mock()
         with mock.patch.object(install, '_windows_target', return_value=target):
             self.assertEqual(install._install_windows(), (target, True))
         self.assertEqual(target.write_text.call_args.args[0].split('\r\n'), [
             '@echo off',
             'setlocal',
-            'set "HOLO_CWD=%CD%"',
             f'cd /d "{install.APP_DIR}"',
             f'"{sys.executable}" "{install.MAIN}" %*',
             '',
