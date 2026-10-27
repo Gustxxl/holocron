@@ -380,6 +380,10 @@ class Language(unittest.TestCase):
 
     def test_empty_steps(self):
         self.assertEqual(self.faults([]), ['the steps are empty'])
+
+
+class Paragraphs(unittest.TestCase):
+    def test_blank_lines(self):
         self.assertEqual(keeper._paragraphs('a\n\n\n b \nc\n \n'), ['a', 'b\nc'])
 
     def test_windows_line_ends(self):
@@ -419,13 +423,21 @@ class Think(unittest.TestCase):
 
 
 class Offline(unittest.TestCase):
-    def test_words_only(self):
-        with mock.patch.object(keeper, 'active', return_value=None), \
-             mock.patch.object(keeper, '_chat') as chat:
-            out = keeper.reply('relay fault', [], CASES)
-        chat.assert_not_called()
+    def test_calculation_dropped_when_model_goes_offline(self):
+        def weigh(cmp, main, message, focus, out):
+            out['calc'] = {'rows': []}
+            return '', main
+
+        focus = {'text': 'Alpha step one\n\nBeta step two', 'filename': 'note'}
+        with mock.patch.object(keeper, 'active', return_value={'slot': 'local'}), \
+             mock.patch.object(keeper, '_weigh', side_effect=weigh), \
+             mock.patch.object(keeper, '_write', side_effect=keeper.KeeperOffline('down')), \
+             mock.patch.object(keeper, '_candidates', return_value=[]):
+            out = keeper.reply('Total 1 000.10 is not equal to 1 000.30', [], [focus], [focus], focus)
         self.assertFalse(out['online'])
-        self.assertIn(RELAY, out['sources'])
+        self.assertIsNone(out['calc'])
+        self.assertEqual(out['reply'], '')
+        self.assertTrue(out['lookup'])
 
 
 class History(unittest.TestCase):

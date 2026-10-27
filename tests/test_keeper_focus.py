@@ -39,15 +39,12 @@ class Wide(unittest.TestCase):
         self.assertIsNone(calls[1].args[3])
 
     def test_slash_works_once(self):
-        calls = self.run_screen(['what fuse', '/', '/', 'b'],
-                                [_state('what fuse', missing=True), _state('what fuse'), _state('/')])
-        self.assertEqual(calls[2].args[0], '/')
-        self.assertIs(calls[2].args[3], CASE)
+        calls = self.run_screen(['what fuse', '/', '/', 'b'], [_state('what fuse', missing=True), _state('what fuse')])
+        self.assertEqual([c.args[0] for c in calls], ['what fuse', 'what fuse'])
 
-    def test_slash_without_miss_is_a_question(self):
-        calls = self.run_screen(['what fuse', '/', 'b'], [_state('what fuse'), _state('/')])
-        self.assertEqual(calls[1].args[0], '/')
-        self.assertIs(calls[1].args[3], CASE)
+    def test_slash_without_miss_is_short(self):
+        calls = self.run_screen(['what fuse', '/', 'b'], [_state('what fuse')])
+        self.assertEqual([c.args[0] for c in calls], ['what fuse'])
 
 
 class Note(unittest.TestCase):

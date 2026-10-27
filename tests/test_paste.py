@@ -141,21 +141,21 @@ class Screens(unittest.TestCase):
         with _size(40), mock.patch('builtins.print') as printed:
             keeper_screen._drop_nav('a\nb', 1)
         up = 2 + keeper_screen.NAV_ROWS + 1
-        printed.assert_called_once_with(f'\033[{up}A\033[JKeeper> a\n        b')
+        printed.assert_called_once_with(f'\033[{up}A\033[Jask> a\n     b')
 
     def test_keeper_history_keeps_lines(self):
         out = io.StringIO()
         with mock.patch.object(keeper_screen, '_print_answer'), mock.patch.object(keeper_screen, '_nav'), \
              mock.patch('sys.stdout', out):
             keeper_screen._draw([{'question': 'a\nb'}], [], None, 'c\nd', {'slot': 'local'})
-        self.assertIn('Keeper> a\n        b\n', out.getvalue())
-        self.assertIn('Keeper> c\n        d\n', out.getvalue())
+        self.assertIn('ask> a\n     b\n', out.getvalue())
+        self.assertIn('ask> c\n     d\n', out.getvalue())
 
     def test_keeper_reads_lines(self):
         with mock.patch.object(keeper_screen, '_redraw', return_value=('local', 0)), \
              mock.patch.object(keeper_screen, 'read_command', side_effect=['b']) as read:
             keeper_screen.keeper_screen()
-        read.assert_called_once_with('Keeper> ', lines=True)
+        read.assert_called_once_with('ask> ', lines=True)
 
     def test_search_reads_lines(self):
         with mock.patch.object(search_screen.archives, 'cases', return_value=[{'text': 'Alpha'}]), \

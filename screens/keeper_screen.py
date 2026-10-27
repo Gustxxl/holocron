@@ -6,13 +6,12 @@ import textwrap
 from core import archives, keeper
 from core.commands import HELP_SECTIONS
 from screens.help_screen import render_help
-from screens.search_screen import open_case, first_line, highlight, highlight_links
+from screens.search_screen import MIN_QUERY, open_case, first_line, highlight, highlight_links
 from ui.interface import (Spinner, clear_screen, dim, haptic, input_block, input_rows, nav_line, num, pause,
                           read_command, wait)
 
-MIN_QUESTION = 3
 NAV_ROWS = 2
-PROMPT = 'Keeper> '
+PROMPT = 'ask> '
 
 LINES = {
     'connecting': 'Waking Keeper',
@@ -20,7 +19,7 @@ LINES = {
     'ready_case': 'Ask about this record.',
     'not_connected': 'No model connected. Search by words only. Settings > Archive > Keeper.',
     'unset': 'No model and no archive. Configure in settings > Archive.',
-    'short': 'Type at least 3 characters.',
+    'short': f'Type at least {MIN_QUERY} characters.',
     'silent': 'Keeper has nothing to add.',
     'empty': 'Nothing in the archive on this.',
     'similar': 'Closest records:',
@@ -295,7 +294,7 @@ def keeper_screen(case=None):
                 continue
             results = [(0, c) for c in records]
             new = open_case(results, number, _terms_for(turns, number), rerun=False)
-            if not new or new == 'l' or len(new) < MIN_QUESTION:
+            if not new or new == 'l' or len(new) < MIN_QUERY:
                 via, greeting = _redraw(turns, records, case)
                 continue
             command = new
@@ -305,7 +304,7 @@ def keeper_screen(case=None):
             greeting = 0
 
         print()
-        if len(command.strip()) < MIN_QUESTION and keeper.active() is None:
+        if len(command.strip()) < MIN_QUERY:
             state = _short(command)
         else:
             with Spinner(LINES['thinking']) as thinking:

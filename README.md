@@ -65,7 +65,9 @@ Boards made with the Kanban plugin for Obsidian are read as boards, not as plain
 
 ## Keeper
 
-Keeper is a local assistant for your archive. Ask in your own words, in any language, and it answers from your records: it refers to them by number, shows the exact lines it relied on and lists the links from those records (an instruction, a ticket, a doc). It keeps track of the conversation, so "what about the second one?" works. Press `k` on an open record to ask about that record.
+Keeper is a local assistant for your archive. Ask in your own words, in any language, and it answers from your records: it refers to them by number, shows the exact lines it relied on and lists the links from those records (an instruction, a ticket, a doc). It keeps track of the conversation, so "what about the second one?" works.
+
+Press `k` on an open record to ask about that record only. Paste an error there and Keeper gives the steps from the record. If the error compares two amounts, Holocron works out the difference itself and shows the calculation above the steps, so the numbers don't depend on the model. Errors the record says can come up after the fix are listed under What may follow. If the record doesn't cover your question, type `/` to ask the whole archive.
 
 Keeper runs on [Ollama](https://ollama.com/download). Settings show what's missing, and if you don't have a model yet, they can download the recommended `qwen2.5:7b` for you. You can also add the address of another machine running Ollama. Keeper uses that server when it's reachable and switches to your own computer when it's not.
 
@@ -151,6 +153,7 @@ If downloads from GitHub are slow or blocked on your network, the update archive
 
 - `check` runs the built-in tests and shows what's connected: editor, clipboard, reminders, calendar, Keeper and the size of your archive.
 - `s` > Lists sets how many rows `l`, `tree` and boards show per page: from 5 to 99, 15 by default.
+- Text pasted into search or Keeper keeps its line breaks, so an error window looks the same as where you copied it from.
 - On a MacBook, the trackpad gives a light tap when you toggle something and a different pattern for success or error.
 - `hyperspace`. Try it. Any key brings you back.
 

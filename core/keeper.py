@@ -898,7 +898,7 @@ def _about(message, past, focus, out, step):
         else:
             _explain(message, past, focus, out, step)
     except KeeperOffline:
-        out['online'] = False
+        out.update(online=False, calc=None)
 
 
 def reply(message, past, cases, records=(), focus=None, progress=None):
