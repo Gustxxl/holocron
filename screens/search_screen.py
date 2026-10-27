@@ -189,11 +189,7 @@ def search_screen(initial_query=None):
     while True:
         if query and not results:
             clear_screen()
-            if '\n' in query:
-                print('Nothing found for:')
-                print(_asked(query, shutil.get_terminal_size().columns - 1))
-            else:
-                print(f"Nothing found for '{query}'.")
+            print(_nothing(query))
             tips = _suggest(cases, query)
             if tips:
                 print(dim('Maybe: ' + ', '.join(tips)))
@@ -538,7 +534,7 @@ def show_list(results, page, query, page_size=PAGE, note=None, exact=None, group
         print(dim(count))
     print()
     for part in missing:
-        print(f"Nothing found for '{part}'.")
+        print(_nothing(part))
     if missing:
         print()
     if exact == 0 and not layout:
@@ -694,9 +690,13 @@ def _rule(text, width):
     return text + ' ' + '─' * max(width - len(text) - 1, 0)
 
 
+def _nothing(query):
+    return input_block("Nothing found for '", query) + "'."
+
+
 def _asked(query, width, indent=ASKED_INDENT):
     if '\n' in query:
-        return input_block(ASKED_INDENT, query)
+        return input_block(indent + '"', query) + '"'
     return textwrap.fill(f'"{query}"', width=width, initial_indent=indent, subsequent_indent=indent + ' ',
                          break_long_words=False, break_on_hyphens=False)
 

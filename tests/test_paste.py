@@ -165,16 +165,31 @@ class Screens(unittest.TestCase):
         read.assert_called_once_with('search> ', lines=True)
 
     def test_asked(self):
-        self.assertEqual(search_screen._asked('Alpha\nBeta', 40), '   Alpha\n   Beta')
-        self.assertEqual(search_screen._asked('Alpha\nBeta', 40, indent=''), '   Alpha\n   Beta')
+        self.assertEqual(search_screen._asked('Alpha\nBeta', 40), '   "Alpha\n    Beta"')
+        self.assertEqual(search_screen._asked('Alpha\nBeta', 40, indent=''), '"Alpha\n Beta"')
         self.assertEqual(search_screen._asked('Alpha', 40, indent=''), '"Alpha"')
+        self.assertEqual(search_screen._asked('Alpha', 40), '   "Alpha"')
+
+    def test_asked_wraps_like_one_line(self):
+        wrapped = search_screen._asked('alpha beta gamma', 12)
+        self.assertEqual(wrapped, '   "alpha\n    beta\n    gamma"')
+        self.assertEqual(search_screen._asked('alpha\nbeta\ngamma', 12), wrapped)
+
+    def test_asked_cyrillic(self):
+        self.assertEqual(search_screen._asked('Альфа\nБета', 40), '   "Альфа\n    Бета"')
+
+    def test_nothing(self):
+        self.assertEqual(search_screen._nothing('Alpha'), "Nothing found for 'Alpha'.")
+        self.assertEqual(search_screen._nothing('Alpha\nBeta'), "Nothing found for 'Alpha\n" + ' ' * 19 + "Beta'.")
+        self.assertEqual(search_screen._nothing('Альфа\nБета'), "Nothing found for 'Альфа\n" + ' ' * 19 + "Бета'.")
+        self.assertEqual(search_screen._nothing(''), "Nothing found for ''.")
 
     def test_case_head(self):
         lines = search_screen._case_head('1/2  ', 'note', 'Vault', '', 'Alpha\nBeta', 60)
         self.assertEqual(len(lines), 2)
         self.assertTrue(lines[0].startswith('── 1/2  note (Vault)'))
         self.assertNotIn('Alpha', lines[0])
-        self.assertEqual(lines[1], '   Alpha\n   Beta')
+        self.assertEqual(lines[1], '   "Alpha\n    Beta"')
 
     def test_list_header(self):
         with _size(80), mock.patch.object(search_screen, 'clear_screen'), \
@@ -182,7 +197,7 @@ class Screens(unittest.TestCase):
              mock.patch('builtins.print') as printed:
             search_screen.show_list([(0, {'text': 'Alpha'})], 0, 'Alpha\nBeta')
         out = _printed(printed)
-        self.assertIn('   Alpha\n   Beta', out)
+        self.assertIn(interface.dim('"Alpha\n Beta"'), out)
         self.assertNotIn('Search: "', out)
 
     def test_nothing_found(self):
@@ -194,7 +209,15 @@ class Screens(unittest.TestCase):
              mock.patch.object(search_screen, 'read_command', side_effect=['b']), \
              mock.patch('builtins.print') as printed:
             search_screen.search_screen('Gamma\nDelta')
-        self.assertIn('Nothing found for:\n   Gamma\n   Delta', _printed(printed))
+            self.assertIn("Nothing found for 'Gamma\n" + ' ' * 19 + "Delta'.", _printed(printed))
+
+        def test_missing_part_quoted(self):
+            groups = ([('Alpha', 0, 1, 0, 1, 1)], ['Gamma\nDelta'])
+            with _size(80), mock.patch.object(search_screen, 'clear_screen'), \
+                 mock.patch.object(search_screen, 'list_rows', return_value=['row']), \
+                 mock.patch('builtins.print') as printed:
+                search_screen.show_list([(0, {'text': 'Alpha'})], 0, 'Alpha; Gamma', groups=groups)
+            self.assertIn("Nothing found for 'Gamma\n" + ' ' * 19 + "Delta'.", _printed(printed))
 
     def test_main_reads_lines(self):
         with mock.patch.object(main_screen, 'main_frame', return_value=''), \
