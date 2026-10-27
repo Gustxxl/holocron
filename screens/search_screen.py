@@ -8,7 +8,8 @@ from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path, page_rows, search_separator
 from core.system import copy_text
 from screens.help_screen import render_help
-from ui.interface import clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line, num
+from ui.interface import (clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line, num,
+                          input_block)
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
 from ui.note import plain, render_note
 from ui.format import plural
@@ -19,6 +20,7 @@ _MARK = '\033[38;2;20;20;20;48;2;116;167;254m'
 _RESET = '\033[0m'
 
 PAGE = 10
+ASKED_INDENT = '   '
 MIN_QUERY = 3
 
 _URL_RE = re.compile(r'https?://\S+')
@@ -187,7 +189,11 @@ def search_screen(initial_query=None):
     while True:
         if query and not results:
             clear_screen()
-            print(f"Nothing found for '{query}'.")
+            if '\n' in query:
+                print('Nothing found for:')
+                print(_asked(query, shutil.get_terminal_size().columns - 1))
+            else:
+                print(f"Nothing found for '{query}'.")
             tips = _suggest(cases, query)
             if tips:
                 print(dim('Maybe: ' + ', '.join(tips)))
@@ -206,7 +212,7 @@ def search_screen(initial_query=None):
             print()
             print(dim('  [type] search   [b] back'))
             print()
-        command = read_command('search> ')
+        command = read_command('search> ', lines=True)
         low = command.lower()
         if low in ('h', 'help'):
             clear_screen()
@@ -523,7 +529,7 @@ def show_list(results, page, query, page_size=PAGE, note=None, exact=None, group
     count += f'   {page + 1}/{pages}' if pages > 1 else ''
     if note:
         print(dim(_fit(note, width)))
-    elif query and len(query) + len(count) + 13 <= width:
+    elif query and '\n' not in query and len(query) + len(count) + 13 <= width:
         print(dim(f'Search: "{query}"   {count}'))
     elif query:
         print(dim(count))
@@ -688,7 +694,9 @@ def _rule(text, width):
     return text + ' ' + '─' * max(width - len(text) - 1, 0)
 
 
-def _asked(query, width, indent='   '):
+def _asked(query, width, indent=ASKED_INDENT):
+    if '\n' in query:
+        return input_block(ASKED_INDENT, query)
     return textwrap.fill(f'"{query}"', width=width, initial_indent=indent, subsequent_indent=indent + ' ',
                          break_long_words=False, break_on_hyphens=False)
 
@@ -696,7 +704,7 @@ def _asked(query, width, indent='   '):
 def _case_head(pos, name, archive, mark, query, width):
     labels = [f'{name} ({archive})', name] if name else [f'({archive})']
     line = f'── {pos}{labels[0]}{mark}'
-    if query and len(line) + len(query) + 6 <= width:
+    if query and '\n' not in query and len(line) + len(query) + 6 <= width:
         return [_rule(f'{line}  "{query}"', width)]
     if not query and len(line) + 2 <= width:
         return [_rule(line, width)]

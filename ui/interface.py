@@ -185,8 +185,26 @@ def quit_app():
     sys.exit(0)
 
 
-def _join(text):
+def screen_rows(text):
+    cols = max(shutil.get_terminal_size().columns, 1)
+    return max(_cells(visible(text)) - 1, 0) // cols + 1
+
+
+def one_line(text):
     return ' '.join(ln.strip() for ln in text.splitlines() if ln.strip())
+
+
+def _keep_lines(text):
+    return '\n'.join(ln.rstrip() for ln in text.splitlines()).strip()
+
+
+def input_block(prompt, text):
+    pad = ' ' * _cells(visible(prompt))
+    return prompt + ('\n' + pad).join(text.split('\n'))
+
+
+def input_rows(prompt, text):
+    return sum(screen_rows(row) for row in input_block(prompt, text).split('\n'))
 
 
 def _drain_tty():
@@ -206,7 +224,7 @@ def _drain_tty():
             data += chunk
     finally:
         termios.tcsetattr(fd, termios.TCSANOW, old)
-    return _join(data.decode('utf-8', 'replace'))
+    return data.decode('utf-8', 'replace')
 
 
 def _drain_pipe():
@@ -217,7 +235,7 @@ def _drain_pipe():
         if not line:
             break
         lines.append(line)
-    return _join(''.join(lines))
+    return ''.join(lines)
 
 
 def _drain_console():
@@ -230,7 +248,7 @@ def _drain_console():
             deadline = time.monotonic() + 0.05
         else:
             time.sleep(0.005)
-    return _join(''.join(chars).replace('\r', '\n'))
+    return ''.join(chars).replace('\r', '\n')
 
 
 def _drain():
@@ -239,14 +257,21 @@ def _drain():
     return _drain_tty() if sys.stdin.isatty() else _drain_pipe()
 
 
-def read_command(prompt='> '):
+def _echo(prompt, first, line):
+    if not sys.stdout.isatty():
+        return
+    sys.stdout.write(f'\033[{input_rows(prompt, first)}A\r\033[J{input_block(prompt, line)}\n')
+    sys.stdout.flush()
+
+
+def read_command(prompt='> ', lines=False):
     try:
-        line = input(prompt).strip()
+        first = input(prompt)
     except EOFError:
         quit_app()
-    extra = _drain()
-    if extra:
-        line = f'{line} {extra}'.strip()
+    line = (_keep_lines if lines else one_line)(f'{first}\n{_drain()}')
+    if line != first.strip():
+        _echo(prompt, first, line)
     if line.lower() in ('q', 'quit', 'exit'):
         quit_app()
     if line.lower() == 'w':

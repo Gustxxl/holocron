@@ -7,10 +7,12 @@ from core import archives, keeper
 from core.commands import HELP_SECTIONS
 from screens.help_screen import render_help
 from screens.search_screen import open_case, first_line, highlight, highlight_links
-from ui.interface import Spinner, clear_screen, dim, haptic, nav_line, num, pause, read_command, wait
+from ui.interface import (Spinner, clear_screen, dim, haptic, input_block, input_rows, nav_line, num, pause,
+                          read_command, wait)
 
 MIN_QUESTION = 3
 NAV_ROWS = 2
+PROMPT = 'Keeper> '
 
 LINES = {
     'connecting': 'Waking Keeper',
@@ -103,9 +105,8 @@ def _nav(turns, records):
 
 
 def _drop_nav(command, greeting):
-    cols = shutil.get_terminal_size().columns
-    up = (len('Keeper> ' + command) - 1) // cols + 1 + NAV_ROWS + greeting
-    print(f'\033[{up}A\033[JKeeper> {command}')
+    up = input_rows(PROMPT, command) + NAV_ROWS + greeting
+    print(f'\033[{up}A\033[J' + input_block(PROMPT, command))
 
 
 def _ask(question, turns, records, focus, thinking):
@@ -223,10 +224,10 @@ def _draw(turns, records, focus, pending, conn):
             rows += 1
         print()
     for turn in turns:
-        print(f"Keeper> {turn['question']}")
+        print(input_block(PROMPT, turn['question']))
         _print_answer(turn)
     if pending:
-        print(f'Keeper> {pending}')
+        print(input_block(PROMPT, pending))
     else:
         _nav(turns, records)
     return rows
@@ -261,7 +262,7 @@ def keeper_screen(case=None):
     via, greeting = _redraw(turns, records, case)
 
     while True:
-        command = read_command('Keeper> ')
+        command = read_command(PROMPT, lines=True)
         low = command.lower()
         if low in ('b', 'back'):
             return
