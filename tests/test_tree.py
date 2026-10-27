@@ -1,5 +1,6 @@
 import io
 import tempfile
+import os
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -8,6 +9,14 @@ from unittest import mock
 from core import tree
 from screens import tree_screen
 from ui.interface import dim
+
+WIDE = os.terminal_size((200, 50))
+
+
+def setUpModule():
+    patch = mock.patch('shutil.get_terminal_size', return_value=WIDE)
+    patch.start()
+    unittest.addModuleCleanup(patch.stop)
 
 
 def _names(node):

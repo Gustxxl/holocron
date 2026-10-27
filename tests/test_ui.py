@@ -14,6 +14,15 @@ from ui.interface import nav_line
 from ui import interface
 
 
+WIDE = os.terminal_size((200, 50))
+
+
+def setUpModule():
+    patch = mock.patch('shutil.get_terminal_size', return_value=WIDE)
+    patch.start()
+    unittest.addModuleCleanup(patch.stop)
+
+
 class Highlight(unittest.TestCase):
     def test_highlights_match(self):
         result = highlight('hello world', 'hello')

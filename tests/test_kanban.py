@@ -1,4 +1,5 @@
 import io
+import os
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -14,9 +15,10 @@ from ui.interface import dim, num
 
 def setUpModule():
     tmp = tempfile.TemporaryDirectory()
-    patch = mock.patch.object(backups, 'DIR', Path(tmp.name))
-    patch.start()
-    unittest.addModuleCleanup(patch.stop)
+    for patch in (mock.patch.object(backups, 'DIR', Path(tmp.name)),
+                  mock.patch('shutil.get_terminal_size', return_value=WIDE)):
+        patch.start()
+        unittest.addModuleCleanup(patch.stop)
     unittest.addModuleCleanup(tmp.cleanup)
 
 
@@ -42,6 +44,7 @@ LINES = [
     '%% kanban:settings', '```', '{"kanban-plugin":"board"}', '```', '%%',
 ]
 BOARD = '\n'.join(LINES)
+WIDE = os.terminal_size((200, 50))
 TITLES = ['Todo', 'Done', 'Later', 'Archive']
 TODO, DONE, LATER, ARCHIVE = TITLES
 EPSILON = 'Epsilon\nLine one\n\nLine two'

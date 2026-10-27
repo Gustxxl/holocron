@@ -6,6 +6,7 @@ from unittest import mock
 from screens import keeper_screen as screen
 
 CASE = {'text': 'Relay fault\nReplace fuse F12', 'archive': 'Vault'}
+WIDTH = 200
 
 
 def _state(question, **extra):
@@ -52,7 +53,7 @@ class Wide(unittest.TestCase):
 class Note(unittest.TestCase):
     def printed(self, state):
         out = io.StringIO()
-        with redirect_stdout(out):
+        with mock.patch.object(screen, '_width', return_value=WIDTH), redirect_stdout(out):
             screen._print_answer(dict(state, start=2))
         return out.getvalue()
 
@@ -100,6 +101,46 @@ class Note(unittest.TestCase):
         self.assertIn('Subtract.', out)
         self.assertIn(screen.LINES['unchecked'], out)
         self.assertNotIn(screen.LINES['silent'], out)
+
+
+class Gap(unittest.TestCase):
+    def lines(self, state):
+        out = io.StringIO()
+        with mock.patch.object(screen, '_redraw', return_value=('local', 0)), \
+             mock.patch.object(screen, '_drop_nav'), \
+             mock.patch.object(screen, '_nav'), \
+             mock.patch.object(screen, 'haptic'), \
+             mock.patch.object(screen, 'Spinner'), \
+             mock.patch.object(screen.keeper, 'active', return_value={'slot': 'local'}), \
+             mock.patch.object(screen.keeper, 'has_server', return_value=True), \
+             mock.patch.object(screen, 'read_command', side_effect=['what fuse', 'b']), \
+             mock.patch.object(screen, '_ask', return_value=state), \
+             mock.patch.object(screen, '_width', return_value=WIDTH), \
+             redirect_stdout(out):
+            screen.keeper_screen(CASE)
+        return out.getvalue().split('\n')
+
+    def test_one_blank_line_before_answer(self):
+        self.assertEqual(self.lines(_state('what fuse'))[:2], ['', '  Noted.'])
+
+    def test_switch_note_then_blank_then_answer(self):
+        lines = self.lines(_state('what fuse', via='server'))
+        self.assertEqual(lines[0], '')
+        self.assertIn(screen.LINES['to_server'], lines[1])
+        self.assertEqual(lines[2:4], ['', '  Noted.'])
+
+    def test_short_question_one_blank_line(self):
+        with mock.patch.object(screen.keeper, 'active', return_value=None):
+            out = io.StringIO()
+            with mock.patch.object(screen, '_redraw', return_value=(None, 0)), \
+                 mock.patch.object(screen, '_drop_nav'), mock.patch.object(screen, '_nav'), \
+                 mock.patch.object(screen, 'haptic'), \
+                 mock.patch.object(screen, 'read_command', side_effect=['ab', 'b']), \
+                 mock.patch.object(screen, '_width', return_value=WIDTH), redirect_stdout(out):
+                screen.keeper_screen(CASE)
+        lines = out.getvalue().split('\n')
+        self.assertEqual(lines[0], '')
+        self.assertIn(screen.LINES['short'], lines[1])
 
 
 if __name__ == '__main__':

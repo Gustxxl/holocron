@@ -1,4 +1,5 @@
 import io
+import os
 import unittest
 from contextlib import redirect_stdout
 from types import SimpleNamespace
@@ -6,6 +7,8 @@ from unittest import mock
 
 from core.sources import registry
 from screens import sources_screen
+
+WIDE = os.terminal_size((200, 50))
 
 
 class SourceSetupScreen(unittest.TestCase):
@@ -92,6 +95,7 @@ class ListsScreen(unittest.TestCase):
              mock.patch.object(sources_screen.cli, 'which', return_value='/x/remindctl'), \
              mock.patch.object(sources_screen.cli, 'shadowed', return_value=shadowed), \
              mock.patch.object(sources_screen.macos, 'remove', side_effect=remove) as self.remove, \
+             mock.patch('shutil.get_terminal_size', return_value=WIDE), \
              redirect_stdout(io.StringIO()) as out:
             self.stored.selected.return_value = []
             self.stored.default.return_value = None

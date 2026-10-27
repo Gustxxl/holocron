@@ -143,8 +143,9 @@ def _calc(calc):
     print()
 
 
-def _print_answer(state):
-    print()
+def _print_answer(state, gap=True):
+    if gap:
+        print()
     kind = state['kind']
     if kind == 'unset':
         _say(LINES['unset'])
@@ -302,22 +303,23 @@ def keeper_screen(case=None):
             _drop_nav(command, greeting)
             greeting = 0
 
+        print()
         if len(command.strip()) < MIN_QUESTION and keeper.active() is None:
             state = _short(command)
         else:
-            print()
             with Spinner(LINES['thinking']) as thinking:
                 state = _ask(command, turns, records, None if wide else case, thinking)
+        gap = False
         if state['kind'] == 'reply' and state['via'] != via:
             note = _switch_note(state['via'])
             if note:
-                print()
                 print(dim('  ' + note))
+                gap = True
             via = state['via']
         state['start'] = len(records) + 1
         records.extend(state['sources'])
         turns.append(state)
-        _print_answer(state)
+        _print_answer(state, gap)
         _nav(turns, records)
 
         if state['archive']:

@@ -1,6 +1,8 @@
 import io
 import re
 import unittest
+import os
+from unittest import mock
 from contextlib import ExitStack, redirect_stdout
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -10,6 +12,14 @@ from ui.interface import visible
 from screens import (diagnostics_screen, events_screen, favorites_screen, help_screen, keeper_screen,
                      schedule_screen, schedule_settings_screen, settings_screen, sources_screen,
                      tasks_screen, waypoints_screen)
+
+WIDE = os.terminal_size((200, 50))
+
+
+def setUpModule():
+    patch = mock.patch('shutil.get_terminal_size', return_value=WIDE)
+    patch.start()
+    unittest.addModuleCleanup(patch.stop)
 
 LEAK = re.compile(r"\[\('")
 
