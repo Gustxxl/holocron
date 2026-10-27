@@ -135,8 +135,8 @@ class Fix(unittest.TestCase):
     def run_fix(self, writes, names=NAMES, side=SIDE, message=ERROR):
         writes = list(writes)
 
-        def chat(system, user, history=None, temperature=0, think=False):
-            self.calls.append((user, think))
+        def chat(system, user, history=None, temperature=0):
+            self.calls.append(user)
             if 'Return {"names"' in user:
                 return names
             if 'Sentence of the note:' in user:
@@ -153,7 +153,7 @@ class Fix(unittest.TestCase):
             return keeper.reply(message, [], CASES, [NOTE], NOTE)
 
     def writes(self):
-        return [user for user, _ in self.calls if keeper._FIX_RULES in user]
+        return [user for user in self.calls if keeper._FIX_RULES in user]
 
     def test_steps_and_calculation(self):
         out = self.run_fix([STEPS])
@@ -177,16 +177,10 @@ class Fix(unittest.TestCase):
 
     def test_limits_asked_once_per_text_paragraph(self):
         self.run_fix([STEPS])
-        asked = [user for user, _ in self.calls if keeper._LIMIT_TASK in user]
+        asked = [user for user in self.calls if keeper._LIMIT_TASK in user]
         self.assertEqual(len(asked), 5)
         self.assertFalse(any('| Orders | Sum |' in user for user in asked))
         self.assertFalse(any('table 77' in user for user in asked))
-
-    def test_only_reference_thinks(self):
-        self.run_fix([STEPS])
-        self.assertEqual([user for user, think in self.calls if think],
-                        [user for user, _ in self.calls if 'Sentence of the note:' in user])
-        self.assertEqual(len([1 for _, think in self.calls if think]), 1)
 
     def test_invented_number_retried_with_reason(self):
         bad = {'steps': ['Add 0.02 to line 55.'], 'after': STEPS['after']}
@@ -229,7 +223,7 @@ class Fix(unittest.TestCase):
 
     def test_only_sentences_naming_a_value_asked(self):
         self.run_fix([STEPS])
-        asked = [user for user, _ in self.calls if 'Sentence of the note:' in user]
+        asked = [user for user in self.calls if 'Sentence of the note:' in user]
         self.assertEqual(len(asked), 1)
         self.assertIn('so it must match the report total.', asked[0])
         self.assertIn('«report total»', asked[0])
@@ -409,33 +403,19 @@ class Language(unittest.TestCase):
 
 
 class Think(unittest.TestCase):
-    def ok(self):
-        return {'message': {'content': '{"quotes": []}'}}
+    def test_always_off(self):
+        with mock.patch.object(keeper, '_get_json', return_value={'message': {'content': '{"quotes": []}'}}) as get:
+            self.assertEqual(keeper._chat_with(CONN, 's', 'u', None, 0), {'quotes': []})
+        self.assertIs(get.call_args.args[2]['think'], False)
 
-    def bad(self, code):
-        error = urllib.error.HTTPError('http://x', code, 'bad', None, None)
-        self.addCleanup(error.close)
-        return error
-
-    def test_falls_back_without_thinking(self):
-        with mock.patch.object(keeper, '_get_json', side_effect=[self.bad(400), self.ok()]) as get:
-            self.assertEqual(keeper._chat_with(CONN, 's', 'u', None, 0, think=True), {'quotes': []})
-        first, second = (c.args[2] for c in get.call_args_list)
-        self.assertTrue(first['think'])
-        self.assertNotIn('think', second)
-
-    def test_other_errors_are_offline(self):
-        for think, code in ((True, 500), (False, 400)):
-            with self.subTest(think=think, code=code), \
-                 mock.patch.object(keeper, '_get_json', side_effect=self.bad(code)) as get:
+    def test_http_errors_are_offline(self):
+        for code in (400, 500):
+            error = urllib.error.HTTPError('http://x', code, 'bad', None, None)
+            self.addCleanup(error.close)
+            with self.subTest(code=code), mock.patch.object(keeper, '_get_json', side_effect=error) as get:
                 with self.assertRaises(keeper.KeeperOffline):
-                    keeper._chat_with(CONN, 's', 'u', None, 0, think=think)
+                    keeper._chat_with(CONN, 's', 'u', None, 0)
                 self.assertEqual(get.call_count, 1)
-
-    def test_off_by_default(self):
-        with mock.patch.object(keeper, '_get_json', return_value=self.ok()) as get:
-            keeper._chat_with(CONN, 's', 'u', None, 0)
-        self.assertNotIn('think', get.call_args.args[2])
 
 
 class Offline(unittest.TestCase):

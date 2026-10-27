@@ -295,7 +295,7 @@ def _parse_json(text):
     return result if isinstance(result, dict) else {}
 
 
-def _chat_with(conn, system, user, history, temperature, think=False):
+def _chat_with(conn, system, user, history, temperature):
     messages = [{'role': 'system', 'content': system}]
     messages += history or []
     messages.append({'role': 'user', 'content': user})
@@ -305,15 +305,10 @@ def _chat_with(conn, system, user, history, temperature, think=False):
         'stream': False,
         'format': 'json',
         'options': {'temperature': temperature, 'num_ctx': 8192},
+        'think': False,
     }
-    if think:
-        payload['think'] = True
     try:
         data = _get_json(conn, '/api/chat', payload)
-    except urllib.error.HTTPError as e:
-        if not think or e.code != 400:
-            raise KeeperOffline(str(e))
-        return _chat_with(conn, system, user, history, temperature)
     except (urllib.error.URLError, OSError, ValueError) as e:
         raise KeeperOffline(str(e))
     try:
@@ -322,17 +317,17 @@ def _chat_with(conn, system, user, history, temperature, think=False):
         return {}
 
 
-def _chat(system, user, history=None, temperature=0, think=False):
+def _chat(system, user, history=None, temperature=0):
     conn = active()
     if conn is None:
         raise KeeperOffline('no connection')
     try:
-        return _chat_with(conn, system, user, history, temperature, think)
+        return _chat_with(conn, system, user, history, temperature)
     except KeeperOffline:
         retry = active(refresh=True)
         if retry is None or retry['slot'] == conn['slot']:
             raise
-        return _chat_with(retry, system, user, history, temperature, think)
+        return _chat_with(retry, system, user, history, temperature)
 
 
 def _norm(word):
@@ -780,8 +775,7 @@ def _target(cmp, main, message, focus):
     sides = {}
     for sentence, side in _mentions(cmp, main, said, head):
         task = _REFERENCE_TASK.format(name=f'«{cmp["labels"][side]}»')
-        data = _chat(_FIX_SYSTEM, f'Error message: {message}\n\nSentence of the note:\n{sentence}\n\n{task}',
-                     think=True)
+        data = _chat(_FIX_SYSTEM, f'Error message: {message}\n\nSentence of the note:\n{sentence}\n\n{task}')
         if _yes(data):
             sides.setdefault(side, sentence)
     return next(iter(sides.items())) if len(sides) == 1 else (None, '')
