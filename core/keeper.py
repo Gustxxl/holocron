@@ -6,6 +6,7 @@ import unicodedata
 import urllib.request
 import urllib.error
 import threading
+from decimal import Decimal, InvalidOperation
 
 from core import search
 from core.settings import KEEPER_LOCAL_URL, keeper_server, keeper_model
@@ -19,8 +20,23 @@ COMMON_SHARE = 0.25
 MAX_LINES = 150
 MAX_RECORD = 8000
 MAX_REPLY = 1500
+MAX_STEPS = 2500
+MAX_PARAGRAPHS = 40
+MAX_UNITS = 10
+LABEL_WORDS = 6
+MIN_LABEL = 8
+MIN_PART = 6
+MIN_LETTERS = 10
+MIN_QUOTE = 3
+STEM = 4
+QUOTE_SHARE = 0.8
+ERROR_SHARE = 0.6
+TITLE_SHARE = 0.7
+FRAME_SHARE = 0.7
 MAX_QUOTES = 4
 MAX_LINKS = 3
+MAX_MENTIONS = 3
+MIN_LATER = 2
 HISTORY_TURNS = 6
 HISTORY_REPLY = 600
 CHAT_TEMPERATURE = 0.3
@@ -41,31 +57,102 @@ _PLAN_PROMPT = (
     'Example: "how do I refund order 12345?" -> {"terms": ["refund", "order", "12345"], "records": []}'
 )
 
-_REPLY_PROMPT = (
+_MANNER = (
     'You are Keeper, the archivist of Holocron, a private archive of the user\'s work notes. '
     'Manner: quiet, restrained and exact, like an old imperial archivist. '
     'No greetings, no compliments, no enthusiasm, no exclamation marks, no emoji. '
     'Never mention being an AI or a model. '
     'Reply only in the language of the user\'s last message. '
+)
+
+_LINKS_RULE = (
+    'Records may list their links as L1, L2 and so on. When the answer depends on a link, '
+    'such as the instruction, ticket or document the record points to, put its numbers in "links", '
+    'most important first, at most three. Never copy links into "reply". '
+)
+
+_REPLY_PROMPT = _MANNER + (
     'You may get numbered records from the archive. Use them when they help: answer from them, retell them, '
     'compare them, point to similar cases, or rewrite their text when asked. Refer to records by number, like [2]. '
     'Never invent numbers, codes, dates, names or links that are not in the records or the conversation. '
     'If no record fits, say so in one short sentence and still help: ask what is meant, '
     'or answer from general knowledge. If the message is unclear, ask one short question. '
     'Keep replies short, up to five sentences, unless the user asks for a rewrite or details. '
-    'Records may list their links as L1, L2 and so on. When the answer depends on a link, '
-    'such as the instruction, ticket or document the record points to, put its numbers in "links", '
-    'most important first, at most three. Never copy links into "reply". '
+) + _LINKS_RULE + (
     'Return strict JSON: {"reply": "text", "used": [numbers of records you relied on], '
     '"quotes": ["exact lines copied from those records"], "links": [link numbers]}. '
     'Examples: "hi" -> {"reply": "Holocron is open.", "used": [], "quotes": [], "links": []} '
     '"how are you?" -> {"reply": "Functional. The archive is in order.", "used": [], "quotes": [], "links": []}'
 )
 
+_FOCUS_PROMPT = _MANNER + (
+    'The user has one record open and asks about it. Answer only from this record and the conversation, '
+    'in up to five sentences. '
+    'Never invent numbers, codes, dates, names or links that are not in the record or the conversation. '
+    'If the record does not cover the question, say so in one short sentence and set "found" to false. '
+) + _LINKS_RULE + (
+    'Return strict JSON: {"reply": "text", "found": true, '
+    '"quotes": ["exact lines copied from the record"], "links": [link numbers]}.'
+)
+
+_FIX_SYSTEM = ('You help a user fix an error using their own work note. '
+               'Use only the note and the computed values. Return strict JSON.')
+
+_NAMES_TASK = (
+    'Question: the error message compares two values, {a} and {b}. For each value, copy word for word '
+    'the few words of the error message that name it. Leave out the numbers and the words that compare them, '
+    'such as "is not equal to". Return {{"names": ["name of {a}", "name of {b}"]}}.'
+)
+
+_REFERENCE_TASK = (
+    'Question: does this sentence say that the data changed by the fix must end up equal to {name}, '
+    'so {name} is the value to keep as is? Return {{"answer": "yes"}} or {{"answer": "no"}}.'
+)
+
+_LIMIT_TASK = (
+    'Question: does this paragraph apply only when the difference or an amount is above, below or equal to '
+    'some value? Return {"op": "above", "below", "equal" or "none", '
+    '"words": "the words of that condition copied from the paragraph", '
+    '"value": the value as a number, in the same units as the amounts in the error message}.'
+)
+
+_FIX_RULES = (
+    'Rules: '
+    '1. Write numbered imperative steps in the language of the note. Do not restate the error or the numbers '
+    'as a step. '
+    '2. Use the names of tables, fields, buttons, scripts and commands exactly as in the note. '
+    'The words that name the values in the error message are not field names. '
+    '3. The direction and the amount are computed: use them. If the values are totals, change one or several '
+    'items by the difference and never write a total anywhere. If the direction '
+    'is not computed, take it from the note and never offer both directions. '
+    '4. Removing an item lowers a total and adding one raises it. Skip a branch that would move the value '
+    'the wrong way. '
+    '5. If a condition can only be checked by the user, write one step with what to check, what to do if it '
+    'holds and what to do if not, keeping '
+    'the order of the note: the specific check first, then the fallback. '
+    '6. The note often describes the smallest case, one unit. If the difference is several units, cover all '
+    'of them and never say that one unit covers several. '
+    '7. Skip a branch whose condition does not hold for the computed values. A more specific branch wins '
+    'over a general one. '
+    '8. If the note says "either X or Y", keep "either X or Y". '
+    '9. Add nothing that is not in the note. '
+    'Return strict JSON: {"steps": ["..."], "after": ["..."]}. Each item of "after" starts with the text of '
+    'a later error in «» and then gives its fix from "Later errors". Write everything in the language of the note. '
+    '"after" is an empty list when there are no later errors.'
+)
+
 _WORD_RE = re.compile(r'[\w-]+')
 _URL_RE = re.compile(r'https?://\S+')
 _MD_LINK_RE = re.compile(r'\[([^\]]*)\]\((https?://[^)\s]+)\)')
 _REF_RE = re.compile(r'\[\d+\]')
+_STEP_RE = re.compile(r'^\s*\d+[.)][ \t]', re.M)
+_FRAME_RE = re.compile(r'-{3,}|\n')
+_SENTENCE_RE = re.compile(r'(?<=[.!?])\s+')
+_GAP_RE = re.compile(r'[ \u00a0\u202f]')
+_NUMBER_RE = re.compile(r'\d+(?:[ \u00a0\u202f]\d{3})*(?:[.,]\d+)?')
+_SMALL = {Decimal(n) for n in range(MAX_UNITS + 1)}
+_LIMITS = ('above', 'below', 'equal')
+_AMOUNT_RE = re.compile(r'(?<![\d.,])(\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+[.,]\d+)(?![.,]?\d)')
 
 _active = {'conn': None, 'at': 0.0}
 
@@ -208,7 +295,7 @@ def _parse_json(text):
     return result if isinstance(result, dict) else {}
 
 
-def _chat_with(conn, system, user, history, temperature):
+def _chat_with(conn, system, user, history, temperature, think=False):
     messages = [{'role': 'system', 'content': system}]
     messages += history or []
     messages.append({'role': 'user', 'content': user})
@@ -219,8 +306,14 @@ def _chat_with(conn, system, user, history, temperature):
         'format': 'json',
         'options': {'temperature': temperature, 'num_ctx': 8192},
     }
+    if think:
+        payload['think'] = True
     try:
         data = _get_json(conn, '/api/chat', payload)
+    except urllib.error.HTTPError as e:
+        if not think or e.code != 400:
+            raise KeeperOffline(str(e))
+        return _chat_with(conn, system, user, history, temperature)
     except (urllib.error.URLError, OSError, ValueError) as e:
         raise KeeperOffline(str(e))
     try:
@@ -229,17 +322,17 @@ def _chat_with(conn, system, user, history, temperature):
         return {}
 
 
-def _chat(system, user, history=None, temperature=0):
+def _chat(system, user, history=None, temperature=0, think=False):
     conn = active()
     if conn is None:
         raise KeeperOffline('no connection')
     try:
-        return _chat_with(conn, system, user, history, temperature)
+        return _chat_with(conn, system, user, history, temperature, think)
     except KeeperOffline:
         retry = active(refresh=True)
         if retry is None or retry['slot'] == conn['slot']:
             raise
-        return _chat_with(retry, system, user, history, temperature)
+        return _chat_with(retry, system, user, history, temperature, think)
 
 
 def _norm(word):
@@ -357,6 +450,77 @@ def _foreign_links(text, source):
     return [u for u in _URL_RE.findall(text) if u.rstrip('.,;)') not in source]
 
 
+def _decimal(raw):
+    return Decimal(_GAP_RE.sub('', raw).replace(',', '.'))
+
+
+def _scale(value):
+    return max(-value.as_tuple().exponent, 0)
+
+
+def _show(value, scale):
+    return f'{value.quantize(Decimal(1).scaleb(-scale)):,.{scale}f}'.replace(',', ' ')
+
+
+def _amount_set(text):
+    return {_decimal(raw) for raw in _NUMBER_RE.findall(text)}
+
+
+def _label(text):
+    tail = _FRAME_RE.split(text)[-1]
+    return ' '.join(tail.split()[-LABEL_WORDS:]).strip(' :=')
+
+
+def _compare(message):
+    found, last = [], 0
+    for match in _AMOUNT_RE.finditer(message):
+        found.append((_label(message[last:match.start()]), _decimal(match.group(1))))
+        last = match.end()
+    if len(found) != 2 or found[0][1] == found[1][1]:
+        return None
+    values = [value for _, value in found]
+    return {'labels': [label or f'value {n}' for n, (label, _) in enumerate(found, 1)], 'values': values,
+            'diff': abs(values[0] - values[1]), 'scale': max(_scale(v) for v in values)}
+
+
+def _units(cmp):
+    unit = Decimal(1).scaleb(-cmp['scale'])
+    count = cmp['diff'] / unit
+    if cmp['scale'] and count == count.to_integral_value() and 1 <= count <= MAX_UNITS:
+        return int(count), unit
+    return None
+
+
+def _fix_plan(cmp, target):
+    labels, values, scale = cmp['labels'], cmp['values'], cmp['scale']
+    diff = _show(cmp['diff'], scale)
+    if target is None:
+        small, big = (0, 1) if values[0] < values[1] else (1, 0)
+        text = (f'«{labels[small]}» is {diff} less than «{labels[big]}». Which one is correct is unknown: '
+                f'either add {diff} to «{labels[small]}» or subtract {diff} from «{labels[big]}».')
+    else:
+        wrong = 1 - target
+        verb = 'add' if values[target] > values[wrong] else 'subtract'
+        text = (f'Change «{labels[wrong]}»: {verb} {diff} ({_show(values[wrong], scale)} → '
+                f'{_show(values[target], scale)}, as «{labels[target]}»).')
+    return text + _units_text(cmp)
+
+
+def _units_text(cmp):
+    units = _units(cmp)
+    return f' That is exactly {units[0]} × {_show(units[1], cmp["scale"])}.' if units else ''
+
+
+def _blind_plan(cmp):
+    return (f'The difference is {_show(cmp["diff"], cmp["scale"])}.' + _units_text(cmp)
+            + ' Which value is correct is not computed: take the direction from the note.')
+
+
+def _texts(values):
+    values = values if isinstance(values, list) else [values]
+    return [str(v).strip() for v in values if v is not None and str(v).strip()]
+
+
 def _record_lines(text):
     out, size = [], 0
     for ln in text.splitlines():
@@ -436,19 +600,144 @@ def _links(case):
     return out
 
 
+def _link_rows(links, start=0):
+    return [f'L{start + n}: {label} {url}'.replace(':  ', ': ') for n, (url, label) in enumerate(links, 1)]
+
+
 def _ask(message, past, picked, focus, temperature):
     blocks, links = [], []
     for i, c in enumerate(picked, 1):
         block = f'[{i}] {_record(c, FOCUS if c is focus else SNIPPET)}'
         own = _links(c)
         if own:
-            rows = [f'L{len(links) + n}: {label} {url}'.replace(':  ', ': ')
-                    for n, (url, label) in enumerate(own, 1)]
-            block += '\nLinks:\n' + '\n'.join(rows)
+            block += '\nLinks:\n' + '\n'.join(_link_rows(own, len(links)))
             links += own
         blocks.append(block)
     user = 'Records:\n' + '\n\n'.join(blocks) + f'\n\nMessage: {message}' if blocks else message
     return _chat(_REPLY_PROMPT, user, past, temperature), links
+
+
+def _paragraphs(text):
+    out, size = [], 0
+    for part in re.split(r'\n\s*\n', text):
+        para = '\n'.join(ln.strip() for ln in part.splitlines() if ln.strip())
+        if not para:
+            continue
+        if size >= FOCUS or len(out) >= MAX_PARAGRAPHS:
+            break
+        out.append(para[:FOCUS - size])
+        size += len(out[-1])
+    return out
+
+
+def _focus_user(message, focus, paras):
+    links = _links(focus)
+    text = f'Record: {title(focus)}\n\n' + '\n\n'.join(paras)
+    if links:
+        text += '\n\nLinks:\n' + '\n'.join(_link_rows(links))
+    return text + f'\n\nMessage: {message}', links
+
+
+def _readable(text):
+    return sum(ch.isalpha() for ch in _URL_RE.sub('', text)) >= MIN_LETTERS
+
+
+def _table(text):
+    return all(ln.lstrip().startswith('|') for ln in text.splitlines())
+
+
+def _parts(text):
+    return [p for p in (_flat(x) for x in _FRAME_RE.split(text)) if len(p) >= MIN_PART]
+
+
+def _other_error(text, frame, said):
+    own = _parts(text)
+    new = [p for p in own if p not in frame and len(set(p.split()) & said) < FRAME_SHARE * len(p.split())]
+    return bool(new) and any(p in frame for p in own)
+
+
+def _split_later(paras, message):
+    frame, said = set(_parts(message)), set(_flat(message).split())
+    for n, para in enumerate(paras[1:], 1):
+        if _other_error(para, frame, said):
+            return paras[:n], paras[n:]
+    return paras, []
+
+
+def _share(words, pool):
+    return sum(w in pool for w in words) / len(words)
+
+
+def _quote_ok(quote, note, said, head):
+    words = _flat(quote).split()
+    return (len(words) >= MIN_QUOTE and _share(words, set(_flat(note).split())) >= QUOTE_SHARE
+            and _share(words, said) < ERROR_SHARE and _share(words, head) < TITLE_SHARE)
+
+
+def _pairs(text):
+    stems = [w[:STEM] for w in _flat(text).split()]
+    return set(zip(stems, stems[1:]))
+
+
+def _side(text, labels):
+    own, first, second = _pairs(text), _pairs(labels[0]), _pairs(labels[1])
+    a, b = len(own & (first - second)), len(own & (second - first))
+    if a == b:
+        return None
+    return 0 if a > b else 1
+
+
+def _mentions(cmp, main, said, head):
+    note, out = '\n\n'.join(main), []
+    for para in main:
+        if _table(para):
+            continue
+        for sentence in _SENTENCE_RE.split(' '.join(para.split())):
+            side = _side(sentence, cmp['labels'])
+            if side is not None and _quote_ok(sentence, note, said, head) and all(sentence != s for s, _ in out):
+                out.append((sentence, side))
+    return out[:MAX_MENTIONS]
+
+
+def _yes(data):
+    return str(data.get('answer') or '').strip().lower().startswith(('y', 'д'))
+
+
+def _own_words(text, note):
+    known = set(_flat(note).split())
+    return ' '.join(w for w in _flat(text).split() if w not in known)
+
+
+def _later_only(main, later):
+    return set(_flat(' '.join(later)).split()) - set(_flat(' '.join(main)).split())
+
+
+def _from_later(item, only):
+    return len(set(_flat(item).split()) & only) >= MIN_LATER
+
+
+def _value_names(names, message):
+    if not isinstance(names, list) or len(names) != 2:
+        return None
+    clean = [str(n).strip() for n in names]
+    keys, flat = [_flat(n) for n in clean], _flat(message)
+    if all(keys) and keys[0] != keys[1] and all(k in flat for k in keys):
+        return clean
+    return None
+
+
+def _limit(data, para):
+    op, words = data.get('op'), str(data.get('words') or '')
+    if op not in _LIMITS or not _flat(words) or _flat(words) not in _flat(para):
+        return None
+    try:
+        value = Decimal(str(data.get('value')).replace(',', '.'))
+    except InvalidOperation:
+        return None
+    digits = _amount_set(words)
+    if not value.is_finite() or value <= 0 or digits and value not in digits:
+        return None
+    return op, value
 
 
 def _quotes(values, used, reply):
@@ -463,15 +752,15 @@ def _quotes(values, used, reply):
     return out[:MAX_QUOTES]
 
 
-def _check(data, message, past, picked, links):
+def _check(data, message, past, picked, links, limit=MAX_REPLY):
     reply = str(data.get('reply') or '').strip()
-    if not reply or len(reply) > MAX_REPLY or not _same_script(reply, message):
+    if not reply or len(reply) > limit or not _same_script(reply, message):
         return None
     if any(unicodedata.category(ch) == 'So' for ch in reply):
         return None
     used = [picked[n - 1] for n in _numbers(data.get('used'), len(picked))]
     known = ' '.join(title(c) + ' ' + c['text'] for c in used) + ' ' + message + ' ' + _transcript(past)
-    bare = _REF_RE.sub('', reply)
+    bare = _STEP_RE.sub('', _REF_RE.sub('', reply))
     if used and _foreign_numbers(bare, known):
         return None
     if _foreign_links(bare, known):
@@ -480,13 +769,157 @@ def _check(data, message, past, picked, links):
     return {'reply': reply, 'used': used, 'quotes': _quotes(data.get('quotes'), used, reply), 'links': chosen}
 
 
+def _rename(cmp, message):
+    a, b = (_show(v, cmp['scale']) for v in cmp['values'])
+    data = _chat(_FIX_SYSTEM, f'Error message: {message}\n\n' + _NAMES_TASK.format(a=a, b=b))
+    cmp['labels'] = _value_names(data.get('names'), message) or cmp['labels']
+
+
+def _target(cmp, main, message, focus):
+    said, head = set(_flat(message).split()), set(_flat(title(focus)).split())
+    sides = {}
+    for sentence, side in _mentions(cmp, main, said, head):
+        task = _REFERENCE_TASK.format(name=f'«{cmp["labels"][side]}»')
+        data = _chat(_FIX_SYSTEM, f'Error message: {message}\n\nSentence of the note:\n{sentence}\n\n{task}',
+                     think=True)
+        if _yes(data):
+            sides.setdefault(side, sentence)
+    return next(iter(sides.items())) if len(sides) == 1 else (None, '')
+
+
+def _off(para, cmp, message):
+    if _table(para):
+        return False
+    limit = _limit(_chat(_FIX_SYSTEM, f'Error message: {message}\n\nParagraph:\n{para}\n\n{_LIMIT_TASK}'), para)
+    if limit is None:
+        return False
+    op, value = limit
+    if op == 'above':
+        return cmp['diff'] <= value
+    if op == 'below':
+        return cmp['diff'] >= value
+    return not value <= cmp['diff'] <= value * MAX_UNITS
+
+
+def _weigh(cmp, main, message, focus, out):
+    _rename(cmp, message)
+    target, basis = _target(cmp, main, message, focus)
+    plan = _fix_plan(cmp, target)
+    out['calc'] = {'rows': [(label, _show(v, cmp['scale'])) for label, v in zip(cmp['labels'], cmp['values'])],
+                   'diff': _show(cmp['diff'], cmp['scale']), 'target': target, 'plan': plan, 'basis': basis}
+    return (plan if target is not None else _blind_plan(cmp)), [p for p in main if not _off(p, cmp, message)]
+
+
+def _fix_user(message, main, later, plan):
+    text = f'Error message: {message}'
+    if plan:
+        text += f'\nComputed by Holocron, exact, trust these:\n{plan}'
+    text += '\n\nNote:\n' + '\n\n'.join(main)
+    if later:
+        text += '\n\nLater errors, may appear after the fix:\n' + '\n\n'.join(later)
+    return f'{text}\n\n{_FIX_RULES}'
+
+
+def _faults(steps, after, known, note):
+    text = ' '.join(steps + after)
+    out = [] if steps else ['the steps are empty']
+    extra = _amount_set(text) - _amount_set(known) - _SMALL
+    if extra:
+        out.append('numbers that are not in the note: ' + ', '.join(sorted(map(str, extra))))
+    if _foreign_links(text, known):
+        out.append('links that are not in the note')
+    own = _script(_own_words(text, note))
+    if steps and own and own != _script(note):
+        out.append('write in the language of the note')
+    return out
+
+
+def _gaps(steps, after, cmp, later, only):
+    out = ['say what to do if a later error appears'] if later and not after else []
+    if any(not _from_later(a, only) for a in after):
+        out.append('each item of "after" must start with a later error from "Later errors" and give its fix from there')
+    if not cmp:
+        return out
+    found, units = _amount_set(' '.join(steps)), _units(cmp)
+    if cmp['diff'] not in found and not (units and Decimal(units[0]) in found):
+        out.append(f'mention the difference {_show(cmp["diff"], cmp["scale"])}')
+    if found & set(cmp['values']):
+        out.append('do not write the totals anywhere, change items by the difference')
+    text = ' '.join(steps + after).casefold()
+    if any(len(label) >= MIN_LABEL and label.casefold() in text for label in cmp['labels']):
+        out.append('the names from the error message are not field names, use the names from the note')
+    return out
+
+
+def _write(message, main, later, cmp, plan):
+    note = '\n\n'.join(main + later)
+    known, user = f'{note} {message} {plan}', _fix_user(message, main, later, plan)
+    only = _later_only(main, later)
+    for _ in range(2):
+        data = _chat(_FIX_SYSTEM, user)
+        steps = [_STEP_RE.sub('', s) for s in _texts(data.get('steps'))]
+        after = _texts(data.get('after'))
+        faults = _faults(steps, after, known, note)
+        issues = faults + _gaps(steps, after, cmp, later, only)
+        if not issues:
+            break
+        user += (f'\n\nYour previous answer: {json.dumps(data, ensure_ascii=False)}\n'
+                 f'Fix these problems: {"; ".join(issues)}')
+    return steps, [a for a in after if _from_later(a, only)], faults
+
+
+def _fix(message, focus, out, step):
+    step('reading_one')
+    paras = [p for p in _paragraphs(focus['text']) if _readable(p)]
+    main, later = _split_later(paras, message)
+    cmp, plan = _compare(message), ''
+    if cmp:
+        step('checking')
+        plan, main = _weigh(cmp, main, message, focus, out)
+    step('writing')
+    steps, after, faults = _write(message, main, later, cmp, plan)
+    out['links'] = _links(focus)[:MAX_LINKS]
+    if not faults:
+        out.update(reply='\n'.join(f'{n}. {s}' for n, s in enumerate(steps, 1)), after=after, archive=True)
+
+
+def _explain(message, past, focus, out, step):
+    step('reading_one')
+    user, links = _focus_user(message, focus, _paragraphs(focus['text']))
+    for temperature in (0, CHAT_TEMPERATURE):
+        data = _chat(_FOCUS_PROMPT, user, past, temperature)
+        checked = _check(dict(data, used=[1]), message, past, [focus], links, MAX_STEPS)
+        if checked:
+            missing = data.get('found') is False
+            out.update(reply=checked['reply'], quotes=checked['quotes'], links=checked['links'],
+                       archive=not missing, missing=missing)
+            return
+
+
+def _about(message, past, focus, out, step):
+    out['online'] = True
+    try:
+        if _compare(message) or len(_parts(message)) > 1:
+            _fix(message, focus, out, step)
+        else:
+            _explain(message, past, focus, out, step)
+    except KeeperOffline:
+        out['online'] = False
+
+
 def reply(message, past, cases, records=(), focus=None, progress=None):
     step = progress or (lambda _: None)
     records = list(records)
     out = {'reply': '', 'quotes': [], 'sources': [], 'cited': 0, 'archive': False,
-           'lookup': False, 'terms': '', 'online': False}
+            'lookup': False, 'terms': '', 'online': False, 'missing': False, 'after': [], 'calc': None}
 
-    terms, refs, online = [], [], active() is not None
+    online = active() is not None
+    if online and focus is not None:
+        _about(message, past, focus, out, step)
+        if out['online']:
+            return out
+        online = False
+    terms, refs = [], []
     if online:
         try:
             terms, refs = _plan(message, past, records)

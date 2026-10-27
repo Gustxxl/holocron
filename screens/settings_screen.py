@@ -388,6 +388,13 @@ def _keeper_download(conn):
         pause(feedback=None)
 
 
+def _keeper_models(found, current):
+    for i, name in enumerate(found, 1):
+        print(f'{num(i, len(str(len(found))))}{name}' + (dim('  current') if name == current else ''))
+    if found:
+        print()
+
+
 def _keeper_models_screen(slot):
     while True:
         conn = keeper.connection(slot)
@@ -405,6 +412,7 @@ def _keeper_models_screen(slot):
             print('  Open the Ollama app, then press Enter.')
         elif state == 'off':
             print(f'  {conn["url"]} is not responding. Press Enter to check again.')
+        _keeper_models(found, conn['model'])
 
         needs_model = state in ('no_models', 'no_model', 'model_missing')
         can_download = needs_model and keeper.RECOMMENDED not in found

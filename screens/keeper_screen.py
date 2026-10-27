@@ -30,6 +30,16 @@ LINES = {
     'thinking': 'Considering',
     'searching': 'Searching the archive',
     'reading': 'Reading the records',
+    'reading_one': 'Reading the record',
+    'wide': 'Type / to search the whole archive.',
+    'after': 'What may follow',
+    'checking': 'Checking the numbers',
+    'writing': 'Writing the steps',
+    'calc': 'Calculation',
+    'correct': 'correct',
+    'diff': 'difference',
+    'basis': 'Based on:',
+    'unchecked': 'The steps did not check out against the record, so only the calculation is shown.',
     'searched': 'Searched:',
 }
 
@@ -119,6 +129,20 @@ def _short(question):
             'cited': 0, 'archive': False, 'lookup': False, 'terms': '', 'online': False, 'via': None, 'links': []}
 
 
+def _calc(calc):
+    width = max([len(LINES['diff'])] + [len(label) for label, _ in calc['rows']])
+    print(dim(f"  {LINES['calc']}"))
+    for n, (label, value) in enumerate(calc['rows']):
+        mark = dim(f"  ← {LINES['correct']}") if calc['target'] == n else ''
+        print(f'    {label:<{width}}  {value:>14}{mark}')
+    print(f"    {LINES['diff']:<{width}}  {calc['diff']:>14}")
+    print()
+    _say(calc['plan'])
+    if calc['basis']:
+        _aside(f"{LINES['basis']} «{calc['basis']}»")
+    print()
+
+
 def _print_answer(state):
     print()
     kind = state['kind']
@@ -131,12 +155,19 @@ def _print_answer(state):
         print()
         return
 
+    if state.get('calc'):
+        _calc(state['calc'])
     if state['reply']:
         _say(state['reply'])
         if state['quotes']:
             print()
             for ln in state['quotes']:
                 _quote(ln, state['terms'])
+        if state.get('after'):
+            print()
+            print(dim(f"  {LINES['after']}"))
+            for ln in state['after']:
+                _say(ln)
         if state.get('links'):
             print()
             print(dim('  Link' if len(state['links']) == 1 else '  Links'))
@@ -145,6 +176,11 @@ def _print_answer(state):
         if state['lookup'] and not state['archive']:
             print()
             _aside(LINES['outside'])
+        if state.get('missing'):
+            print()
+            _aside(LINES['wide'])
+    elif state.get('calc'):
+        _aside(LINES['unchecked'])
     elif state['online']:
         _say(LINES['similar'] if state['sources'] else LINES['silent'])
     else:
@@ -247,7 +283,11 @@ def keeper_screen(case=None):
         if command == '':
             via, greeting = _redraw(turns, records, case, refresh=True)
             continue
-        if command.isdigit():
+        wide = low == '/' and bool(turns) and turns[-1].get('missing', False)
+        if wide:
+            command = turns[-1]['question']
+            _redraw(turns, records, case, command)
+        elif command.isdigit():
             number = int(command)
             if not 1 <= number <= len(records):
                 continue
@@ -265,8 +305,9 @@ def keeper_screen(case=None):
         if len(command.strip()) < MIN_QUESTION and keeper.active() is None:
             state = _short(command)
         else:
+            print()
             with Spinner(LINES['thinking']) as thinking:
-                state = _ask(command, turns, records, case, thinking)
+                state = _ask(command, turns, records, None if wide else case, thinking)
         if state['kind'] == 'reply' and state['via'] != via:
             note = _switch_note(state['via'])
             if note:
