@@ -143,6 +143,12 @@ def _run(cases, text):
     return results, groups, text, False
 
 
+def _again(cases, query, list_mode):
+    if list_mode:
+        return _all(cases), None
+    return _find(cases, query) if query else ([], None)
+
+
 def _too_short(text):
     return not _parts(text) and text.lower() not in ('l', 'list')
 
@@ -212,8 +218,7 @@ def search_screen(initial_query=None):
             settings_screen()
             archives.load()
             cases = archives.cases()
-            if query:
-                results, groups = _find(cases, query)
+            results, groups = _again(cases, query, list_mode)
             continue
         if low in ('b', 'back'):
             return
@@ -222,8 +227,7 @@ def search_screen(initial_query=None):
                 return
             archives.load(force=True)
             cases = archives.cases()
-            if query:
-                results, groups = _find(cases, query)
+            results, groups = _again(cases, query, list_mode)
             continue
         if low == 'n' and results:
             page += 1

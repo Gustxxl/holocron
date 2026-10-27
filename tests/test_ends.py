@@ -1,4 +1,5 @@
 import unittest
+from contextlib import ExitStack
 from unittest import mock
 
 from screens import events_screen, favorites_screen, search_screen, tasks_screen, tree_screen
@@ -27,6 +28,44 @@ class SearchList(unittest.TestCase):
             search_screen.search_screen('l')
         self.assertEqual(seen, [0, 30, 0, 30, 0])
         pause.assert_not_called()
+
+
+class Refresh(unittest.TestCase):
+    def run_list(self, commands, *patches):
+        seen = []
+        old = [{'text': 'Alpha', 'filepath': '/v/a.md', 'element_id': 'e1'}]
+        new = [{'text': 'Beta', 'filepath': '/v/a.md', 'element_id': 'e1'}]
+        show = lambda results, page, *a, **k: seen.append([c['text'] for _, c in results]) or page
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(search_screen.archives, 'cases', side_effect=[old, new]))
+            load = stack.enter_context(mock.patch.object(search_screen.archives, 'load'))
+            stack.enter_context(mock.patch.object(search_screen.favorites, 'resolve', return_value=[]))
+            stack.enter_context(mock.patch.object(search_screen, 'page_rows', return_value=15))
+            stack.enter_context(mock.patch.object(search_screen, 'show_list', side_effect=show))
+            stack.enter_context(mock.patch.object(search_screen, 'read_command', side_effect=commands))
+            for patch in patches:
+                stack.enter_context(patch)
+            search_screen.search_screen('l')
+        return seen, load
+
+    def test_enter_reloads_list(self):
+        seen, load = self.run_list(['', 'b'])
+        self.assertEqual(seen, [['Alpha'], ['Beta']])
+        load.assert_called_once_with(force=True)
+
+    def test_settings_reload_list(self):
+        seen, load = self.run_list(['s', 'b'], mock.patch('screens.settings_screen.settings_screen'))
+        self.assertEqual(seen, [['Alpha'], ['Beta']])
+        load.assert_called_once_with()
+
+    def test_enter_without_query_leaves(self):
+        with mock.patch.object(search_screen.archives, 'cases', return_value=CASES), \
+             mock.patch.object(search_screen, 'clear_screen'), \
+             mock.patch.object(search_screen, 'show_list') as show, \
+             mock.patch.object(search_screen, 'read_command', side_effect=['']), \
+             mock.patch('builtins.print'):
+            self.assertIsNone(search_screen.search_screen())
+        show.assert_not_called()
 
 
 class Records(unittest.TestCase):
