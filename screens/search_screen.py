@@ -10,7 +10,7 @@ from core.system import copy_text
 from screens.help_screen import render_help
 from ui.interface import (clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line, num,
                           input_block)
-from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, table_cells
+from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, rules, table_cells
 from ui.note import plain, render_note
 from ui.format import plural
 
@@ -611,7 +611,7 @@ def show_case(case, query='', number=None, total=None, trail=()):
         if case.get('filename') or 'lane' in case:
             rendered = render_note(body, width)
         else:
-            rendered = render_tables(_wrap(code_blocks(links(body)), width), width)
+            rendered = rules(render_tables(_wrap(code_blocks(links(body)), width), width), width)
         print()
         print(_marks(highlight_links(paint_code(highlight(rendered, *terms)))))
     print()
@@ -691,7 +691,7 @@ def _rule(text, width):
 
 
 def _nothing(query):
-    return input_block("Nothing found for '", query) + "'."
+    return input_block('Nothing found for "', query) + '".'
 
 
 def _asked(query, width, indent=ASKED_INDENT):

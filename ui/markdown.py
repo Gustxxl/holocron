@@ -12,6 +12,19 @@ _DUP_RE = re.compile(r'(https?://[^\s<>\[\]()|"\']+?)/?(\s*)\1/?(?![^\s<>\[\]()|
 _CODE = '\x05'
 _CODE_BG = '\033[48;5;236m'
 _FENCE_RE = re.compile(r'^\s*(```|~~~)')
+_RULE_RE = re.compile(r'^\s{0,3}([-*_])(?:\s*\1){2,}\s*$')
+
+
+def is_rule(line):
+    return bool(_RULE_RE.match(line))
+
+
+def rule(width):
+    return dim('─' * width)
+
+
+def rules(text, width):
+    return '\n'.join(rule(width) if is_rule(ln) else ln for ln in text.split('\n'))
 
 
 def code_blocks(text):

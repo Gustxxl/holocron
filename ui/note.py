@@ -1,14 +1,13 @@
 import re
 import textwrap
 from ui.interface import bold, dim
-from ui.markdown import code_blocks, is_code, links, render_tables
+from ui.markdown import code_blocks, is_code, is_rule, links, render_tables, rule
 
 _B_ON, _B_OFF = '\x01', '\x02'
 
 _FRONT_RE = re.compile(r'\A---\n.*?\n---[ \t]*(?:\n|\Z)', re.S)
 _COMMENT_RE = re.compile(r'%%.*?%%', re.S)
 _HEADING_RE = re.compile(r'^\s{0,3}#{1,6}\s+(.*?)(?:\s+#+)?\s*$')
-_RULE_RE = re.compile(r'^\s{0,3}([-*_])(?:\s*\1){2,}\s*$')
 _TASK_RE = re.compile(r'^(\s*)[-*+]\s+\[(.)\]\s+(.*)$')
 _BULLET_RE = re.compile(r'^(\s*)[-*+]\s+(.*)$')
 _ORDERED_RE = re.compile(r'^(\s*)(\d+[.)])\s+(.*)$')
@@ -70,8 +69,8 @@ def _task(m, width, n, digits):
 def _line(ln, width):
     if not ln.strip():
         return ''
-    if _RULE_RE.match(ln):
-        return dim('─' * min(width, 40))
+    if is_rule(ln):
+        return rule(width)
     m = _HEADING_RE.match(ln)
     if m:
         return bold(_fill(plain(m.group(1)), width, '', ''))
