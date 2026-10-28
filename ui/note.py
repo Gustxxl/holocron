@@ -1,7 +1,7 @@
 import re
 import textwrap
 from ui.interface import bold, dim
-from ui.markdown import code_blocks, is_code, is_rule, links, render_tables, rule
+from ui.markdown import code_blocks, is_code, is_rule, links, render_tables, rules
 
 _B_ON, _B_OFF = '\x01', '\x02'
 
@@ -70,7 +70,7 @@ def _line(ln, width):
     if not ln.strip():
         return ''
     if is_rule(ln):
-        return rule(width)
+        return ln.strip()
     m = _HEADING_RE.match(ln)
     if m:
         return bold(_fill(plain(m.group(1)), width, '', ''))
@@ -115,5 +115,5 @@ def render_note(text, width):
             out.append(_task(m, width, n, digits))
             continue
         out.append(_line(ln, width))
-    text = re.sub(r'\n{3,}', '\n\n', '\n'.join(out)).strip('\n')
+    text = rules(re.sub(r'\n{3,}', '\n\n', '\n'.join(out)).strip('\n'), width)
     return text.replace(_B_ON, '\033[1m').replace(_B_OFF, '\033[22m')

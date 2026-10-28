@@ -19,12 +19,29 @@ def is_rule(line):
     return bool(_RULE_RE.match(line))
 
 
-def rule(width):
-    return dim('─' * width)
+def _blank(lines, i):
+    return not 0 <= i < len(lines) or not lines[i].strip()
+
+
+def _separator(lines, i):
+    if not _blank(lines, i - 1):
+        return False
+    for ln in lines[i + 1:]:
+        if not ln.strip():
+            return True
+        if ln.strip() == lines[i].strip():
+            return False
+    return True
 
 
 def rules(text, width):
-    return '\n'.join(rule(width) if is_rule(ln) else ln for ln in text.split('\n'))
+    lines = text.split('\n')
+    out = []
+    for i, ln in enumerate(lines):
+        if is_rule(ln):
+            ln = dim('─' * (width if _separator(lines, i) else min(len(ln.strip()), width)))
+        out.append(ln)
+    return '\n'.join(out)
 
 
 def code_blocks(text):
