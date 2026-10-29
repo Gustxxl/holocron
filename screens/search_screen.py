@@ -37,8 +37,29 @@ def _marks(text):
     return _LINK_RE.sub(lambda m: ' ' + dim(f'[{m.group(1)}]'), text)
 
 
+_TRAIL = '.,;:!?\'"»”’>]}'
+
+
+def _url_end(url):
+    url = url.rstrip(_TRAIL)
+    while url.endswith(')') and url.count(')') > url.count('('):
+        url = url[:-1].rstrip(_TRAIL)
+    return url
+
+
+def _links(text, paint):
+    def repl(m):
+        url = _url_end(m.group())
+        return paint(url) + m.group()[len(url):]
+    return _URL_RE.sub(repl, text)
+
+
 def highlight_links(text):
-    return _URL_RE.sub(lambda m: dim(underline(m.group())), text)
+    return _links(text, lambda url: dim(underline(url)))
+
+
+def dim_links(text):
+    return dim(_links(text, underline))
 
 
 def _hl_match(qw, tw):

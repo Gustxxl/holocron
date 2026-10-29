@@ -87,8 +87,12 @@ _REPLY_PROMPT = _MANNER + (
 
 _FOCUS_PROMPT = _MANNER + (
     'The user has one record open and asks about it. Answer only from this record and the conversation, '
-    'in up to five sentences. '
+    'in up to five sentences, not counting code. '
     'Never invent numbers, codes, dates, names or links that are not in the record or the conversation. '
+    'If the user asks for a command, query or script, take it from the record and put it in a code block: '
+    'change only the values the user gives, keep the rest as in the record and follow the order the user asks for. '
+    'The values in the record are only examples: take every value from the user\'s messages in this conversation, '
+    'the latest first, never from the record. '
     'If the record does not cover the question, say so in one short sentence and set "found" to false. '
 ) + _LINKS_RULE + (
     'Return strict JSON: {"reply": "text", "found": true, '
@@ -147,6 +151,7 @@ _MD_LINK_RE = re.compile(r'\[([^\]]*)\]\((https?://[^)\s]+)\)')
 _REF_RE = re.compile(r'\[\d+\]')
 _STEP_RE = re.compile(r'^\s*\d+[.)][ \t]', re.M)
 _FRAME_RE = re.compile(r'-{3,}|\n')
+_CODE_RE = re.compile(r'(```|~~~).*?(?:\1|\Z)', re.S)
 _SENTENCE_RE = re.compile(r'(?<=[.!?])\s+')
 _GAP_RE = re.compile(r'[ \u00a0\u202f]')
 _NUMBER_RE = re.compile(r'\d+(?:[ \u00a0\u202f]\d{3})*(?:[.,]\d+)?')
@@ -747,9 +752,24 @@ def _quotes(values, used, reply):
     return out[:MAX_QUOTES]
 
 
+def _said(message, past):
+    return [m['content'] for m in past or [] if m['role'] == 'user'] + [message]
+
+
+def _foreign_values(reply, said):
+    known = set(_WORD_RE.findall(_norm(' '.join(said))))
+    out = []
+    for block in _CODE_RE.finditer(reply):
+        for w in _WORD_RE.findall(block.group()):
+            if len(w) > 1 and any(ch.isdigit() for ch in w) and _norm(w) not in known and w not in out:
+                out.append(w)
+    return out
+
+
 def _check(data, message, past, picked, links, limit=MAX_REPLY):
     reply = str(data.get('reply') or '').strip()
-    if not reply or len(reply) > limit or not _same_script(reply, message):
+    prose = _CODE_RE.sub('', reply)
+    if not reply or len(reply) > limit or (_script(prose) and not _same_script(prose, message)):
         return None
     if any(unicodedata.category(ch) == 'So' for ch in reply):
         return None
@@ -886,7 +906,8 @@ def _explain(message, past, focus, out, step):
         if checked:
             missing = data.get('found') is False
             out.update(reply=checked['reply'], quotes=checked['quotes'], links=checked['links'],
-                       archive=not missing, missing=missing)
+                       archive=not missing, missing=missing,
+                       foreign=_foreign_values(checked['reply'], _said(message, past)))
             return
 
 
@@ -905,7 +926,8 @@ def reply(message, past, cases, records=(), focus=None, progress=None):
     step = progress or (lambda _: None)
     records = list(records)
     out = {'reply': '', 'quotes': [], 'sources': [], 'cited': 0, 'archive': False,
-            'lookup': False, 'terms': '', 'online': False, 'missing': False, 'after': [], 'calc': None}
+            'lookup': False, 'terms': '', 'online': False, 'missing': False, 'after': [], 'calc': None,
+            'foreign': []}
 
     online = active() is not None
     if online and focus is not None:
@@ -950,7 +972,8 @@ def reply(message, past, cases, records=(), focus=None, progress=None):
         used = [c for c in checked['used'] if c is not focus]
         others = [c for c in rest if all(c is not u for u in used)] if used else []
         out.update(reply=checked['reply'], quotes=checked['quotes'], sources=(used + others)[:RECORDS],
-            cited=len(used), archive=bool(checked['used']), links=checked['links'])
+                   cited=len(used), archive=bool(checked['used']), links=checked['links'],
+                   foreign=_foreign_values(checked['reply'], _said(message, past)))
     else:
         out['sources'] = rest[:RECORDS]
     return out

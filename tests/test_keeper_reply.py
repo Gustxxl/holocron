@@ -296,6 +296,107 @@ class Explain(unittest.TestCase):
         self.assertEqual((out['missing'], out['archive']), (True, False))
 
 
+UNIT = {'text': "Delete a unit\n\nDelete like this:\nDELETE FROM [Alpha$Unit]\nWHERE [Item] = 'A1'",
+        'archive': 'Vault'}
+ASK = 'Удали единицу у товара B2'
+CODE = "```sql\nDELETE FROM [Alpha$Unit]\nWHERE [Item] = 'B2'\n```"
+
+
+class Code(unittest.TestCase):
+    def setUp(self):
+        mock.patch.object(keeper, 'active', return_value=CONN).start()
+        self.chat = mock.patch.object(keeper, '_chat').start()
+        self.addCleanup(mock.patch.stopall)
+
+    def ask(self, *answers):
+        self.chat.side_effect = list(answers)
+        return keeper.reply(ASK, [], [UNIT], [UNIT], UNIT)
+
+    def test_code_only_passes(self):
+        out = self.ask({'reply': CODE})
+        self.assertEqual(out['reply'], CODE)
+        self.assertEqual(self.chat.call_count, 1)
+
+    def test_code_with_text(self):
+        reply = f'Сначала проверь:\n{CODE}'
+        self.assertEqual(self.ask({'reply': reply})['reply'], reply)
+
+    def test_unclosed_fence(self):
+        reply = "Сделай так:\n```\nDELETE FROM [Alpha$Unit]"
+        self.assertEqual(self.ask({'reply': reply})['reply'], reply)
+
+    def test_text_in_other_language_rejected(self):
+        bad = {'reply': f'Check it first:\n{CODE}'}
+        self.assertEqual(self.ask(bad, bad)['reply'], '')
+
+    def test_invented_value_in_code_rejected(self):
+        bad = {'reply': CODE.replace('B2', 'B77')}
+        self.assertEqual(self.ask(bad, bad)['reply'], '')
+
+    def test_prompt_allows_commands(self):
+        self.assertIn('take it from the record and put it in a code block', keeper._FOCUS_PROMPT)
+        self.assertIn('not counting code', keeper._FOCUS_PROMPT)
+        self.assertIn('The values in the record are only examples', keeper._FOCUS_PROMPT)
+
+    def test_value_from_record_flagged(self):
+        out = self.ask({'reply': CODE.replace('B2', 'A1')})
+        self.assertEqual(out['foreign'], ['A1'])
+
+    def test_own_values_not_flagged(self):
+        self.assertEqual(self.ask({'reply': CODE})['foreign'], [])
+
+    def test_past_messages_count(self):
+        past = [{'role': 'user', 'content': 'Удали единицу у товара C3'},
+                {'role': 'assistant', 'content': json.dumps({'reply': 'Готово.'})}]
+        self.chat.side_effect = [{'reply': CODE.replace('B2', 'C3')}]
+        out = keeper.reply('а теперь просто SELECT', past, [UNIT], [UNIT], UNIT)
+        self.assertEqual(out['foreign'], [])
+
+    def test_keeper_reply_does_not_count(self):
+        past = [{'role': 'user', 'content': 'покажи пример'},
+                {'role': 'assistant', 'content': json.dumps({'reply': 'C3'})}]
+        self.chat.side_effect = [{'reply': CODE.replace('B2', 'C3')}]
+        out = keeper.reply('а теперь просто SELECT C', past, [UNIT], [UNIT], UNIT)
+        self.assertEqual(out['foreign'], ['C3'])
+
+    def test_history_reaches_model(self):
+        past = [{'role': 'user', 'content': 'Удали единицу у товара B2'},
+                {'role': 'assistant', 'content': json.dumps({'reply': CODE})}]
+        self.chat.side_effect = [{'reply': CODE.replace('DELETE FROM', 'SELECT * FROM')}]
+        keeper.reply('а теперь просто SELECT', past, [UNIT], [UNIT], UNIT)
+        self.assertEqual(self.chat.call_args.args[2], past)
+
+
+class Foreign(unittest.TestCase):
+    def test_flags_code_values_not_said(self):
+        self.assertEqual(keeper._foreign_values("```\nWHERE a = 'A1' AND b = 'B2'\n```", ['B2']), ['A1'])
+
+    def test_case_and_yo(self):
+        self.assertEqual(keeper._foreign_values('```\nтов1 Ёж2\n```', ['ТОВ1 еж2']), [])
+
+    def test_single_digit_ignored(self):
+        self.assertEqual(keeper._foreign_values('```\nx = 0\n```', []), [])
+
+    def test_once_each(self):
+        self.assertEqual(keeper._foreign_values('```\nA1 A1 B2\n```', []), ['A1', 'B2'])
+
+    def test_prose_ignored(self):
+        self.assertEqual(keeper._foreign_values('Use A1 here', []), [])
+
+    def test_unclosed_fence(self):
+        self.assertEqual(keeper._foreign_values('Run:\n```\nA1', []), ['A1'])
+
+    def test_several_blocks(self):
+        self.assertEqual(keeper._foreign_values('```\nA1\n```\ntext B2\n~~~\nC3\n~~~', []), ['A1', 'C3'])
+
+    def test_value_inside_name(self):
+        self.assertEqual(keeper._foreign_values('```\n[Base_45$Unit]\n```', ['Base_45']), [])
+
+    def test_empty(self):
+        self.assertEqual(keeper._foreign_values('', []), [])
+        self.assertEqual(keeper._foreign_values('```\n```', ['A1']), [])
+
+
 class Values(unittest.TestCase):
     def test_compare(self):
         cmp = keeper._compare(ERROR)

@@ -2,13 +2,13 @@ import contextlib
 import io
 import shutil
 import sys
-import textwrap
 from core import archives, keeper
 from core.commands import HELP_SECTIONS
 from screens.help_screen import render_help
-from screens.search_screen import MIN_QUERY, open_case, first_line, highlight, highlight_links
-from ui.interface import (Spinner, clear_screen, dim, haptic, input_block, input_rows, nav_line, num, pause,
+from screens.search_screen import MIN_QUERY, open_case, first_line, highlight, highlight_links, dim_links
+from ui.interface import (Spinner, clear_screen, dim, fill, haptic, input_block, input_rows, nav_line, num, pause,
                           read_command, wait)
+from ui.markdown import code_blocks, is_code, paint_code
 
 NAV_ROWS = 2
 PROMPT = 'ask> '
@@ -41,6 +41,8 @@ LINES = {
     'diff': 'difference',
     'basis': 'Based on:',
     'unchecked': 'The steps did not check out against the record, so only the calculation is shown.',
+    'foreign': 'Not from your messages:',
+    'verify': 'Check before running.',
     'searched': 'Searched:',
 }
 
@@ -59,23 +61,21 @@ def _width():
 
 def _fill(text):
     return '\n'.join(
-        textwrap.fill(ln, width=_width(), initial_indent='  ', subsequent_indent='  ',
-                      break_long_words=False, break_on_hyphens=False) if ln.strip() else ''
+        ln if is_code(ln) else fill(ln, _width(), '  ') if ln.strip() else ''
         for ln in text.splitlines()
     )
 
 
 def _say(text):
-    print(highlight_links(_fill(text)))
+    print(highlight_links(paint_code(_fill(code_blocks(text)))))
 
 
 def _aside(text):
-    print(dim(_fill(text)))
+    print(dim_links(_fill(text)))
 
 
 def _quote(line, terms):
-    wrapped = textwrap.fill(line, width=_width(), initial_indent='  │ ', subsequent_indent='  │ ',
-                            break_long_words=False, break_on_hyphens=False)
+    wrapped = fill(line, _width(), '  │ ')
     print(highlight_links(highlight(wrapped, terms)))
 
 
@@ -85,7 +85,7 @@ def _source(n, case, digits):
     room = _width() - digits - 7 - len(archive)
     if len(title) > room:
         title = title[:max(room, 10) - 1] + '…'
-    print(f'{num(n, digits)}{title}  ' + dim(f'({archive})'))
+    print(f'{num(n, digits)}{highlight_links(title)}  ' + dim(f'({archive})'))
 
 
 def _switch_note(via):
@@ -160,6 +160,9 @@ def _print_answer(state, gap=True):
         _calc(state['calc'])
     if state['reply']:
         _say(state['reply'])
+        if state.get('foreign'):
+            print()
+            _aside(f"{LINES['foreign']} {', '.join(state['foreign'])}. {LINES['verify']}")
         if state['quotes']:
             print()
             for ln in state['quotes']:
@@ -209,7 +212,7 @@ def _draw(turns, records, focus, pending, conn):
     print(dim('Keeper'))
     print()
     if focus:
-        print(num(1) + dim(first_line(focus)[:_width() - 4]))
+        print(num(1) + dim_links(first_line(focus)[:_width() - 4]))
         print()
     rows = 0
     if conn is None:

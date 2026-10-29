@@ -59,6 +59,16 @@ class Note(unittest.TestCase):
         self.assertIn('Not in this record.', out)
         self.assertIn(screen.LINES['wide'], out)
 
+    def test_foreign_values_shown_under_reply(self):
+        out = self.printed(_state('q', reply='```\nA1\n```', quotes=['Alpha line.'], foreign=['A1', 'B2']))
+        line = f"{screen.LINES['foreign']} A1, B2. {screen.LINES['verify']}"
+        self.assertIn(line, out)
+        self.assertLess(out.index(line), out.index('Alpha line.'))
+
+    def test_no_foreign_line(self):
+        self.assertNotIn(screen.LINES['foreign'], self.printed(_state('q')))
+        self.assertNotIn(screen.LINES['foreign'], self.printed(_state('q', foreign=[])))
+
     def test_hidden_when_found(self):
         self.assertNotIn(screen.LINES['wide'], self.printed(_state('q')))
 

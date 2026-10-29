@@ -5,6 +5,7 @@ import time
 import os
 import re
 import shutil
+import textwrap
 import threading
 import unicodedata
 from colorama.ansitowin32 import StreamWrapper
@@ -188,6 +189,12 @@ def quit_app():
 def screen_rows(text):
     cols = max(shutil.get_terminal_size().columns, 1)
     return max(_cells(visible(text)) - 1, 0) // cols + 1
+
+
+def fill(text, width, indent=''):
+    rows = textwrap.fill(text, width=width, initial_indent=indent, subsequent_indent=indent,
+                         break_long_words=False, break_on_hyphens=False).split('\n')
+    return '\n'.join(row[len(indent):] if _cells(row) > width else row for row in rows)
 
 
 def one_line(text):
