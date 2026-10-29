@@ -40,6 +40,8 @@ class Empty(unittest.TestCase):
     def edit(self, written, case=None, confirm=True):
         case = case or self.case(EMPTY)
         with mock.patch.object(search_screen, 'show_case', return_value=[]), \
+             mock.patch.object(search_screen.archives, 'cases', return_value=self.cases), \
+             mock.patch.object(search_screen, 'trash_note', side_effect=lambda fp: Path(fp).unlink()), \
              mock.patch.object(search_screen, 'read_command', side_effect=['e', 'b']), \
              mock.patch.object(search_screen, '_refresh', side_effect=lambda results, *a, **k: results), \
              mock.patch.object(search_screen, 'haptic'), \
@@ -72,26 +74,26 @@ class Empty(unittest.TestCase):
         error.assert_not_called()
         self.assertEqual(read_note(self.vault / f'{EMPTY}.md'), 'filled')
 
-    def test_close_editor_untouched(self):
-        error, ask = self.edit('\n')
+    def test_untouched_empty_note_offers_trash(self):
+        error, ask = self.edit('\n', confirm=False)
         error.assert_not_called()
-        ask.assert_not_called()
+        ask.assert_called_once_with('Move the note to the trash? Linked from 1 record, those links will break.')
         self.assertEqual((self.vault / f'{EMPTY}.md').read_text(encoding='utf-8'), '')
 
     def test_clear_asks(self):
         _, ask = self.edit('', self.case('linker'), confirm=False)
-        ask.assert_called_once()
+        ask.assert_called_once_with('Move the note to the trash?')
         self.assertEqual(read_note(self.vault / 'linker.md'), LINK)
 
-    def test_clear_confirmed(self):
+    def test_clear_moves_to_trash(self):
         self.edit('', self.case('linker'))
-        self.assertEqual(read_note(self.vault / 'linker.md'), '')
-        self.assertIn('linker', {c['filename'] for c in self.load()})
+        self.assertFalse((self.vault / 'linker.md').exists())
+        self.assertNotIn('linker', {c['filename'] for c in self.load()})
 
-    def test_clear_backed_up(self):
+    def test_clear_leaves_nothing_behind(self):
         self.edit('', self.case('linker'))
-        texts = [f.read_text(encoding='utf-8') for f in self.backups.iterdir()]
-        self.assertEqual(texts, [LINK])
+        self.assertEqual(list(self.backups.iterdir()), [])
+        self.assertEqual(sorted(p.name for p in self.vault.iterdir()), sorted([f'{EMPTY}.md', 'blank.md']))
 
     def test_normal_edit_not_asked(self):
         error, ask = self.edit(f'{LINK} again', self.case('linker'))

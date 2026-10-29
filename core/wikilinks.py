@@ -1,7 +1,9 @@
 import re
 from pathlib import PurePath
 
-_RE = re.compile(r'(?<!!)\[\[([^\]|\\]+)(?:\\?\|([^\]]+))?\]\]')
+_LINK = r'\[\[([^\]|\\]+)(?:\\?\|([^\]]+))?\]\]'
+_RE = re.compile(r'(?<!!)' + _LINK)
+_ANY_RE = re.compile(_LINK)
 _SUFFIXES = ('.excalidraw.md', '.excalidraw', '.md')
 
 
@@ -94,3 +96,18 @@ def numbered(text, cases, mark, here=None):
         return mark(shown, order[key])
 
     return _RE.sub(repl, text), found
+
+
+def linked(filepath, cases):
+    files, paths, names = index(cases)
+    sources = set()
+    for case in cases:
+        fp = case.get('filepath')
+        if not fp or fp == filepath or fp in sources:
+            continue
+        for m in _ANY_RE.finditer(case.get('raw', case.get('text', ''))):
+            hit = resolve(m.group(1).strip(), files, paths, names)
+            if hit and hit[0]['filepath'] == filepath:
+                sources.add(fp)
+                break
+    return len(sources)

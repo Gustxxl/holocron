@@ -92,6 +92,15 @@ def _line(ln, width):
     return _fill(_inline(ln.strip()), width, indent, indent)
 
 
+def drop_title(text, name):
+    from core.archives.vault import note_name
+    lines = _FRONT_RE.sub('', text.replace('\r\n', '\n')).split('\n')
+    i = next((i for i, ln in enumerate(lines) if ln.strip()), None)
+    if i is None or note_name(lines[i]).casefold() != name.casefold():
+        return text
+    return '\n'.join(lines[:i] + lines[i + 1:]).strip('\n')
+
+
 def render_note(text, width):
     text = code_blocks(_COMMENT_RE.sub('', _FRONT_RE.sub('', text.replace('\r\n', '\n'))))
     lines = text.splitlines()

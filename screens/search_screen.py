@@ -3,7 +3,7 @@ import shutil
 import textwrap
 from pathlib import Path
 from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks, keeper, kanban
-from core.archives.vault import Vault, save_note, create_note, read_note
+from core.archives.vault import Vault, save_note, create_note, read_note, renamed, rename_note, trash_note
 from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path, page_rows, search_separator
 from core.system import copy_text
@@ -11,7 +11,7 @@ from screens.help_screen import render_help
 from ui.interface import (clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line, num,
                           input_block)
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, rules, table_cells
-from ui.note import plain, render_note
+from ui.note import drop_title, plain, render_note
 from ui.format import plural
 
 
@@ -272,6 +272,10 @@ def search_screen(initial_query=None):
             continue
         if command.isdigit() and results:
             new_query = open_case(results, int(command), query)
+            if not new_query and any(_deleted(c) for _, c in results):
+                archives.load(force=True)
+                cases = archives.cases()
+                results, groups = _again(cases, query, list_mode)
             if new_query:
                 if new_query != 'l':
                     back = None
@@ -347,6 +351,48 @@ def _save(case, text):
     case['text'] = text
     if 'raw' in case:
         case['raw'], case['text'] = text, excalidraw.strip_emoji(text).strip()
+
+
+def _deleted(case):
+    return bool(case.get('filename')) and not Path(case['filepath']).exists()
+
+
+def _delete(case):
+    count = wikilinks.linked(case['filepath'], archives.cases())
+    linked = f' Linked from {plural(count, "record")}, those links will break.' if count else ''
+    if not _confirm(f'Move the note to the trash?{linked}'):
+        return False
+    try:
+        trash_note(case['filepath'])
+    except Exception as e:
+        error(f'Could not delete: {e}')
+        return False
+    if favorites.is_pinned(case):
+        favorites.toggle(case)
+    haptic('success')
+    return True
+
+
+def _follow(case, old, text):
+    if case.get('archive') != Vault.name or 'lane' in case or not case.get('filename'):
+        return None
+    fp = case['filepath']
+    base = renamed(fp, old, text)
+    if not base:
+        return None
+    count = wikilinks.linked(fp, archives.cases())
+    if count:
+        return f'Name kept, linked from {plural(count, "record")}.'
+    try:
+        new = rename_note(fp, base)
+    except OSError:
+        return 'Name kept: could not rename the file.'
+    if not new:
+        return 'Name kept: no free name for it.'
+    stem = Path(new).stem
+    favorites.move(case, new, stem)
+    case.update(filepath=new, element_id=stem, filename=stem, source=Path(new).name)
+    return None
 
 
 def _move(case):
@@ -427,19 +473,29 @@ def open_case(results, number, query, rerun=True, trail=()):
                 error('Could not open the editor')
                 continue
             edited = edited.strip()
-            if edited == source.strip():
+            if edited == source.strip() and (edited or not case.get('filename')):
                 continue
             if not edited and not case.get('filename'):
                 error('Empty text — edit cancelled')
                 continue
-            if not edited and not _confirm('Clear the note?'):
+            if not edited:
+                if _delete(case):
+                    results = [(s, c) for s, c in _refresh(results, query, False, force=True) if not _deleted(c)]
+                    if not results:
+                        return None
+                    number = min(number, len(results))
                 continue
             try:
                 _save(case, edited)
-                haptic('success')
             except Exception as e:
                 kept = ' — your text is copied' if copy_text(edited) else ''
                 error(f'Could not save: {e}{kept}')
+            else:
+                haptic('success')
+                note = _follow(case, source, edited)
+                if note:
+                    print(dim(f'  {note}'))
+                    pause(feedback=None)
             results = _refresh(results, query, False)
             continue
 
@@ -616,7 +672,7 @@ def show_case(case, query='', number=None, total=None, trail=()):
     lines = text.splitlines()
     first = next((ln.strip() for ln in lines if ln.strip()), '')
     if case.get('filename'):
-        title, body, name = case['filename'], text, ''
+        title, body, name = case['filename'], drop_title(text, case['filename']), ''
     elif first.startswith('|'):
         title, body = name, text
     else:

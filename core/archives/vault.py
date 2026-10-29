@@ -4,6 +4,8 @@ from core.settings import vault_path, new_cases_path, vault_exclude
 from .base import Archive
 from core import backups, kanban
 from core.excalidraw import strip_emoji
+from send2trash import send2trash
+
 
 NAME_MAX = 80
 _UNSAFE = re.compile(r'[\\/:*?"<>|#^\[\]]')
@@ -25,6 +27,27 @@ def note_name(text):
     if name.upper() in _RESERVED:
         name += '_'
     return name or 'Untitled'
+
+
+def renamed(filepath, old, text):
+    stem, before, after = Path(filepath).stem, note_name(old), note_name(text)
+    if not text.strip() or after == before or not re.fullmatch(rf'{re.escape(before)}( \d+)?', stem):
+        return None
+    return after
+
+
+def trash_note(filepath):
+    send2trash(filepath)
+
+
+def rename_note(filepath, base):
+    old = Path(filepath)
+    for n in range(1, 1000):
+        new = old.with_name(f'{base}.md' if n == 1 else f'{base} {n}.md')
+        if not new.exists() or new.samefile(old):
+            old.rename(new)
+            return str(new)
+    return None
 
 
 def create_note(folder, text):

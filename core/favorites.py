@@ -32,3 +32,13 @@ def toggle(case):
 def resolve(cases):
     index = {tuple(_key(c)): c for c in cases}
     return [index[tuple(k)] for k in _load() if tuple(k) in index]
+
+
+def move(case, filepath, element_id):
+    keys, key = _load(), _key(case)
+    if key not in keys:
+        return
+    keys[keys.index(key)] = [filepath, element_id]
+    cfg = config.load()
+    cfg['favorites'] = keys
+    config.save(cfg)
