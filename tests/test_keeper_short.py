@@ -1,6 +1,8 @@
 import unittest
 from unittest import mock
+import io
 
+from ui.interface import dim, num
 from screens import keeper_screen, search_screen
 
 CONN = {'slot': 'local'}
@@ -54,3 +56,21 @@ class Short(unittest.TestCase):
         self.assertEqual(keeper_screen.LINES['short'], f'Type at least {search_screen.MIN_QUERY} characters.')
         with mock.patch.object(keeper_screen, 'MIN_QUERY', 5):
             self.run_screen('abcd')[0].assert_not_called()
+
+
+class Header(unittest.TestCase):
+    def draw(self, focus):
+        out = io.StringIO()
+        with mock.patch.object(keeper_screen, '_width', return_value=200), \
+             mock.patch.object(keeper_screen, '_nav'), \
+             mock.patch.object(keeper_screen.keeper, 'has_server', return_value=False), \
+             mock.patch('sys.stdout', out):
+            keeper_screen._draw([], [], focus, None, CONN)
+        return out.getvalue()
+
+    def test_blank_line_under_title_with_record(self):
+        out = self.draw({'text': 'Alpha record'})
+        self.assertTrue(out.startswith(f"{dim('Keeper')}\n\n{num(1)}{dim('Alpha record')}\n\n"))
+
+    def test_blank_line_under_title_without_record(self):
+        self.assertTrue(self.draw(None).startswith(f"{dim('Keeper')}\n\n  Awaiting"))

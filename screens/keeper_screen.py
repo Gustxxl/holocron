@@ -207,9 +207,10 @@ def _print_answer(state, gap=True):
 
 def _draw(turns, records, focus, pending, conn):
     print(dim('Keeper'))
+    print()
     if focus:
         print(num(1) + dim(first_line(focus)[:_width() - 4]))
-    print()
+        print()
     rows = 0
     if conn is None:
         _say(LINES['not_connected'])
