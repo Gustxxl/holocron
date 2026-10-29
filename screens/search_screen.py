@@ -177,7 +177,7 @@ def search_screen(initial_query=None):
         pause()
         return
     query = (initial_query or '').strip()
-    results, groups, list_mode, page = [], None, False, 0
+    results, groups, list_mode, page, back = [], None, False, 0, None
     exact, exact_for = None, None
     if query and _too_short(query):
         clear_screen()
@@ -223,7 +223,13 @@ def search_screen(initial_query=None):
             results, groups = _again(cases, query, list_mode)
             continue
         if low in ('b', 'back'):
-            return
+            if not back:
+                return
+            (query, page), back, list_mode = back, None, False
+            archives.load()
+            cases = archives.cases()
+            results, groups = _again(cases, query, False)
+            continue
         if command == '':
             if not results:
                 return
@@ -246,6 +252,10 @@ def search_screen(initial_query=None):
         if command.isdigit() and results:
             new_query = open_case(results, int(command), query)
             if new_query:
+                if new_query != 'l':
+                    back = None
+                elif not list_mode:
+                    back = query, page
                 archives.load()
                 cases = archives.cases()
                 results, groups, query, list_mode = _run(cases, new_query)
@@ -259,7 +269,7 @@ def search_screen(initial_query=None):
         archives.load()
         cases = archives.cases()
         results, groups, query, list_mode = _run(cases, command)
-        page = 0
+        page, back = 0, None
 
 
 def create_case():
