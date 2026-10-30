@@ -354,10 +354,22 @@ _KEEPER_STATUS = {
 _KEEPER_NAMES = {'server': 'Server', 'local': 'This computer'}
 
 
-def _keeper_install_hint():
-    if system.OS == 'Linux':
-        return 'Install: curl -fsSL https://ollama.com/install.sh | sh'
-    return 'Download: https://ollama.com/download'
+_OLLAMA_DOCS = {
+    'Darwin': 'https://docs.ollama.com/macos',
+    'Windows': 'https://docs.ollama.com/windows',
+    'Linux': 'https://docs.ollama.com/linux',
+}
+_OLLAMA_FAQ = 'https://docs.ollama.com/faq'
+_OLLAMA_GPU = 'https://docs.ollama.com/gpu'
+
+
+def _ollama_docs():
+    return _OLLAMA_DOCS.get(system.OS, 'https://ollama.com/download')
+
+
+def _keeper_rows(rows):
+    states = keeper.statuses(rows)
+    return [(s, keeper.placement(c) if s[0] == 'ready' else None) for c, s in zip(rows, states)]
 
 
 def _keeper_download(conn):
@@ -390,7 +402,10 @@ def _keeper_download(conn):
 
 def _keeper_models(found, current):
     for i, name in enumerate(found, 1):
-        print(f'{num(i, len(str(len(found))))}{name}' + (dim('  current') if name == current else ''))
+        marks = [m for m, on in (('tested', name == keeper.RECOMMENDED), ('current', name == current)) if on]
+        print(f'{num(i, len(str(len(found))))}{name}' + (dim('  ' + ' · '.join(marks)) if marks else ''))
+    if any(name != keeper.RECOMMENDED for name in found):
+        print(dim(f'  Keeper is tested on {keeper.RECOMMENDED}. Larger models often answer better, smaller ones worse.'))
     if found:
         print()
 
@@ -406,12 +421,18 @@ def _keeper_models_screen(slot):
         state, found = wait('Checking models', keeper.status, conn)
         if state == 'missing':
             print('  Keeper runs on Ollama, a free app for AI models on this computer.')
-            print('  ' + _keeper_install_hint())
+            print(f'  Install it: {_ollama_docs()}')
             print('  Then open it and press Enter.')
+            print()
         elif state == 'stopped':
-            print('  Open the Ollama app, then press Enter.')
+            print('  Ollama is installed but not running. Start it, then press Enter.')
+            print(dim(f'  How to start it: {_ollama_docs()}'))
+            print()
         elif state == 'off':
             print(f'  {conn["url"]} is not responding. Press Enter to check again.')
+            print(dim('  Ollama on another computer must be open to the network.'))
+            print(dim(f'  {_OLLAMA_FAQ}'))
+            print()
         _keeper_models(found, conn['model'])
 
         needs_model = state in ('no_models', 'no_model', 'model_missing')
@@ -442,14 +463,19 @@ def keeper_screen():
         clear_screen()
         print(dim('Settings > Archive > Keeper'))
         print()
-        states = wait('Checking Keeper', keeper.statuses, rows)
-        for i, (conn, (state, _)) in enumerate(zip(rows, states), 1):
+        states = wait('Checking Keeper', _keeper_rows, rows)
+        for i, (conn, ((state, _), where)) in enumerate(zip(rows, states), 1):
             name = _KEEPER_NAMES[conn['slot']]
             model = conn['model'] or '—'
-            print(f'{num(i)}{name:<14} {model:<20} {dim(_KEEPER_STATUS[state])}')
+            shown = f'{_KEEPER_STATUS[state]} · {where}' if where else _KEEPER_STATUS[state]
+            print(f'{num(i)}{name:<14} {model:<20} {dim(shown)}')
             if conn['slot'] == 'server':
                 print(dim(f'    {conn["url"].split("://", 1)[-1]}'))
         print()
+        if any(where == 'CPU' for _, where in states):
+            print(dim('  The model runs on the CPU, so replies are slow.'))
+            print(dim(f'  GPU support: {_OLLAMA_GPU}'))
+            print()
         if has_server:
             print(dim('  Keeper uses the server when it is on, otherwise this computer.'))
             print()

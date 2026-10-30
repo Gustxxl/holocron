@@ -273,6 +273,18 @@ def current_slot():
     return conn['slot'] if conn else None
 
 
+def placement(conn):
+    try:
+        data = _get_json(conn, '/api/ps', timeout=PROBE_TIMEOUT)
+        model = next((m for m in data.get('models', []) if conn['model'] in (m.get('name'), m.get('model'))), None)
+        size, vram = int(model['size']), int(model.get('size_vram') or 0)
+    except (urllib.error.URLError, OSError, ValueError, AttributeError, TypeError, KeyError):
+        return None
+    if size <= 0:
+        return None
+    return 'GPU' if vram >= size else 'CPU' if vram <= 0 else 'GPU + CPU'
+
+
 def pull(conn, name, progress):
     try:
         with _open(conn, '/api/pull', {'model': name, 'name': name, 'stream': True}, 600) as resp:
