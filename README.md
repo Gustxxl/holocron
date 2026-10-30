@@ -50,7 +50,7 @@ Point Holocron to an Obsidian vault and every Markdown note becomes searchable n
 
 - `[[Wikilinks]]` in a note get numbers. Type `j 2` to jump to the second one and `b` to come back.
 - Checkboxes like `- [ ]` can be ticked with `x 3` without leaving the note.
-- `note` opens your editor and saves a new note to the folder you chose. The first line becomes the file name.
+- `note` opens your editor and saves a new note to the folder you chose. The first line becomes the file name, and the name follows it when you change the first line later. If other records link to the note, the name stays, so no link breaks. Clear a note's text in the editor to move it to the trash. Holocron asks first and warns if other records link to it.
 - `tree` browses the archive by folder and opens kanban boards list by list.
 - `f` pins the open record to favorites, or the board you're browsing in `tree`.
 
@@ -67,7 +67,7 @@ Boards made with the Kanban plugin for Obsidian are read as boards, not as plain
 
 Keeper is a local assistant for your archive. Ask in your own words, in any language, and it answers from your records: it refers to them by number, shows the exact lines it relied on and lists the links from those records (an instruction, a ticket, a doc). It keeps track of the conversation, so "what about the second one?" works.
 
-Press `k` on an open record to ask about that record only. Paste an error there and Keeper gives the steps from the record. If the error compares two amounts, Holocron works out the difference itself and shows the calculation above the steps, so the numbers don't depend on the model. Errors the record says can come up after the fix are listed under What may follow. If the record doesn't cover your question, type `/` to ask the whole archive.
+Press `k` on an open record to ask about that record only. Paste an error there and Keeper gives the steps from the record. If the error compares two amounts, Holocron works out the difference itself and shows the calculation above the steps, so the numbers don't depend on the model. Errors the record says can come up after the fix are listed under What may follow. Ask for a command or a query from the record with your own values, and Keeper copies it from the record with only those values changed. Codes and numbers in it that you didn't type are listed under it, so you know what to check before running it. The model can still get a command wrong, so read it before you run it. If the record doesn't cover your question, type `/` to ask the whole archive.
 
 Keeper runs on [Ollama](https://ollama.com/download). Settings show what's missing, and if you don't have a model yet, they can download the recommended `qwen2.5:7b` for you. You can also add the address of another machine running Ollama. Keeper uses that server when it's reachable and switches to your own computer when it's not.
 
@@ -154,6 +154,7 @@ If downloads from GitHub are slow or blocked on your network, the update archive
 - `check` runs the built-in tests and shows what's connected: editor, clipboard, reminders, calendar, Keeper and the size of your archive.
 - `s` > Lists sets how many rows `l`, `tree` and boards show per page: from 5 to 99, 15 by default.
 - Text pasted into search or Keeper keeps its line breaks, so an error window looks the same as where you copied it from.
+- A line of `---`, `***` or `___` after a blank line is drawn across the whole window, as in Obsidian. Lines like that right under text, or the matching lines around a pasted error window, keep their own length.
 - On a MacBook, the trackpad gives a light tap when you toggle something and a different pattern for success or error.
 - `hyperspace`. Try it. Any key brings you back.
 
