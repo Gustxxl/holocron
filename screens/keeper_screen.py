@@ -236,13 +236,17 @@ def _draw(turns, records, focus, pending, conn):
     return rows
 
 
-def _redraw(turns, records, focus, pending=None, refresh=False):
+def _wake(refresh=False):
     if (refresh or not keeper.cached()) and keeper.configured():
         clear_screen()
         print(dim('Keeper'))
         print()
         wait(LINES['connecting'], keeper.active, True)
-    conn = keeper.active()
+    return keeper.active()
+
+
+def _redraw(turns, records, focus, pending=None, refresh=False):
+    conn = _wake(refresh)
     frame = io.StringIO()
     with contextlib.redirect_stdout(frame):
         rows = _draw(turns, records, focus, pending, conn)
@@ -260,6 +264,11 @@ def _terms_for(turns, number):
 
 
 def keeper_screen(case=None):
+    if _wake() is None:
+        from screens.settings_screen import keeper_screen as keeper_settings
+        keeper_settings()
+        if _wake(True) is None:
+            return
     session = {'turns': [], 'records': [case]} if case else _SESSION
     turns, records = session['turns'], session['records']
     via, greeting = _redraw(turns, records, case)

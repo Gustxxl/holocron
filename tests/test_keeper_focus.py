@@ -20,6 +20,7 @@ def _state(question, **extra):
 class Wide(unittest.TestCase):
     def run_screen(self, commands, answers):
         with mock.patch.object(screen, '_redraw', return_value=('local', 0)), \
+             mock.patch.object(screen, '_wake', return_value={'slot': 'local'}), \
              mock.patch.object(screen, '_drop_nav'), \
              mock.patch.object(screen, '_print_answer'), \
              mock.patch.object(screen, '_nav'), \
@@ -114,6 +115,7 @@ class Gap(unittest.TestCase):
     def lines(self, state):
         out = io.StringIO()
         with mock.patch.object(screen, '_redraw', return_value=('local', 0)), \
+             mock.patch.object(screen, '_wake', return_value={'slot': 'local'}), \
              mock.patch.object(screen, '_drop_nav'), \
              mock.patch.object(screen, '_nav'), \
              mock.patch.object(screen, 'haptic'), \
@@ -140,6 +142,7 @@ class Gap(unittest.TestCase):
         with mock.patch.object(screen.keeper, 'active', return_value=None):
             out = io.StringIO()
             with mock.patch.object(screen, '_redraw', return_value=(None, 0)), \
+                 mock.patch.object(screen, '_wake', return_value={'slot': 'local'}), \
                  mock.patch.object(screen, '_drop_nav'), mock.patch.object(screen, '_nav'), \
                  mock.patch.object(screen, 'haptic'), \
                  mock.patch.object(screen, 'read_command', side_effect=['ab', 'b']), \

@@ -223,10 +223,19 @@ class Other(Screen):
                          {**DIAG_PATCHES, 'core.diagnostics.run': report})
         self.assertIn('NameError', text)
 
-    def test_keeper_offline(self):
-        text = self.open(keeper_screen, keeper_screen.keeper_screen, ['b'], {
-            'core.keeper.configured': False, 'core.keeper.cached': True, 'core.keeper.active': None})
-        self.assertIn('No model connected', text)
+    def test_keeper_offline_opens_settings(self):
+        with patch.object(settings_screen, 'keeper_screen') as settings:
+            self.open(keeper_screen, keeper_screen.keeper_screen, [], {
+                'core.keeper.configured': False, 'core.keeper.cached': True, 'core.keeper.active': None})
+        settings.assert_called_once()
+
+    def test_keeper_opens_after_settings(self):
+        conn = {'slot': 'local'}
+        with patch.object(settings_screen, 'keeper_screen') as settings, \
+                patch.object(keeper_screen, '_wake', side_effect=[None, conn, conn]):
+            text = self.open(keeper_screen, keeper_screen.keeper_screen, ['b'], {'core.keeper.has_server': False})
+        settings.assert_called_once()
+        self.assertIn(keeper_screen.LINES['ready'], visible(text))
 
     def test_favorites_empty(self):
         text = self.open(favorites_screen, favorites_screen.favorites_screen, [],

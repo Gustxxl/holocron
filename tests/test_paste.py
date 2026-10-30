@@ -153,6 +153,8 @@ class Screens(unittest.TestCase):
 
     def test_keeper_reads_lines(self):
         with mock.patch.object(keeper_screen, '_redraw', return_value=('local', 0)), \
+             mock.patch.object(keeper_screen, '_wake', return_value={'slot': 'local'}), \
+             mock.patch.object(keeper_screen.keeper, 'active', return_value={'slot': 'local'}), \
              mock.patch.object(keeper_screen, 'read_command', side_effect=['b']) as read:
             keeper_screen.keeper_screen()
         read.assert_called_once_with('ask> ', lines=True)

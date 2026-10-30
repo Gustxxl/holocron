@@ -17,6 +17,7 @@ class Short(unittest.TestCase):
         state = dict(keeper_screen._short(command), kind='reply', via='local')
         with mock.patch.object(keeper_screen, '_SESSION', {'turns': [], 'records': []}), \
              mock.patch.object(keeper_screen, '_redraw', return_value=('local', 0)), \
+             mock.patch.object(keeper_screen, '_wake', return_value=CONN), \
              mock.patch.object(keeper_screen, '_drop_nav'), mock.patch.object(keeper_screen, '_nav'), \
              mock.patch.object(keeper_screen, '_width', return_value=200), \
              mock.patch.object(keeper_screen, 'Spinner'), \
