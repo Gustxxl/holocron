@@ -29,8 +29,8 @@ from core.settings import (
 
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
-from ui.interface import (clear_line, clear_screen, dim, error, is_back, nav_line, num, pause, progress, read_command,
-                          red, show_menu, wait)
+from ui.interface import (clear_line, clear_screen, dim, error, haptic, is_back, nav_line, num, pause, progress,
+                          read_command, red, show_menu, wait)
 from pathlib import Path
 from ui.clean_path import clean_input_path
 from core import system
@@ -118,9 +118,11 @@ def user_screen():
             return
         if command == 'c':
             update_operator_name('')
+            haptic('toggle')
             continue
         if command:
             update_operator_name(command)
+            haptic('toggle')
 
 
 
@@ -144,10 +146,12 @@ def home_screen():
             return
         if command == 'd':
             update_home_order([])
+            haptic('toggle')
             continue
         new = reorder(shown, command)
         if new:
             update_home_order([*new, *(b for b in order if b not in new)])
+            haptic('toggle')
         elif command:
             error(f'Type block numbers, e.g. {len(shown)}1')
 
@@ -167,8 +171,10 @@ def rows_screen():
             return
         if command == 'd':
             update_page_rows(PAGE_ROWS)
+            haptic('toggle')
         elif command.isascii() and command.isdigit() and PAGE_MIN <= int(command) <= PAGE_MAX:
             update_page_rows(int(command))
+            haptic('toggle')
         elif command:
             error(f'Type a number from {PAGE_MIN} to {PAGE_MAX}')
 
@@ -201,7 +207,7 @@ def excalidraw_obsidian_screen():
             continue
         update_archive_path(cleaned)
         archives.load()
-        pause()
+        pause(feedback='success')
         return
 
 
@@ -220,7 +226,7 @@ def excalidraw_plain_screen():
         if command == 'c':
             update_excalidraw_path('')
             archives.load()
-            pause()
+            pause(feedback='success')
             return
         cp = Path(clean_input_path(command))
         if not (cp.is_dir() or (cp.is_file() and cp.suffix == '.excalidraw')):
@@ -228,7 +234,7 @@ def excalidraw_plain_screen():
             continue
         update_excalidraw_path(str(cp))
         archives.load()
-        pause()
+        pause(feedback='success')
         return
 
 
@@ -253,7 +259,7 @@ def _folder_screen(title, current, update, hint):
                 continue
             update(cleaned)
         archives.load()
-        pause()
+        pause(feedback='success')
         return
 
 
@@ -285,6 +291,7 @@ def vault_screen():
             name = rows[int(command) - 1][0]
             update_vault_exclude([p for p in skip if p != name] if name in skip else [*skip, name])
             archives.load()
+            haptic('toggle')
             continue
         if command == 'a' and current:
             raw = read_command('folder> ')
@@ -297,6 +304,7 @@ def vault_screen():
             if rel not in skip:
                 update_vault_exclude([*skip, rel])
                 archives.load()
+                haptic('toggle')
             continue
         if command == 'c':
             update_vault_path('')
@@ -307,7 +315,7 @@ def vault_screen():
                 continue
             update_vault_path(cleaned)
         archives.load()
-        pause()
+        pause(feedback='success')
         return
 
 
@@ -334,10 +342,13 @@ def separator_screen():
             return
         if command == 'd':
             update_search_separator(SEARCH_SEPARATOR)
+            haptic('toggle')
         elif command == 'c':
             update_search_separator('')
+            haptic('toggle')
         elif command and not any(ch.isalnum() or ch.isspace() for ch in command):
             update_search_separator(command)
+            haptic('toggle')
         elif command:
             error('Use symbols only, like ; or |')
 
@@ -402,7 +413,7 @@ def _keeper_download(conn):
         update_keeper_model(conn['slot'], keeper.RECOMMENDED)
         clear_line()
         print('Done.')
-        pause()
+        pause(feedback='success')
     except keeper.KeeperOffline as e:
         clear_line()
         print(f'Download failed: {e}')
@@ -410,7 +421,7 @@ def _keeper_download(conn):
     except KeyboardInterrupt:
         clear_line()
         print('Cancelled.')
-        pause(feedback=None)
+        pause()
 
 
 def _keeper_models(found, current):
@@ -476,6 +487,7 @@ def _keeper_models_screen(slot):
         elif found and command.isascii() and command.isdigit() and 1 <= int(command) <= len(found):
             update_keeper_model(slot, found[int(command) - 1])
             keeper.reset()
+            haptic('toggle')
             return
 
 
@@ -549,6 +561,7 @@ def _keeper_setup():
                 return True
         elif found and command.isascii() and command.isdigit() and 1 <= int(command) <= len(found):
             update_keeper_model('local', found[int(command) - 1])
+            haptic('toggle')
 
 
 def _server_screen():
@@ -589,6 +602,7 @@ def _server_screen():
         if low == 'c':
             if conn:
                 update_keeper_server('')
+                haptic('toggle')
         elif low == 'm':
             if conn:
                 _keeper_models_screen('server')
@@ -597,6 +611,8 @@ def _server_screen():
                 update_keeper_server(command)
             except ValueError:
                 error('Type an address like server-ip:11434')
+            else:
+                haptic('toggle')
 
 
 def keeper_screen():

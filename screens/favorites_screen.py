@@ -20,7 +20,7 @@ def favorites_screen():
             clear_screen()
             print('No favorites yet.')
             print(dim('Open a record and press f to pin it.'))
-            pause(feedback=None)
+            pause()
             return
         if len(results) == 1:
             _open(results, 1)

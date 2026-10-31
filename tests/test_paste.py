@@ -207,7 +207,7 @@ class Screens(unittest.TestCase):
              mock.patch.object(search_screen, '_too_short', return_value=False), \
              mock.patch.object(search_screen, '_run', return_value=([], None, 'Gamma\nDelta', False)), \
              mock.patch.object(search_screen, '_suggest', return_value=[]), \
-             mock.patch.object(search_screen, 'clear_screen'), mock.patch.object(search_screen, 'error_haptic'), \
+             mock.patch.object(search_screen, 'clear_screen'), mock.patch.object(search_screen, 'haptic'), \
              mock.patch.object(search_screen, 'read_command', side_effect=['b']), \
              mock.patch('builtins.print') as printed:
             search_screen.search_screen('Gamma\nDelta')

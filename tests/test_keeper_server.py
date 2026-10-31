@@ -91,6 +91,7 @@ class Server(unittest.TestCase):
              mock.patch.object(screen.keeper, 'status', return_value=(state, [])), \
              mock.patch.object(screen, 'wait', side_effect=lambda label, fn, *a: fn(*a)), \
              mock.patch.object(screen, 'clear_screen'), \
+             mock.patch.object(screen, 'haptic'), \
              mock.patch.object(screen, '_keeper_models_screen') as models, \
              mock.patch.object(screen, 'update_keeper_server', side_effect=update) as store, \
              mock.patch.object(screen, 'error') as error, \
@@ -174,6 +175,7 @@ class Main(unittest.TestCase):
              mock.patch.object(screen.keeper, 'reset'), \
              mock.patch.object(screen, 'wait', side_effect=lambda label, fn, *a: fn(*a)), \
              mock.patch.object(screen, 'clear_screen'), \
+             mock.patch.object(screen, 'haptic'), \
              mock.patch.object(screen, '_keeper_setup', return_value=ready) as setup, \
              mock.patch.object(screen, '_server_screen') as server, \
              mock.patch.object(screen, 'read_command', side_effect=commands) as read, \

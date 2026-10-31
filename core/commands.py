@@ -87,7 +87,7 @@ def _cmd_update(raw):
 def _cmd_help(raw):
     clear_screen()
     render_help(HELP_SECTIONS)
-    pause(feedback=None)
+    pause()
 
 
 def _cmd_list(raw):

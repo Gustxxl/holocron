@@ -50,7 +50,7 @@ def _handle(raw):
     if not archives.is_loaded():
         hint = 'Archive not found — check settings.' if archives.missing() else 'No archive set — add a path in settings.'
         print(dim(hint))
-        pause()
+        pause(feedback='warning')
         return
     search_screen(raw)
 

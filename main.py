@@ -36,7 +36,7 @@ def start():
             first = None if config.broken or query else main_frame()
         if config.broken:
             print(f'Settings could not be read, defaults are used. A copy is in {config.broken}')
-            pause()
+            pause(feedback='warning')
         main_screen(first, query)
     except (KeyboardInterrupt, EOFError):
         disconnect()

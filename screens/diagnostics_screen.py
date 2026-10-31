@@ -73,4 +73,4 @@ def _details(label, tb):
     print(dim(f'Diagnostics > {label}'))
     print()
     print(tb.rstrip())
-    pause(feedback=None)
+    pause()

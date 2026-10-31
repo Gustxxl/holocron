@@ -178,7 +178,7 @@ def _add(source, text, lists, chosen):
     name = next((l['title'] for l in lists if l['id'] == draft['list']), '')
     clear_screen()
     print(dim(f'Added to #{name} — hidden in settings'))
-    pause()
+    pause(feedback='success')
 
 
 def _line(task, now):

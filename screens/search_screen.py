@@ -8,8 +8,7 @@ from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path, page_rows, search_separator
 from core.system import copy_text
 from screens.help_screen import render_help
-from ui.interface import (clear_screen, dim, error, pause, read_command, error_haptic, haptic, underline, nav_line, num,
-                          input_block)
+from ui.interface import clear_screen, dim, error, pause, read_command, haptic, underline, nav_line, num, input_block
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, rules, table_cells
 from ui.note import drop_title, plain, render_note
 from ui.format import plural
@@ -195,7 +194,7 @@ def search_screen(initial_query=None):
             print('Archive not found — check settings.')
         else:
             print('No archive set — add a path in settings.')
-        pause()
+        pause(feedback='warning')
         return
     query = (initial_query or '').strip()
     results, groups, list_mode, page, back = [], None, False, 0, None
@@ -203,7 +202,7 @@ def search_screen(initial_query=None):
     if query and _too_short(query):
         clear_screen()
         print(f'Type at least {MIN_QUERY} characters.')
-        pause()
+        pause(feedback='warning')
         return
     if query:
         results, groups, query, list_mode = _run(cases, query)
@@ -217,7 +216,7 @@ def search_screen(initial_query=None):
             print()
             print(dim('  [b] back   [h] help'))
             print()
-            error_haptic()
+            haptic('warning')
         elif results:
             if exact_for is not results:
                 exact, exact_for = _exact(results, query, list_mode), results
@@ -289,7 +288,7 @@ def search_screen(initial_query=None):
         if _too_short(command):
             clear_screen()
             print(f'Type at least {MIN_QUERY} characters.')
-            pause()
+            pause(feedback='warning')
             continue
         archives.load()
         cases = archives.cases()
@@ -463,7 +462,7 @@ def open_case(results, number, query, rerun=True, trail=()):
         if low in ('e', 'edit') and editor.available():
             if not case.get('filepath') or not case.get('element_id'):
                 print(dim('  Editing not available for this case'))
-                pause()
+                pause(feedback='warning')
                 continue
             results = _refresh(results, query, False)
             case = results[number - 1][1]
@@ -495,7 +494,7 @@ def open_case(results, number, query, rerun=True, trail=()):
                 note = _follow(case, source, edited)
                 if note:
                     print(dim(f'  {note}'))
-                    pause(feedback=None)
+                    pause()
             results = _refresh(results, query, False)
             continue
 

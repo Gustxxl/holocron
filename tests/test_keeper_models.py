@@ -12,6 +12,7 @@ class Models(unittest.TestCase):
              mock.patch.object(screen.keeper, 'reset'), \
              mock.patch.object(screen, 'wait', return_value=(state, found)), \
              mock.patch.object(screen, 'clear_screen'), \
+             mock.patch.object(screen, 'haptic'), \
              mock.patch.object(screen, 'update_keeper_model') as update, \
              mock.patch.object(screen, 'read_command', side_effect=commands), \
              mock.patch('builtins.print') as printed:

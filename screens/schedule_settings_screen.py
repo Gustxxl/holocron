@@ -3,7 +3,7 @@ from core import clocks, schedule, zones
 from core.dates import DAYS, monday, parse_date, parse_periods
 from ui.format import date_span, day_runs, days_summary, periods, plural, week_span
 from core.system import copy_text
-from ui.interface import clear_screen, confirm, dim, error, is_back, num, pause, read_command, red, nav_line
+from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, num, pause, read_command, red, nav_line
 import re
 
 
@@ -74,6 +74,7 @@ def _hours_screen(index, picked):
         for i in picked:
             weeks[index][i] = value
         schedule.save_weeks(weeks)
+        haptic('toggle')
         return
 
 
@@ -126,10 +127,12 @@ def _weeks_screen():
                 error(f'The cycle can be at most {schedule.MAX_WEEKS} weeks.')
                 continue
             schedule.save_weeks(weeks + [[None] * 7])
+            haptic('toggle')
             _week_screen(len(weeks))
         elif command == '-' and weeks:
             if confirm(f'Remove week {len(weeks)}?'):
                 schedule.save_weeks(weeks[:-1])
+                haptic('toggle')
         elif command.isdigit() and 1 <= int(command) <= len(weeks):
             _week_screen(int(command) - 1)
 
@@ -155,6 +158,7 @@ def _current_week_screen():
             return
         if command.isdigit() and 1 <= int(command) <= len(weeks):
             schedule.set_current_week(int(command))
+            haptic('toggle')
             return
 
 
@@ -177,6 +181,7 @@ def _add_vacation(vacations):
         error('The last day is before the first.')
         return
     schedule.save_vacations(list(vacations) + [(a, b)])
+    haptic('success')
 
 
 def _vacations_screen():
@@ -209,6 +214,7 @@ def _vacations_screen():
             i = int(command) - 1
             if confirm(f'Remove {date_span(*vacations[i])}?'):
                 schedule.save_vacations(vacations[:i] + vacations[i + 1:])
+                haptic('success')
 
 
 def _share_screen(sched):
@@ -221,11 +227,12 @@ def _share_screen(sched):
     print()
     print(code)
     print()
-    if copy_text(code):
+    copied = copy_text(code)
+    if copied:
         print(dim('Copied. Send it to someone with Holocron: Settings > Schedule > Import.'))
     else:
         print(dim('Copy the code and send it to someone with Holocron: Settings > Schedule > Import.'))
-    pause()
+    pause(feedback='success' if copied else None)
 
 
 def _import_screen():
@@ -257,18 +264,20 @@ def _import_screen():
         print()
         if confirm('Replace your schedule?'):
             schedule.import_schedule(sched)
+            haptic('success')
         return
 
 
 def _toggle(sched):
     if sched.enabled:
         schedule.set_enabled(False)
-        return
-    issues = sched.problems()
-    if issues:
-        error('Cannot turn on: ' + ', '.join(issues) + '.')
-        return
-    schedule.set_enabled(True)
+    else:
+        issues = sched.problems()
+        if issues:
+            error('Cannot turn on: ' + ', '.join(issues) + '.')
+            return
+        schedule.set_enabled(True)
+    haptic('toggle')
 
 
 ZONE_PAGE = 15
@@ -343,6 +352,14 @@ def _add_clock(zone):
     clocks.add(zone, read_command('name> '))
 
 
+def _pick(zone, adding):
+    if adding:
+        _add_clock(zone)
+    else:
+        schedule.set_zone(zone)
+    haptic('toggle')
+
+
 def _search(text):
     if not zones.names():
         error('Time zones are not available on this system.')
@@ -375,7 +392,7 @@ def _zone_screen():
         if found and command.isdigit():
             n = int(command)
             if 1 <= n <= len(found):
-                (_add_clock if adding else schedule.set_zone)(found[n - 1])
+                _pick(found[n - 1], adding)
                 query, found, adding = '', [], False
             continue
         if found and low in ('n', 'p'):
@@ -384,10 +401,12 @@ def _zone_screen():
         if not found:
             drop = _DROP_RE.fullmatch(low)
             if drop:
-                clocks.remove(int(drop.group(1)))
+                if clocks.remove(int(drop.group(1))):
+                    haptic('toggle')
                 continue
             if low == 'c':
                 schedule.set_zone('')
+                haptic('toggle')
                 continue
             if low == 'a':
                 command, adding = read_command('city> '), True
@@ -396,7 +415,7 @@ def _zone_screen():
                     continue
         result = _search(command)
         if len(result) == 1:
-            (_add_clock if adding else schedule.set_zone)(result[0])
+            _pick(result[0], adding)
             adding = False
         elif result:
             query, found, page = command, result, 0

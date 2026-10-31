@@ -90,23 +90,18 @@ def haptic(sequence):
         pass
 
 
-def error_haptic():
-    haptic('error')
-
-
-def pause(feedback='success'):
+def pause(feedback=None):
     print()
-    key = 'return' if system.IS_MACOS else 'Enter'
-    input(dim(f'Press {key} to continue...'))
     if feedback:
         haptic(feedback)
+    key = 'return' if system.IS_MACOS else 'Enter'
+    input(dim(f'Press {key} to continue...'))
 
 
 def error(text):
     clear_screen()
     print(dim(text))
-    error_haptic()
-    pause(feedback=None)
+    pause(feedback='error')
 
 
 _SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'

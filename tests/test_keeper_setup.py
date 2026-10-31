@@ -67,6 +67,7 @@ class Models(unittest.TestCase):
              mock.patch.object(screen.keeper, 'reset'), \
              mock.patch.object(screen, 'wait', side_effect=lambda label, fn, *a: fn(*a)), \
              mock.patch.object(screen, 'clear_screen'), \
+             mock.patch.object(screen, 'haptic'), \
              mock.patch.object(screen.system, 'OS', os_name), \
              mock.patch.object(screen, 'update_keeper_model') as update, \
              mock.patch.object(screen, 'read_command', side_effect=list(commands)), \
@@ -147,6 +148,7 @@ class Setup(unittest.TestCase):
              mock.patch.object(screen.keeper, 'has_server', return_value=server_after), \
              mock.patch.object(screen, 'wait', side_effect=lambda label, fn, *a: fn(*a)), \
              mock.patch.object(screen, 'clear_screen'), \
+             mock.patch.object(screen, 'haptic'), \
              mock.patch.object(screen.system, 'OS', os_name), \
              mock.patch.object(screen.system, 'open_file', return_value=opened) as open_file, \
              mock.patch.object(screen, 'error') as error, \
@@ -274,6 +276,7 @@ class Status(unittest.TestCase):
              mock.patch.object(screen, '_keeper_setup', return_value=True), \
              mock.patch.object(screen, 'wait', side_effect=lambda label, fn, *a: fn(*a)), \
              mock.patch.object(screen, 'clear_screen'), \
+             mock.patch.object(screen, 'haptic'), \
              mock.patch.object(screen, 'read_command', side_effect=['b']), \
              mock.patch('builtins.print') as printed:
             screen.keeper_screen()
