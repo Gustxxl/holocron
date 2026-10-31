@@ -29,7 +29,8 @@ from core.settings import (
 
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
-from ui.interface import clear_line, clear_screen, dim, error, num, pause, progress, read_command, red, show_menu, wait
+from ui.interface import (clear_line, clear_screen, dim, error, is_back, num, pause, progress, read_command, red,
+                          show_menu, wait)
 from pathlib import Path
 from ui.clean_path import clean_input_path
 from core import system
@@ -456,6 +457,22 @@ def _keeper_models_screen(slot):
             return
 
 
+def _server_address(has_server):
+    print(dim('  Address of a computer running Ollama, for example server-ip:11434'))
+    print(dim('  [c] clear   [b] back' if has_server else '  [b] back'))
+    new = read_command('address> ')
+    if not new or is_back(new):
+        return
+    if new.lower() == 'c':
+        if has_server:
+            update_keeper_server('')
+        return
+    try:
+        update_keeper_server(new)
+    except ValueError:
+        error('Type an address like server-ip:11434')
+
+
 def keeper_screen():
     while True:
         rows = keeper.connections()
@@ -488,13 +505,6 @@ def keeper_screen():
         if command == 'b':
             return
         if command == 'a':
-            print(dim('  Address of a computer running Ollama, for example server-ip:11434'))
-            if has_server:
-                print(dim('  Enter to keep, x to remove.'))
-            new = read_command('address> ')
-            if new.lower() == 'x' and has_server:
-                update_keeper_server('')
-            elif new:
-                update_keeper_server(new)
+            _server_address(has_server)
         elif command.isdigit() and 1 <= int(command) <= len(rows):
             _keeper_models_screen(rows[int(command) - 1]['slot'])

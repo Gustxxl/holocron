@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from core.config import load, save
 from ui.interface import clear_screen
 from ui.clean_path import clean_input_path
@@ -94,11 +96,28 @@ def update_new_cases_path(new_path):
     print('Success')
 
 
-KEEPER_LOCAL_URL = 'http://localhost:11434'
+KEEPER_PORT = 11434
+KEEPER_LOCAL_URL = f'http://localhost:{KEEPER_PORT}'
+
+
+def normalize_server(raw):
+    text = raw.strip().rstrip('/')
+    typed = '://' in text
+    parts = urlsplit(text if typed else f'http://{text}')
+    if (not text or any(ch.isspace() for ch in text) or parts.scheme not in ('http', 'https')
+            or not parts.hostname or parts.username is not None or parts.query or parts.fragment
+            or parts.netloc.endswith(':') or parts.port == 0):
+        raise ValueError(raw)
+    netloc = parts.netloc if typed or parts.port else f'{parts.netloc}:{KEEPER_PORT}'
+    return f'{parts.scheme}://{netloc}{parts.path}'
 
 
 def keeper_server():
-    return (load().get('keeper_server_url') or '').strip()
+    raw = load().get('keeper_server_url')
+    try:
+        return normalize_server(raw) if isinstance(raw, str) and raw.strip() else ''
+    except ValueError:
+        return ''
 
 
 def keeper_model(slot):
@@ -106,13 +125,11 @@ def keeper_model(slot):
 
 
 def update_keeper_server(url):
-    url = url.strip().rstrip('/')
-    if url and '://' not in url:
-        url = 'http://' + url
+    url = normalize_server(url) if url.strip() else ''
     cfg = load()
-    cfg['keeper_server_url'] = url
-    if not url:
+    if url != cfg.get('keeper_server_url'):
         cfg['keeper_server_model'] = ''
+    cfg['keeper_server_url'] = url
     save(cfg)
 
 
