@@ -151,6 +151,7 @@ class Server(unittest.TestCase):
         self.assertIn('  Address   s', out)
         self.assertIn(f'  Status    {screen.dim("off")}', out)
         self.assertIn('https://docs.ollama.com/faq', out)
+        self.assertIn('In Docker, publish the port: -p 11434:11434', out)
         self.assertIn('[c] clear', out)
 
     def test_foreign(self):

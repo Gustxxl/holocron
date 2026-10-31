@@ -69,7 +69,11 @@ Keeper is a local assistant for your archive. Ask in your own words, in any lang
 
 Press `k` on an open record to ask about that record only. Paste an error there and Keeper gives the steps from the record. If the error compares two amounts, Holocron works out the difference itself and shows the calculation above the steps, so the numbers don't depend on the model. Errors the record says can come up after the fix are listed under What may follow. Ask for a command or a query from the record with your own values, and Keeper copies it from the record with only those values changed. Codes and numbers in it that you didn't type are listed under it, so you know what to check before running it. The model can still get a command wrong, so read it before you run it. If the record doesn't cover your question, type `/` to ask the whole archive.
 
-Keeper runs on [Ollama](https://ollama.com/download). Holocron doesn't install it for you, but settings show what's missing and link to Ollama's guide for your system. If you don't have a model yet, they can download `qwen2.5:7b`, the model Keeper is tested on. Other models work too. Larger ones often answer better but need more memory, and smaller ones answer worse. You can also add the address of another machine running Ollama, like `server-ip` or `server-ip:11434`, or a full `https://` address if it sits behind a proxy. Keeper uses that server when it's reachable and switches to your own computer when it's not.
+Keeper is optional. Until you choose a model, `k`, `keeper` and their hints stay hidden. Set it up in settings (`s` > Archive > Keeper). Keeper runs on [Ollama](https://ollama.com/download), and Holocron doesn't install it for you. Settings walk you through it step by step, the same way as for reminders: they check that Ollama is installed and running, link to Ollama's guide for your system and, if you don't have a model yet, download `qwen2.5:7b`, the model Keeper is tested on. Other models work too. Larger ones often answer better but need more memory, and smaller ones answer worse. If Ollama stops answering later, `k` opens these settings.
+
+Ollama can run as an app or in Docker, and Keeper works with both. If the container is stopped, settings tell you to start it. To use the GPU in Docker, pass it to the container as shown in [Ollama's Docker guide](https://docs.ollama.com/docker).
+
+Keeper can also use Ollama on another machine, for example one with a GPU. Add its address in settings (Keeper > `s`), like `server-ip` or `server-ip:11434`, or a full `https://` address if it sits behind a proxy. Ollama installed as an app has to be opened to the network with `OLLAMA_HOST` (see [Ollama's FAQ](https://docs.ollama.com/faq)), and a container needs its port published with `-p 11434:11434`. Ollama has no passwords, so anyone who can reach that port can use it. Keep it on a network you trust or behind a proxy that asks for a login. Keeper uses the server when it's reachable and switches to your own computer when it's not.
 
 ## Shifts
 
@@ -107,7 +111,7 @@ Type `h` in Holocron for the full list. The main ones:
 | any words           | search the archive                                   |
 | `words; more words` | several searches at once                             |
 | `l`                 | browse all records                                   |
-| `k`, `keeper`       | ask Keeper                                           |
+| `k`, `keeper`       | ask Keeper, once a model is chosen                   |
 | `sch`, `schedule`   | shift schedule                                       |
 | `c`, `calendar`     | Apple Calendar events                                |
 | `r`, `reminders`    | Apple Reminders                                      |

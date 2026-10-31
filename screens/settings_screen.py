@@ -345,6 +345,7 @@ def separator_screen():
 _KEEPER_STATUS = {
     'missing': 'Ollama not installed',
     'stopped': 'Ollama not running',
+    'docker': 'Ollama not running',
     'off': 'off',
     'foreign': 'not Ollama',
     'no_models': 'no models',
@@ -366,8 +367,13 @@ _OLLAMA_START = {
     'macOS': 'Open Ollama from Applications, then press Enter.',
     'Windows': 'Open Ollama from the Start menu, then press Enter.',
 }
-_KEEPER_STEPS = {'missing': 0, 'stopped': 1, 'foreign': 1, 'no_models': 2, 'no_model': 2, 'model_missing': 2}
+_KEEPER_STEPS = {'missing': 0, 'stopped': 1, 'docker': 1, 'foreign': 1, 'no_models': 2, 'no_model': 2,
+                 'model_missing': 2}
 _OLLAMA_GPU = 'https://docs.ollama.com/gpu'
+_OLLAMA_DOCKER = 'https://docs.ollama.com/docker'
+_DOCKER_START = 'If it runs in Docker, start the container: docker start ollama'
+_DOCKER_PORT = 'In Docker, publish the port: -p 11434:11434'
+_DOCKER_GPU = f'If Ollama runs in Docker, pass the GPU to the container: {_OLLAMA_DOCKER}'
 
 
 def _ollama_docs():
@@ -435,10 +441,17 @@ def _keeper_models_screen(slot):
             print('  Ollama is installed but not running. Start it, then press Enter.')
             print(dim(f'  How to start it: {_ollama_docs()}'))
             print()
+        elif state == 'docker':
+            print('  Ollama is not responding on this computer.')
+            print(f'  {_DOCKER_START}')
+            print(dim(f'  Docker guide: {_OLLAMA_DOCKER}'))
+            print(dim(f'  Not installed yet: {_ollama_docs()}'))
+            print()
         elif state == 'off':
             print(f'  {conn["url"]} is not responding. Press Enter to check again.')
             print(dim('  Ollama on another computer must be open to the network.'))
             print(dim(f'  {_OLLAMA_FAQ}'))
+            print(dim(f'  {_DOCKER_PORT}'))
             print()
         elif state == 'foreign':
             print(f'  {conn["url"]} answers, but it is not Ollama.')
@@ -466,8 +479,7 @@ def _keeper_models_screen(slot):
             return
 
 
-def _open_docs():
-    url = _ollama_docs()
+def _open_docs(url):
     if not system.open_file(url):
         error(f'Could not open a browser. The guide is at {url}')
 
@@ -496,6 +508,11 @@ def _keeper_setup():
             print('  Ollama is installed but not running.')
             print(f'  {_OLLAMA_START.get(system.OS, "Run ollama serve, then press Enter.")}')
             print(dim(f'  Guide: {_ollama_docs()}'))
+        elif state == 'docker':
+            print('  Ollama is not responding on this computer.')
+            print(f'  {_DOCKER_START}')
+            print(dim(f'  Guide: {_OLLAMA_DOCKER}'))
+            print(dim(f'  Not installed yet: {_ollama_docs()}'))
         elif state == 'foreign':
             print(f'  {conn["url"]} answers, but it is not Ollama.')
             print(dim('  Another program is using this port.'))
@@ -509,7 +526,7 @@ def _keeper_setup():
         print()
         _keeper_models(found, conn['model'])
 
-        guide = state in ('missing', 'stopped')
+        guide = state in ('missing', 'stopped', 'docker')
         can_download = current == 2 and keeper.RECOMMENDED not in found
         nav = [('number', 'select', '#', 'select')] if found else []
         nav += [('o', 'open the guide', 'o', 'guide')] if guide else []
@@ -523,7 +540,7 @@ def _keeper_setup():
         if is_back(command):
             return False
         if command == 'o' and guide:
-            _open_docs()
+            _open_docs(_OLLAMA_DOCKER if state == 'docker' else _ollama_docs())
         elif command == 'd' and can_download:
             _keeper_download(conn)
         elif command == 's':
@@ -551,6 +568,7 @@ def _server_screen():
                 print()
                 print(dim('  Ollama on that computer must be open to the network.'))
                 print(dim(f'  {_OLLAMA_FAQ}'))
+                print(dim(f'  {_DOCKER_PORT}'))
             elif state == 'foreign':
                 print()
                 print(dim('  Check the address and port.'))
@@ -599,9 +617,12 @@ def keeper_screen():
             if conn['slot'] == 'server':
                 print(dim(f'    {conn["url"].split("://", 1)[-1]}'))
         print()
-        if any(where == 'CPU' for _, where in states):
+        cpu = [conn['slot'] for conn, (_, where) in zip(rows, states) if where == 'CPU']
+        if cpu:
             print(dim('  The model runs on the CPU, so replies are slow.'))
             print(dim(f'  GPU support: {_OLLAMA_GPU}'))
+            if 'server' in cpu or keeper.docker():
+                print(dim(f'  {_DOCKER_GPU}'))
             print()
         if has_server:
             print(dim('  Keeper uses the server when it is on, otherwise this computer.'))

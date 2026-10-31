@@ -224,10 +224,14 @@ def _installed():
     return bool(shutil.which('ollama')) or any(p.exists() for p in _apps())
 
 
+def docker():
+    return bool(shutil.which('docker'))
+
+
 def status(conn):
     state, found = _tags(conn)
     if state == 'off' and conn['slot'] == 'local':
-        return ('stopped' if _installed() else 'missing'), []
+        return ('stopped' if _installed() else 'docker' if docker() else 'missing'), []
     if state != 'up':
         return state, []
     if not found:

@@ -85,6 +85,13 @@ class Models(unittest.TestCase):
                 self.assertIn(f'Install it: {url}', out)
                 self.assertNotIn('curl', out)
 
+    def test_docker(self):
+        out, _ = self.models('docker', [], os_name='Linux')
+        self.assertIn('If it runs in Docker, start the container: docker start ollama', out)
+        self.assertIn('https://docs.ollama.com/docker', out)
+        self.assertIn('Not installed yet: https://docs.ollama.com/linux', out)
+        self.assertNotIn('installed but not running', out)
+
     def test_stopped(self):
         out, _ = self.models('stopped', [], os_name='Linux')
         self.assertIn('installed but not running', out)
@@ -94,6 +101,7 @@ class Models(unittest.TestCase):
         out, _ = self.models('off', [], conn=SERVER)
         self.assertIn('http://s is not responding.', out)
         self.assertIn('https://docs.ollama.com/faq', out)
+        self.assertIn('In Docker, publish the port: -p 11434:11434', out)
 
     def test_foreign(self):
         hints = {'server': '  Check the address and port.', 'local': '  Another program is using this port.'}
@@ -158,7 +166,7 @@ class Setup(unittest.TestCase):
         s.read.assert_not_called()
 
     def test_current_step(self):
-        for state, step in (('missing', 'Ollama installed'), ('stopped', 'Ollama running'),
+        for state, step in (('missing', 'Ollama installed'), ('stopped', 'Ollama running'), ('docker', 'Ollama running'),
                             ('foreign', 'Ollama running'), ('no_models', 'Model chosen'),
                             ('no_model', 'Model chosen'), ('model_missing', 'Model chosen')):
             with self.subTest(state=state):
@@ -194,6 +202,17 @@ class Setup(unittest.TestCase):
                               ('Linux', 'Run ollama serve, then press Enter.')):
             with self.subTest(os_name=os_name):
                 self.assertIn(text, self.setup('stopped', os_name=os_name).out)
+
+    def test_docker_hint(self):
+        out = self.setup('docker', os_name='Windows').out
+        self.assertIn('docker start ollama', out)
+        self.assertIn('Guide: https://docs.ollama.com/docker', out)
+        self.assertIn('Not installed yet: https://docs.ollama.com/windows', out)
+        self.assertIn('[o] open the guide', out)
+
+    def test_open_docker_guide(self):
+        s = self.setup('docker', commands=['o', 'b'])
+        s.open_file.assert_called_once_with('https://docs.ollama.com/docker')
 
     def test_foreign_has_no_guide(self):
         s = self.setup('foreign', commands=['o', 'b'])
@@ -245,11 +264,12 @@ class Setup(unittest.TestCase):
 
 
 class Status(unittest.TestCase):
-    def status(self, state, where):
-        with mock.patch.object(screen.keeper, 'connections', return_value=[LOCAL]), \
-             mock.patch.object(screen.keeper, 'has_server', return_value=False), \
+    def status(self, state, where, docker=False, rows=(LOCAL,)):
+        with mock.patch.object(screen.keeper, 'connections', return_value=list(rows)), \
+             mock.patch.object(screen.keeper, 'docker', return_value=docker), \
+             mock.patch.object(screen.keeper, 'has_server', return_value=SERVER in rows), \
              mock.patch.object(screen.keeper, 'reset'), \
-             mock.patch.object(screen.keeper, 'statuses', return_value=[(state, ['m'])]), \
+             mock.patch.object(screen.keeper, 'statuses', return_value=[(state, ['m'])] * len(rows)), \
              mock.patch.object(screen.keeper, 'placement', return_value=where) as place, \
              mock.patch.object(screen, '_keeper_setup', return_value=True), \
              mock.patch.object(screen, 'wait', side_effect=lambda label, fn, *a: fn(*a)), \
@@ -264,7 +284,21 @@ class Status(unittest.TestCase):
         self.assertIn('online · CPU', out)
         self.assertIn('replies are slow', out)
         self.assertIn('https://docs.ollama.com/gpu', out)
+        self.assertNotIn('Docker', out)
         place.assert_called_once_with(LOCAL)
+
+    def test_cpu_hint_with_local_docker(self):
+        out, _ = self.status('ready', 'CPU', docker=True)
+        self.assertIn('pass the GPU to the container: https://docs.ollama.com/docker', out)
+
+    def test_cpu_hint_for_server(self):
+        out, _ = self.status('ready', 'CPU', rows=(SERVER, LOCAL))
+        self.assertIn('pass the GPU to the container', out)
+
+    def test_docker_label(self):
+        out, place = self.status('docker', 'CPU')
+        place.assert_not_called()
+        self.assertIn('Ollama not running', out)
 
     def test_gpu(self):
         out, _ = self.status('ready', 'GPU')

@@ -96,8 +96,9 @@ class Probe(unittest.TestCase):
 
 
 class Status(unittest.TestCase):
-    def status(self, conn, answer=None, error=None, installed=True):
+    def status(self, conn, answer=None, error=None, installed=True, docker=False):
         with patch.object(keeper, '_get_json', return_value=answer, side_effect=error) as get, \
+             patch.object(keeper, 'docker', return_value=docker), \
              patch.object(keeper, '_installed', return_value=installed) as which:
             out = keeper.status(conn)
         self.assertEqual(get.call_args.args[1], '/api/tags')
@@ -133,6 +134,22 @@ class Status(unittest.TestCase):
     def test_local_off(self):
         self.assertEqual(self.status(LOCAL, error=OSError('down'))[0], ('stopped', []))
         self.assertEqual(self.status(LOCAL, error=OSError('down'), installed=False)[0], ('missing', []))
+
+    def test_local_off_with_docker(self):
+        out, _ = self.status(LOCAL, error=OSError('down'), installed=False, docker=True)
+        self.assertEqual(out, ('docker', []))
+
+    def test_installed_wins_over_docker(self):
+        out, _ = self.status(LOCAL, error=OSError('down'), docker=True)
+        self.assertEqual(out, ('stopped', []))
+
+    def test_server_off_ignores_docker(self):
+        out, _ = self.status(SERVER, error=OSError('down'), installed=False, docker=True)
+        self.assertEqual(out, ('off', []))
+
+    def test_docker_up_is_plain_ollama(self):
+        out, _ = self.status(LOCAL, {'models': [{'name': 'm'}]}, installed=False, docker=True)
+        self.assertEqual(out, ('ready', ['m']))
 
     def test_foreign_errors(self):
         for exc in (urllib.error.HTTPError('http://s/api/tags', 404, 'Not Found', None, None),
@@ -185,3 +202,14 @@ class Installed(unittest.TestCase):
     def test_other_system_ignores_app_paths(self):
         self.assertFalse(self.installed('Linux', folders=['Applications/Ollama.app'],
                                         files=['AppData/Local/Programs/Ollama/ollama.exe']))
+
+
+class Docker(unittest.TestCase):
+    def test_found(self):
+        with patch.object(keeper.shutil, 'which', return_value='/usr/bin/docker') as which:
+            self.assertTrue(keeper.docker())
+        which.assert_called_once_with('docker')
+
+    def test_absent(self):
+        with patch.object(keeper.shutil, 'which', return_value=None):
+            self.assertFalse(keeper.docker())
