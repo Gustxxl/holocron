@@ -346,6 +346,7 @@ _KEEPER_STATUS = {
     'missing': 'Ollama not installed',
     'stopped': 'Ollama not running',
     'off': 'off',
+    'foreign': 'not Ollama',
     'no_models': 'no models',
     'no_model': 'choose a model',
     'model_missing': 'model removed',
@@ -433,6 +434,10 @@ def _keeper_models_screen(slot):
             print(f'  {conn["url"]} is not responding. Press Enter to check again.')
             print(dim('  Ollama on another computer must be open to the network.'))
             print(dim(f'  {_OLLAMA_FAQ}'))
+            print()
+        elif state == 'foreign':
+            print(f'  {conn["url"]} answers, but it is not Ollama.')
+            print(dim('  Check the address and port.' if slot == 'server' else '  Another program is using this port.'))
             print()
         _keeper_models(found, conn['model'])
 

@@ -1,3 +1,4 @@
+import http.client
 import json
 import re
 import shutil
@@ -159,6 +160,7 @@ _SMALL = {Decimal(n) for n in range(MAX_UNITS + 1)}
 _LIMITS = ('above', 'below', 'equal')
 _AMOUNT_RE = re.compile(r'(?<![\d.,])(\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+[.,]\d+)(?![.,]?\d)')
 
+_OFFLINE = (urllib.error.URLError, OSError, http.client.HTTPException, ValueError)
 _active = {'conn': None, 'at': 0.0}
 
 
@@ -195,20 +197,28 @@ def _get_json(conn, path, payload=None, timeout=120):
         return json.loads(resp.read().decode('utf-8'))
 
 
-def _list_models(conn):
+def _tags(conn):
     try:
         data = _get_json(conn, '/api/tags', timeout=PROBE_TIMEOUT)
-        return sorted(m['name'] for m in data.get('models', []) if m.get('name'))
-    except (urllib.error.URLError, OSError, ValueError, AttributeError, TypeError):
-        return None
+    except urllib.error.HTTPError as e:
+        e.close()
+        return 'foreign', []
+    except (http.client.HTTPException, ValueError):
+        return 'foreign', []
+    except _OFFLINE:
+        return 'off', []
+    models = data.get('models') if isinstance(data, dict) else None
+    if not isinstance(models, list) or not all(isinstance(m, dict) for m in models):
+        return 'foreign', []
+    return 'up', sorted(m['name'] for m in models if isinstance(m.get('name'), str) and m['name'])
 
 
 def status(conn):
-    found = _list_models(conn)
-    if found is None:
-        if conn['slot'] == 'local':
-            return ('stopped' if shutil.which('ollama') else 'missing'), []
-        return 'off', []
+    state, found = _tags(conn)
+    if state == 'off' and conn['slot'] == 'local':
+        return ('stopped' if shutil.which('ollama') else 'missing'), []
+    if state != 'up':
+        return state, []
     if not found:
         return 'no_models', found
     if not conn['model']:
@@ -227,9 +237,10 @@ def statuses(conns):
     threads = [threading.Thread(target=check, args=(i, c), daemon=True) for i, c in enumerate(conns)]
     for t in threads:
         t.start()
+    deadline = time.monotonic() + PROBE_TIMEOUT
     for t in threads:
-        t.join()
-    return out
+        t.join(max(0.0, deadline - time.monotonic()))
+    return [s or ('off', []) for s in out]
 
 
 def reset():
@@ -241,18 +252,7 @@ def cached():
 
 
 def _probe(conns):
-    states = [None] * len(conns)
-
-    def check(i, conn):
-        states[i] = status(conn)[0]
-
-    threads = [threading.Thread(target=check, args=(i, c), daemon=True) for i, c in enumerate(conns)]
-    for t in threads:
-        t.start()
-    deadline = time.monotonic() + PROBE_TIMEOUT
-    for t in threads:
-        t.join(max(0.0, deadline - time.monotonic()))
-    return next((c for c, s in zip(conns, states) if s == 'ready'), None)
+    return next((c for c, (s, _) in zip(conns, statuses(conns)) if s == 'ready'), None)
 
 
 def configured():
@@ -278,7 +278,7 @@ def placement(conn):
         data = _get_json(conn, '/api/ps', timeout=PROBE_TIMEOUT)
         model = next((m for m in data.get('models', []) if conn['model'] in (m.get('name'), m.get('model'))), None)
         size, vram = int(model['size']), int(model.get('size_vram') or 0)
-    except (urllib.error.URLError, OSError, ValueError, AttributeError, TypeError, KeyError):
+    except (*_OFFLINE, AttributeError, TypeError, KeyError):
         return None
     if size <= 0:
         return None
@@ -295,7 +295,7 @@ def pull(conn, name, progress):
                 if data.get('error'):
                     raise KeeperOffline(data['error'])
                 progress(data.get('status', ''), data.get('completed'), data.get('total'))
-    except (urllib.error.URLError, OSError, ValueError) as e:
+    except _OFFLINE as e:
         raise KeeperOffline(str(e))
 
 
@@ -326,7 +326,7 @@ def _chat_with(conn, system, user, history, temperature):
     }
     try:
         data = _get_json(conn, '/api/chat', payload)
-    except (urllib.error.URLError, OSError, ValueError) as e:
+    except _OFFLINE as e:
         raise KeeperOffline(str(e))
     try:
         return _parse_json(data['message']['content'])

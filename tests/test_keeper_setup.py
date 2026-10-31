@@ -92,6 +92,20 @@ class Models(unittest.TestCase):
         self.assertIn('http://s is not responding.', out)
         self.assertIn('https://docs.ollama.com/faq', out)
 
+    def test_foreign(self):
+        hints = {'server': '  Check the address and port.', 'local': '  Another program is using this port.'}
+        for conn in (SERVER, LOCAL):
+            with self.subTest(slot=conn['slot']):
+                out, update = self.models('foreign', [], conn=conn)
+                self.assertIn(f'  {conn["url"]} answers, but it is not Ollama.', out)
+                self.assertIn(hints[conn['slot']], out)
+                other = hints['local' if conn['slot'] == 'server' else 'server']
+                self.assertNotIn(other, out)
+                self.assertNotIn('not responding', out)
+                self.assertNotIn('[number] select', out)
+                self.assertNotIn('[d] download', out)
+                update.assert_not_called()
+
     def test_lists_models_with_warning(self):
         out, update = self.models('no_model', ['other:1b', keeper.RECOMMENDED], commands=['1'])
         self.assertIn('other:1b', out)
@@ -154,6 +168,11 @@ class Status(unittest.TestCase):
         place.assert_not_called()
         self.assertIn('Ollama not running', out)
         self.assertNotIn('replies are slow', out)
+
+    def test_foreign_label(self):
+        out, place = self.status('foreign', 'CPU')
+        place.assert_not_called()
+        self.assertIn('not Ollama', out)
 
 
 if __name__ == '__main__':
