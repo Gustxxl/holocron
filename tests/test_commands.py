@@ -53,6 +53,38 @@ def _entry(section, name):
     return next(e for title, entries in commands.HELP_SECTIONS if title == section for e in entries if e.name == name)
 
 
+class Keeper(unittest.TestCase):
+    CONN = {'slot': 'local', 'url': 'http://l', 'model': 'm'}
+
+    def _configured(self, conns):
+        return patch.object(commands.keeper, 'configured', return_value=conns)
+
+    def test_available_with_model(self):
+        with self._configured([self.CONN]), patch.object(commands.keeper, 'active') as active:
+            for name in ('k', 'K', 'keep', 'keeper'):
+                with self.subTest(name):
+                    self.assertEqual(commands.lookup(name).name, 'keeper')
+        active.assert_not_called()
+
+    def test_hidden_without_model(self):
+        with self._configured([]), patch.object(commands.keeper, 'active') as active:
+            for name in ('k', 'keep', 'keeper'):
+                with self.subTest(name):
+                    self.assertIsNone(commands.lookup(name))
+        active.assert_not_called()
+
+    def test_help_follows_model(self):
+        for conns, shown in (([self.CONN], True), ([], False)):
+            with self.subTest(shown), self._configured(conns):
+                self.assertIs(_entry('Commands', 'keeper / k').when(), shown)
+                self.assertIs(_entry('Search', 'k').when(), shown)
+
+    def test_opens_keeper(self):
+        with self._configured([self.CONN]), patch('screens.keeper_screen.keeper_screen') as screen:
+            commands.lookup('k').run('k')
+        screen.assert_called_once_with()
+
+
 class Sources(unittest.TestCase):
     def _source(self, ready=True, add=True):
         source = SimpleNamespace(available=lambda: ready)

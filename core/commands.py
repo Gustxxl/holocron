@@ -54,6 +54,10 @@ def _has_reminders():
     return _ready('tasks')
 
 
+def _has_keeper():
+    return bool(keeper.configured())
+
+
 def _can_add_event():
     return _has_calendar() and hasattr(registry.active('events'), 'add')
 
@@ -143,7 +147,7 @@ def _cmd_check(raw):
 
 
 COMMANDS = [
-    Command('keeper',     _cmd_keeper,     ('k', 'keep'), 'ask the archive in your own words'),
+    Command('keeper',     _cmd_keeper,     ('k', 'keep'), 'ask the archive in your own words', _has_keeper),
     Command('schedule',   _cmd_schedule,   ('sch',),      'shift schedule, week by week'),
     Command('calendar',   _cmd_calendar,   ('c', 'cal'),  'upcoming calendar events', _has_calendar),
     Command('reminders',  _cmd_reminders,  ('r',),        'open reminders', _has_reminders),
@@ -173,7 +177,7 @@ HELP_SECTIONS = [
         HelpEntry('x number',     'check / uncheck a task in the open note'),
         HelpEntry('m',            'move the open kanban card to another list'),
         HelpEntry('a',            'add a card to the open kanban list or to the list of the open card', editor.available),
-        HelpEntry('k', 'ask Keeper about this record', lambda: bool(keeper.configured())),
+        HelpEntry('k', 'ask Keeper about this record', _has_keeper),
         HelpEntry('j number', 'jump to a linked note'),
     ]),
     ('Schedule', [
