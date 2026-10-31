@@ -355,7 +355,7 @@ _KEEPER_NAMES = {'server': 'Server', 'local': 'This computer'}
 
 
 _OLLAMA_DOCS = {
-    'Darwin': 'https://docs.ollama.com/macos',
+    'macOS': 'https://docs.ollama.com/macos',
     'Windows': 'https://docs.ollama.com/windows',
     'Linux': 'https://docs.ollama.com/linux',
 }

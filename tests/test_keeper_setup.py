@@ -58,7 +58,7 @@ class Placement(unittest.TestCase):
 
 
 class Models(unittest.TestCase):
-    def models(self, state, found, conn=LOCAL, commands=('b',), os_name='Darwin'):
+    def models(self, state, found, conn=LOCAL, commands=('b',), os_name='macOS'):
         with mock.patch.object(screen.keeper, 'connection', return_value=conn), \
              mock.patch.object(screen.keeper, 'status', return_value=(state, found)), \
              mock.patch.object(screen.keeper, 'reset'), \
@@ -71,8 +71,11 @@ class Models(unittest.TestCase):
             screen._keeper_models_screen(conn['slot'])
         return _printed(printed), update
 
+    def test_links_for_this_system(self):
+        self.assertIn(screen.system.OS, screen._OLLAMA_DOCS)
+
     def test_missing_links_per_os(self):
-        for os_name, url in (('Darwin', 'https://docs.ollama.com/macos'), ('Windows', 'https://docs.ollama.com/windows'),
+        for os_name, url in (('macOS', 'https://docs.ollama.com/macos'), ('Windows', 'https://docs.ollama.com/windows'),
                              ('Linux', 'https://docs.ollama.com/linux'), ('Other', 'https://ollama.com/download')):
             with self.subTest(os_name=os_name):
                 out, _ = self.models('missing', [], os_name=os_name)
