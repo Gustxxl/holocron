@@ -8,8 +8,9 @@ import urllib.request
 import urllib.error
 import threading
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
-from core import search
+from core import search, system
 from core.settings import KEEPER_LOCAL_URL, keeper_server, keeper_model
 
 RECOMMENDED = 'qwen2.5:7b'
@@ -213,10 +214,20 @@ def _tags(conn):
     return 'up', sorted(m['name'] for m in models if isinstance(m.get('name'), str) and m['name'])
 
 
+def _apps():
+    home = Path.home()
+    return {'macOS': [Path('/Applications/Ollama.app'), home / 'Applications/Ollama.app'],
+            'Windows': [home / 'AppData/Local/Programs/Ollama/ollama.exe']}.get(system.OS, [])
+
+
+def _installed():
+    return bool(shutil.which('ollama')) or any(p.exists() for p in _apps())
+
+
 def status(conn):
     state, found = _tags(conn)
     if state == 'off' and conn['slot'] == 'local':
-        return ('stopped' if shutil.which('ollama') else 'missing'), []
+        return ('stopped' if _installed() else 'missing'), []
     if state != 'up':
         return state, []
     if not found:

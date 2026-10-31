@@ -1,9 +1,11 @@
 import http.client
 import json
+import tempfile
 import threading
 import time
 import unittest
 import urllib.error
+from pathlib import Path
 from unittest.mock import patch
 
 from core import keeper
@@ -94,9 +96,9 @@ class Probe(unittest.TestCase):
 
 
 class Status(unittest.TestCase):
-    def status(self, conn, answer=None, error=None, ollama='/usr/bin/ollama'):
+    def status(self, conn, answer=None, error=None, installed=True):
         with patch.object(keeper, '_get_json', return_value=answer, side_effect=error) as get, \
-             patch.object(keeper.shutil, 'which', return_value=ollama) as which:
+             patch.object(keeper, '_installed', return_value=installed) as which:
             out = keeper.status(conn)
         self.assertEqual(get.call_args.args[1], '/api/tags')
         self.assertEqual(get.call_args.kwargs['timeout'], keeper.PROBE_TIMEOUT)
@@ -130,7 +132,7 @@ class Status(unittest.TestCase):
 
     def test_local_off(self):
         self.assertEqual(self.status(LOCAL, error=OSError('down'))[0], ('stopped', []))
-        self.assertEqual(self.status(LOCAL, error=OSError('down'), ollama=None)[0], ('missing', []))
+        self.assertEqual(self.status(LOCAL, error=OSError('down'), installed=False)[0], ('missing', []))
 
     def test_foreign_errors(self):
         for exc in (urllib.error.HTTPError('http://s/api/tags', 404, 'Not Found', None, None),
@@ -152,3 +154,34 @@ class Status(unittest.TestCase):
         for answer in ([], 'x', None, {}, {'models': None}, {'models': 'x'}, {'models': [None]}, {'models': ['m']}):
             with self.subTest(answer=answer):
                 self.assertEqual(self.status(SERVER, answer)[0], ('foreign', []))
+
+
+class Installed(unittest.TestCase):
+    def installed(self, os_name, which=None, files=(), folders=()):
+        with tempfile.TemporaryDirectory() as home:
+            for name in folders:
+                Path(home, name).mkdir(parents=True)
+            for name in files:
+                Path(home, name).parent.mkdir(parents=True, exist_ok=True)
+                Path(home, name).touch()
+            with patch.object(keeper.shutil, 'which', return_value=which), \
+                 patch.object(keeper.system, 'OS', os_name), \
+                 patch.object(keeper.Path, 'home', return_value=Path(home)):
+                return keeper._installed()
+
+    def test_command_in_path(self):
+        self.assertTrue(self.installed('Linux', which='/usr/bin/ollama'))
+
+    def test_nothing(self):
+        self.assertFalse(self.installed('Linux'))
+        self.assertFalse(self.installed('Windows'))
+
+    def test_mac_app_never_opened(self):
+        self.assertTrue(self.installed('macOS', folders=['Applications/Ollama.app']))
+
+    def test_windows_before_new_path(self):
+        self.assertTrue(self.installed('Windows', files=['AppData/Local/Programs/Ollama/ollama.exe']))
+
+    def test_other_system_ignores_app_paths(self):
+        self.assertFalse(self.installed('Linux', folders=['Applications/Ollama.app'],
+                                        files=['AppData/Local/Programs/Ollama/ollama.exe']))

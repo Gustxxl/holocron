@@ -29,8 +29,8 @@ from core.settings import (
 
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
-from ui.interface import (clear_line, clear_screen, dim, error, is_back, num, pause, progress, read_command, red,
-                          show_menu, wait)
+from ui.interface import (clear_line, clear_screen, dim, error, is_back, nav_line, num, pause, progress, read_command,
+                          red, show_menu, wait)
 from pathlib import Path
 from ui.clean_path import clean_input_path
 from core import system
@@ -362,6 +362,11 @@ _OLLAMA_DOCS = {
     'Linux': 'https://docs.ollama.com/linux',
 }
 _OLLAMA_FAQ = 'https://docs.ollama.com/faq'
+_OLLAMA_START = {
+    'macOS': 'Open Ollama from Applications, then press Enter.',
+    'Windows': 'Open Ollama from the Start menu, then press Enter.',
+}
+_KEEPER_STEPS = {'missing': 0, 'stopped': 1, 'foreign': 1, 'no_models': 2, 'no_model': 2, 'model_missing': 2}
 _OLLAMA_GPU = 'https://docs.ollama.com/gpu'
 
 
@@ -443,43 +448,143 @@ def _keeper_models_screen(slot):
 
         needs_model = state in ('no_models', 'no_model', 'model_missing')
         can_download = needs_model and keeper.RECOMMENDED not in found
-        nav = '  '
-        nav += '[number] select   ' if found else ''
-        nav += f'[d] download {keeper.RECOMMENDED}   ' if can_download else ''
-        nav += '[b] back'
-        print(dim(nav))
+        nav = [('number', 'select', '#', 'select')] if found else []
+        nav += [('d', f'download {keeper.RECOMMENDED}', 'd', 'download')] if can_download else []
+        nav.append(('b', 'back'))
+        print(dim(nav_line(nav)))
         print()
 
-        command = read_command('model> ')
+        command = read_command('model> ').lower()
         keeper.reset()
-        if command == 'b':
+        if is_back(command):
             return
         if command == 'd' and can_download:
             _keeper_download(conn)
-        elif command.isdigit() and found and 1 <= int(command) <= len(found):
+        elif found and command.isascii() and command.isdigit() and 1 <= int(command) <= len(found):
             update_keeper_model(slot, found[int(command) - 1])
             keeper.reset()
             return
 
 
-def _server_address(has_server):
-    print(dim('  Address of a computer running Ollama, for example server-ip:11434'))
-    print(dim('  [c] clear   [b] back' if has_server else '  [b] back'))
-    new = read_command('address> ')
-    if not new or is_back(new):
-        return
-    if new.lower() == 'c':
-        if has_server:
-            update_keeper_server('')
-        return
-    try:
-        update_keeper_server(new)
-    except ValueError:
-        error('Type an address like server-ip:11434')
+def _open_docs():
+    url = _ollama_docs()
+    if not system.open_file(url):
+        error(f'Could not open a browser. The guide is at {url}')
+
+
+def _keeper_setup():
+    while True:
+        conn = keeper.connection('local')
+        clear_screen()
+        print(dim('Settings > Archive > Keeper'))
+        print()
+        state, found = wait('Checking Ollama', keeper.status, conn)
+        if state == 'ready':
+            return True
+        current = _KEEPER_STEPS[state]
+        print('  Keeper answers questions about your archive in your own words.')
+        print('  It runs on Ollama, a free app for AI models on this computer.')
+        print()
+        for i, name in enumerate(('Ollama installed', 'Ollama running', 'Model chosen')):
+            mark = dim('✓') if i < current else '→'
+            print(f'  {mark} {name}' if i <= current else dim(f'  · {name}'))
+        print()
+        if state == 'missing':
+            print('  Install Ollama, open it once, then press Enter.')
+            print(dim(f'  Guide: {_ollama_docs()}'))
+        elif state == 'stopped':
+            print('  Ollama is installed but not running.')
+            print(f'  {_OLLAMA_START.get(system.OS, "Run ollama serve, then press Enter.")}')
+            print(dim(f'  Guide: {_ollama_docs()}'))
+        elif state == 'foreign':
+            print(f'  {conn["url"]} answers, but it is not Ollama.')
+            print(dim('  Another program is using this port.'))
+        elif state == 'no_models':
+            print('  Ollama has no models yet. Download one to start.')
+            print(dim(f'  Keeper is tested on {keeper.RECOMMENDED}.'))
+        elif state == 'model_missing':
+            print(f'  {conn["model"]} is no longer in Ollama. Choose another model.')
+        else:
+            print('  Choose the model Keeper will use.')
+        print()
+        _keeper_models(found, conn['model'])
+
+        guide = state in ('missing', 'stopped')
+        can_download = current == 2 and keeper.RECOMMENDED not in found
+        nav = [('number', 'select', '#', 'select')] if found else []
+        nav += [('o', 'open the guide', 'o', 'guide')] if guide else []
+        nav += [('d', f'download {keeper.RECOMMENDED}', 'd', 'download')] if can_download else []
+        nav += [('s', 'use a server', 's', 'server'), ('↵', 'check again', '↵', 'check'), ('b', 'back')]
+        print(dim(nav_line(nav)))
+        print()
+
+        command = read_command('keeper> ').lower()
+        keeper.reset()
+        if is_back(command):
+            return False
+        if command == 'o' and guide:
+            _open_docs()
+        elif command == 'd' and can_download:
+            _keeper_download(conn)
+        elif command == 's':
+            _server_screen()
+            if keeper.has_server():
+                return True
+        elif found and command.isascii() and command.isdigit() and 1 <= int(command) <= len(found):
+            update_keeper_model('local', found[int(command) - 1])
+
+
+def _server_screen():
+    while True:
+        conn = keeper.connection('server')
+        clear_screen()
+        print(dim('Settings > Archive > Keeper > Server'))
+        print()
+        print('  Keeper can use Ollama on another computer, for example one with a GPU.')
+        print()
+        if conn:
+            state, _ = wait('Checking server', keeper.status, conn)
+            print(f'  Address   {conn["url"].split("://", 1)[-1]}')
+            print(f'  Model     {conn["model"] or "—"}')
+            print(f'  Status    {dim(_KEEPER_STATUS[state])}')
+            if state == 'off':
+                print()
+                print(dim('  Ollama on that computer must be open to the network.'))
+                print(dim(f'  {_OLLAMA_FAQ}'))
+            elif state == 'foreign':
+                print()
+                print(dim('  Check the address and port.'))
+        else:
+            print(f'  Address   {dim("not set")}')
+        print()
+        nav = [('type', 'address, e.g. server-ip:11434', 'type', 'address')]
+        nav += [('m', 'model'), ('c', 'clear')] if conn else []
+        nav += [('↵', 'check again', '↵', 'check'), ('b', 'back')]
+        print(dim(nav_line(nav)))
+        print()
+
+        command = read_command('address> ')
+        keeper.reset()
+        low = command.lower()
+        if is_back(low):
+            return
+        if low == 'c':
+            if conn:
+                update_keeper_server('')
+        elif low == 'm':
+            if conn:
+                _keeper_models_screen('server')
+        elif command:
+            try:
+                update_keeper_server(command)
+            except ValueError:
+                error('Type an address like server-ip:11434')
 
 
 def keeper_screen():
     while True:
+        if not keeper.has_server() and not _keeper_setup():
+            return
         rows = keeper.connections()
         has_server = keeper.has_server()
         clear_screen()
@@ -501,15 +606,15 @@ def keeper_screen():
         if has_server:
             print(dim('  Keeper uses the server when it is on, otherwise this computer.'))
             print()
-        address = '[a] server address' if has_server else '[a] add server'
-        print(dim(f'  [number] model   {address}   [↵] check   [b] back'))
+        nav = [('number', 'model', '#', 'model'), ('s', 'server'), ('↵', 'check again', '↵', 'check'), ('b', 'back')]
+        print(dim(nav_line(nav)))
         print()
 
-        command = read_command('Keeper> ')
+        command = read_command('keeper> ').lower()
         keeper.reset()
-        if command == 'b':
+        if is_back(command):
             return
-        if command == 'a':
-            _server_address(has_server)
-        elif command.isdigit() and 1 <= int(command) <= len(rows):
+        if command == 's':
+            _server_screen()
+        elif command.isascii() and command.isdigit() and 1 <= int(command) <= len(rows):
             _keeper_models_screen(rows[int(command) - 1]['slot'])
