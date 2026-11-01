@@ -173,6 +173,7 @@ HELP_SECTIONS = [
         HelpEntry('nn / pp',      'last / first page or case'),
         HelpEntry('l / list',     'browse all cases'),
         HelpEntry('e',            'edit the open case', editor.available),
+        HelpEntry('d',            'move the open note to the trash'),
         HelpEntry('f',            'pin / unpin the open case'),
         HelpEntry('x number',     'check / uncheck a task in the open note'),
         HelpEntry('m',            'move the open kanban card to another list'),

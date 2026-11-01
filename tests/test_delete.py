@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from core.archives import vault
@@ -34,7 +35,7 @@ class Notes(unittest.TestCase):
 class Delete(Notes):
     def delete(self, case, answer=True, others=()):
         search_screen.archives.cases.return_value = [case, *others]
-        with mock.patch.object(search_screen, '_confirm', return_value=answer) as confirm, \
+        with mock.patch.object(search_screen, 'confirm', return_value=answer) as confirm, \
              mock.patch.object(search_screen, 'trash_note', side_effect=lambda fp: Path(fp).unlink()) as trash, \
              mock.patch.object(search_screen.favorites, 'is_pinned', return_value=False):
             done = search_screen._delete(case)
@@ -44,7 +45,7 @@ class Delete(Notes):
         case = self.note()
         done, prompt, trash = self.delete(case)
         self.assertTrue(done)
-        self.assertEqual(prompt, 'Move the note to the trash?')
+        self.assertEqual(prompt, 'Delete Alpha? It goes to the trash.')
         trash.assert_called_once_with(case['filepath'])
         self.assertFalse(Path(case['filepath']).exists())
 
@@ -59,11 +60,11 @@ class Delete(Notes):
         case = self.note()
         other = {'filepath': str(self.dir / 'Beta.md'), 'text': 'See [[Alpha]]'}
         _, prompt, _ = self.delete(case, others=[other])
-        self.assertEqual(prompt, 'Move the note to the trash? Linked from 1 record, those links will break.')
+        self.assertEqual(prompt, 'Delete Alpha? It goes to the trash. Linked from 1 record, those links will break.')
 
     def test_trash_error_keeps_note(self):
         case = self.note()
-        with mock.patch.object(search_screen, '_confirm', return_value=True), \
+        with mock.patch.object(search_screen, 'confirm', return_value=True), \
              mock.patch.object(search_screen, 'trash_note', side_effect=OSError('no trash here')), \
              mock.patch.object(search_screen, 'error') as error:
             self.assertFalse(search_screen._delete(case))
@@ -72,7 +73,7 @@ class Delete(Notes):
 
     def test_pinned_note_unpinned(self):
         case = self.note()
-        with mock.patch.object(search_screen, '_confirm', return_value=True), \
+        with mock.patch.object(search_screen, 'confirm', return_value=True), \
              mock.patch.object(search_screen, 'trash_note'), \
              mock.patch.object(search_screen.favorites, 'is_pinned', return_value=True), \
              mock.patch.object(search_screen.favorites, 'toggle') as toggle:
@@ -86,59 +87,74 @@ class Delete(Notes):
 
 
 class Edit(Notes):
-    def edit(self, results, edited, answer=True, commands=('e', 'b')):
+    def edit(self, results, edited=None, answer=True, commands=('e', 'b')):
         with mock.patch.object(search_screen, 'show_case', return_value=[]), \
              mock.patch.object(search_screen.editor, 'available', return_value=True), \
              mock.patch.object(search_screen.editor, 'edit_text', return_value=edited), \
-             mock.patch.object(search_screen, '_confirm', return_value=answer) as confirm, \
+             mock.patch.object(search_screen, 'confirm', return_value=answer) as confirm, \
              mock.patch.object(search_screen, 'trash_note', side_effect=lambda fp: Path(fp).unlink()) as trash, \
+             mock.patch.object(search_screen, '_save') as save, \
              mock.patch.object(search_screen.favorites, 'is_pinned', return_value=False), \
              mock.patch.object(search_screen, 'error') as error, \
              mock.patch.object(search_screen, 'read_command', side_effect=list(commands)) as read:
             out = search_screen.open_case(results, 1, '')
-        return out, trash, confirm, error, read
+        return SimpleNamespace(out=out, trash=trash, confirm=confirm, save=save, error=error, read=read)
 
-    def test_cleared_note_deleted(self):
+    def test_cleared_note_kept(self):
         case = self.note()
-        out, trash, _, _, read = self.edit([(0, case)], '')
-        self.assertIsNone(out)
-        trash.assert_called_once_with(case['filepath'])
-        self.assertEqual(read.call_count, 1)
+        s = self.edit([(0, case)], '')
+        s.confirm.assert_called_once_with('Clear all text in Alpha?')
+        s.save.assert_called_once_with(case, '')
+        s.trash.assert_not_called()
+        self.assertEqual(s.read.call_count, 2)
 
     def test_spaces_count_as_empty(self):
-        _, trash, _, _, _ = self.edit([(0, self.note())], ' \n \n')
-        trash.assert_called_once()
+        s = self.edit([(0, self.note())], ' \n \n')
+        s.confirm.assert_called_once()
+        s.trash.assert_not_called()
 
-    def test_cancel_keeps_note_and_text(self):
+    def test_clear_cancelled_keeps_text(self):
+        s = self.edit([(0, self.note())], '', answer=False)
+        s.save.assert_not_called()
+        s.trash.assert_not_called()
+
+    def test_untouched_empty_note_not_asked(self):
+        s = self.edit([(0, self.note(text=''))], '')
+        s.confirm.assert_not_called()
+        s.save.assert_not_called()
+        s.trash.assert_not_called()
+
+    def test_d_deletes_last_note(self):
         case = self.note()
-        _, trash, _, _, read = self.edit([(0, case)], '', answer=False)
-        trash.assert_not_called()
-        self.assertEqual(Path(case['filepath']).read_text(encoding='utf-8'), 'Alpha')
-        self.assertEqual(read.call_count, 2)
+        s = self.edit([(0, case)], commands=('d',))
+        self.assertIsNone(s.out)
+        s.trash.assert_called_once_with(case['filepath'])
+        self.assertEqual(s.read.call_count, 1)
+
+    def test_d_cancelled(self):
+        case = self.note()
+        s = self.edit([(0, case)], answer=False, commands=('d', 'b'))
+        s.trash.assert_not_called()
+        self.assertTrue(Path(case['filepath']).exists())
+        self.assertEqual(s.read.call_count, 2)
 
     def test_next_record_opens(self):
         first, second = self.note('Alpha'), self.note('Beta', 'Beta')
-        with mock.patch.object(search_screen, 'show_case', return_value=[]):
-            self.edit([(0, first), (0, second)], '')
+        s = self.edit([(0, first), (0, second)], commands=('d', 'b'))
+        s.trash.assert_called_once_with(first['filepath'])
         self.assertTrue(Path(second['filepath']).exists())
 
-    def test_empty_note_offered_without_change(self):
-        case = self.note(text='')
-        _, trash, confirm, _, _ = self.edit([(0, case)], '')
-        confirm.assert_called_once()
-        trash.assert_called_once()
-
-    def test_board_block_not_deleted(self):
+    def test_board_block_not_cleared_or_deleted(self):
         block = {'archive': 'Board', 'filepath': str(self.dir / 'b.excalidraw'), 'element_id': 'x1', 'text': 'Alpha'}
-        _, trash, confirm, error, _ = self.edit([(0, block)], '')
-        trash.assert_not_called()
-        confirm.assert_not_called()
-        error.assert_called_once_with('Empty text — edit cancelled')
+        s = self.edit([(0, block)], '', commands=('e', 'd', 'b'))
+        s.trash.assert_not_called()
+        s.confirm.assert_not_called()
+        s.error.assert_called_once_with('Empty text — edit cancelled')
 
     def test_unchanged_text_does_nothing(self):
-        _, trash, confirm, _, _ = self.edit([(0, self.note())], 'Alpha')
-        trash.assert_not_called()
-        confirm.assert_not_called()
+        s = self.edit([(0, self.note())], 'Alpha')
+        s.confirm.assert_not_called()
+        s.save.assert_not_called()
 
 
 class Deleted(Notes):

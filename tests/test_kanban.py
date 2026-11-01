@@ -283,7 +283,7 @@ class Screen(unittest.TestCase):
              mock.patch.object(search_screen, '_refresh', side_effect=lambda results, *a, **k: results), \
              mock.patch.object(search_screen, 'haptic') as hap, \
              mock.patch.object(search_screen, 'error') as err, \
-             mock.patch.object(search_screen, '_confirm') as confirm, \
+             mock.patch.object(search_screen, 'confirm') as confirm, \
              mock.patch.object(search_screen.editor, 'available', return_value=True), \
              mock.patch.object(search_screen.editor, 'edit_text', return_value=edited) as edit, \
              redirect_stdout(io.StringIO()) as out:

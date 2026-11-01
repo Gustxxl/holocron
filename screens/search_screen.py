@@ -8,7 +8,8 @@ from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path, page_rows, search_separator
 from core.system import copy_text
 from screens.help_screen import render_help
-from ui.interface import clear_screen, dim, error, pause, read_command, haptic, underline, nav_line, num, input_block
+from ui.interface import (clear_screen, confirm, dim, error, pause, read_command, haptic, underline, nav_line, num,
+                          input_block)
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, rules, table_cells
 from ui.note import drop_title, plain, render_note
 from ui.format import plural
@@ -328,10 +329,6 @@ def _refresh(results, query, rerun, force=False):
     return [(s, fresh.get((c.get('filepath'), c.get('element_id')), c)) for s, c in results]
 
 
-def _confirm(prompt):
-    return input(f'  {prompt} [y/N] ').strip().lower() in ('y', 'yes')
-
-
 def _save(case, text):
     fp, eid = case.get('filepath'), case.get('element_id')
     if 'lane' in case:
@@ -352,6 +349,10 @@ def _save(case, text):
         case['raw'], case['text'] = text, excalidraw.strip_emoji(text).strip()
 
 
+def _is_note(case):
+    return case.get('archive') == Vault.name and 'lane' not in case and bool(case.get('filename'))
+
+
 def _deleted(case):
     return bool(case.get('filename')) and not Path(case['filepath']).exists()
 
@@ -359,7 +360,7 @@ def _deleted(case):
 def _delete(case):
     count = wikilinks.linked(case['filepath'], archives.cases())
     linked = f' Linked from {plural(count, "record")}, those links will break.' if count else ''
-    if not _confirm(f'Move the note to the trash?{linked}'):
+    if not confirm(f'Delete {case["filename"]}? It goes to the trash.{linked}'):
         return False
     try:
         trash_note(case['filepath'])
@@ -472,17 +473,12 @@ def open_case(results, number, query, rerun=True, trail=()):
                 error('Could not open the editor')
                 continue
             edited = edited.strip()
-            if edited == source.strip() and (edited or not case.get('filename')):
+            if edited == source.strip():
                 continue
-            if not edited and not case.get('filename'):
+            if not edited and not _is_note(case):
                 error('Empty text — edit cancelled')
                 continue
-            if not edited:
-                if _delete(case):
-                    results = [(s, c) for s, c in _refresh(results, query, False, force=True) if not _deleted(c)]
-                    if not results:
-                        return None
-                    number = min(number, len(results))
+            if not edited and not confirm(f'Clear all text in {case["filename"]}?'):
                 continue
             try:
                 _save(case, edited)
@@ -491,13 +487,20 @@ def open_case(results, number, query, rerun=True, trail=()):
                 error(f'Could not save: {e}{kept}')
             else:
                 haptic('success')
-                note = _follow(case, source, edited)
+                note = _follow(case, source, edited) if edited else None
                 if note:
                     print(dim(f'  {note}'))
                     pause()
             results = _refresh(results, query, False)
             continue
 
+        if low in ('d', 'delete') and _is_note(case):
+            if _delete(case):
+                results = [(s, c) for s, c in _refresh(results, query, False, force=True) if not _deleted(c)]
+                if not results:
+                    return None
+                number = min(number, len(results))
+            continue
         if low in ('f', 'fav'):
             if case.get('filepath'):
                 favorites.toggle(case)
@@ -704,6 +707,8 @@ def show_case(case, query='', number=None, total=None, trail=()):
     nav = []
     if editor.available():
         nav.append(('e', 'edit', 'e', 'edit'))
+    if _is_note(case):
+        nav.append(('d', 'delete', 'd', 'delete'))
     if 'lane' in case:
         nav.append(('m', 'move', 'm', 'move'))
         if editor.available():
