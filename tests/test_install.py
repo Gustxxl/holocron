@@ -50,6 +50,7 @@ class Remove(unittest.TestCase):
         self.run_remove()
         self.assertTrue(config.exists())
 
+    @unittest.skipIf(os.name == 'nt', 'Homebrew')
     def test_homebrew_tools_kept(self):
         cellar = self.file(self.root / 'Cellar' / 'remindctl' / '0.3.8' / 'bin' / 'remindctl')
         self.brew.mkdir()

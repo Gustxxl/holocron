@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import os
 import ssl
 import subprocess
 import tarfile
@@ -338,6 +339,7 @@ class Copies(unittest.TestCase):
             self.assertEqual(cli.which('sampletool'), str(local))
             self.assertEqual(cli.shadowed('sampletool'), '/opt/homebrew/bin/sampletool')
 
+    @unittest.skipIf(os.name == 'nt', 'Homebrew')
     def test_homebrew_copy(self):
         with mock.patch.object(cli, '_system', return_value=self.brew_link()):
             self.assertEqual(cli.origin('sampletool'), 'homebrew')
@@ -358,6 +360,7 @@ class Copies(unittest.TestCase):
         self.assertFalse(local.exists())
         popen.assert_not_called()
 
+    @unittest.skipIf(os.name == 'nt', 'Homebrew')
     def test_remove_keeps_homebrew_copy(self):
         self.tool('bin')
         link = self.brew_link()
