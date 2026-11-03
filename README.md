@@ -97,7 +97,7 @@ Settings also show which copy of the tool Holocron uses, the one it downloaded o
 
 - **Reminders.** View, tick off (`x 2`) and edit reminders. Add one with `a`: `Call the vendor #work @office`. `#list` and `@waypoint` are optional.
 - **Waypoints.** Save an address under a short name like `office` once, then use `@office` in any reminder. Choose whether it fires on arrival or when you leave, and set the radius (100 m by default).
-- **Calendar.** Upcoming events grouped by day. Add one with `a`: `Standup 10:00` or `Lunch tomorrow 12:30-13:30 #work`.
+- **Calendar.** Upcoming events grouped by day. Add one with `a`: `Standup 20:00` or `Lunch tomorrow 12:30-13:30 #work`.
 - **Meeting links.** Holocron looks for links in the event URL, location, notes and invitees and shows the meeting link right under the event: Zoom, Google Meet, Teams, Webex, Whereby, Jitsi and Telemost.
 
 On Windows and Linux everything else works the same, only reminders and calendar are macOS-only. If you need them on another system, [open an issue](https://github.com/Gustxxl/holocron/issues).
