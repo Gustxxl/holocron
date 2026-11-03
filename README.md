@@ -8,7 +8,8 @@ Holocron reads the same file from the terminal and gets me the right block in a 
 
 So drop everything on a board and don't worry about order or wording. Skip a word, use a different word form or make a typo, and the right block still comes up, ready to read or edit.
 
-<img width="2388" height="2022" alt="CleanShot 2026-10-10 kpVgcpSX@2x" src="https://github.com/user-attachments/assets/11a8a3c2-0327-4de3-89ff-41bdb1dbcd33" />
+<img width="2470" height="1962" alt="CleanShot 2026-11-03 E2Qd4Hk9@2x" src="https://github.com/user-attachments/assets/dc3b0d89-23eb-416b-b565-9b3dfd8652fc" />
+
 
 ## What's inside
 
