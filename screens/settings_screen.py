@@ -29,7 +29,7 @@ from core.settings import (
 
 from core import archives, keeper
 from screens.schedule_settings_screen import schedule_settings
-from ui.interface import (clear_line, clear_screen, dim, error, haptic, is_back, nav_line, num, pause, progress,
+from ui.interface import (clear_line, clear_screen, dim, error, haptic, is_back, nav_line, num, pause, pick, progress,
                           read_command, red, show_menu, wait)
 from pathlib import Path
 from ui.clean_path import clean_input_path
@@ -51,7 +51,7 @@ def settings_screen():
         command = read_command('settings> ')
         if command == 'b':
             return
-        if command.isdigit() and 1 <= int(command) <= len(items):
+        if pick(command, len(items)):
             items[int(command) - 1][1]()
 
 
@@ -287,7 +287,7 @@ def vault_screen():
             return
         if command == '':
             continue
-        if command.isdigit() and 1 <= int(command) <= len(rows):
+        if pick(command, len(rows)):
             name = rows[int(command) - 1][0]
             update_vault_exclude([p for p in skip if p != name] if name in skip else [*skip, name])
             archives.load()

@@ -1,7 +1,8 @@
 import re
 from core import sources, system
 from core.sources import cli, macos
-from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, num, pause, read_command, nav_line, wait
+from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, num, pause, pick, read_command, nav_line, wait
+
 
 _DEFAULT_RE = re.compile(r'd\s*(\d+)')
 _STEPS = ['old_macos', 'missing', 'denied']
@@ -159,15 +160,15 @@ def lists_screen(source):
         clear_screen()
         print(frame)
         command = read_command(f'{source.LISTS}> ').lower()
-        pick = _DEFAULT_RE.fullmatch(command)
+        default = _DEFAULT_RE.fullmatch(command)
         count = _MAIN_RE.fullmatch(command)
         days = _AHEAD_RE.fullmatch(command)
         if is_back(command):
             return
         if command == 'i' and tool:
             tool_screen(source)
-        elif pick and 1 <= int(pick.group(1)) <= len(lists):
-            sources.set_default(source.KEY, lists[int(pick.group(1)) - 1]['id'])
+        elif default and 1 <= int(default.group(1)) <= len(lists):
+            sources.set_default(source.KEY, lists[int(default.group(1)) - 1]['id'])
             haptic('toggle')
         elif count and int(count.group(1)) <= 20:
             sources.set_option(source.KEY, 'shown', int(count.group(1)))
@@ -175,7 +176,7 @@ def lists_screen(source):
         elif days and int(days.group(1)) <= 30:
             sources.set_option(source.KEY, 'ahead', int(days.group(1)))
             haptic('toggle')
-        elif command.isdigit() and 1 <= int(command) <= len(lists):
+        elif pick(command, len(lists)):
             sources.toggle_list(source.KEY, lists[int(command) - 1]['id'])
             haptic('toggle')
 

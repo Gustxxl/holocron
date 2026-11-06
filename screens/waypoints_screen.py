@@ -2,7 +2,7 @@ import re
 from core import editor, waypoints
 from core.sources import remindctl
 from screens.help_screen import show_help
-from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, read_command, nav_line
+from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, pick, read_command, nav_line
 
 _RADIUS_RE = re.compile(r'r\s*(\d+)')
 
@@ -21,7 +21,7 @@ def waypoints_screen():
             show_help()
         elif command == 'a':
             _add()
-        elif command.isdigit() and 1 <= int(command) <= len(points):
+        elif pick(command, len(points)):
             _open(list(points), int(command), items)
 
 
@@ -96,7 +96,7 @@ def _open(names, number, items):
             number += 1
         elif command == 'p' and number > 1:
             number -= 1
-        elif command.isdigit():
+        elif pick(command, len(names)):
             number = int(command)
 
 

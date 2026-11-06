@@ -1,7 +1,7 @@
 import sys
 from core import archives, diagnostics, keeper
 from screens.help_screen import show_help
-from ui.interface import clear_screen, dim, haptic, is_back, pause, progress, read_command, red
+from ui.interface import clear_screen, dim, haptic, is_back, pause, pick, progress, read_command, red
 
 
 def diagnostics_screen():
@@ -24,7 +24,7 @@ def diagnostics_screen():
                 break
             if command in ('h', 'help'):
                 show_help()
-            elif command.isdigit() and 1 <= int(command) <= len(report['failed']):
+            elif pick(command, len(report['failed'])):
                 _details(*report['failed'][int(command) - 1])
 
 

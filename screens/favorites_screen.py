@@ -2,7 +2,7 @@ from core import archives, favorites
 from core.commands import HELP_SECTIONS
 from screens.help_screen import render_help
 from screens.search_screen import open_case, search_screen, show_list
-from ui.interface import clear_screen, dim, pause, read_command
+from ui.interface import clear_screen, dim, pause, pick, read_command
 
 
 def _open(results, number):
@@ -41,6 +41,6 @@ def favorites_screen():
             page = len(results)
         elif command == 'pp':
             page = 0
-        elif command.isdigit() and 1 <= int(command) <= len(results):
+        elif pick(command, len(results)):
             if _open(results, int(command)):
                 return

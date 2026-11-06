@@ -3,7 +3,7 @@ from core import dates, events, sources
 from screens.help_screen import show_help
 from screens.sources_screen import lists_screen, source_setup, unreadable
 from ui.format import day_label, time_range
-from ui.interface import clear_screen, dim, error, haptic, hyperlink, is_back, pause, read_command, nav_line, underline
+from ui.interface import clear_screen, dim, error, haptic, hyperlink, is_back, pause, pick, read_command, nav_line, underline
 
 
 def events_screen(source):
@@ -32,7 +32,7 @@ def events_screen(source):
             text = read_command('text> ')
             if text:
                 _add(source, text, lists, chosen)
-        elif low.isdigit() and 1 <= int(low) <= len(flat):
+        elif pick(low, len(flat)):
             _open(flat, int(low))
 
 
@@ -101,7 +101,7 @@ def _open(flat, number):
             number = len(flat)
         elif command == 'pp':
             number = 1
-        elif command.isdigit() and 1 <= int(command) <= len(flat):
+        elif pick(command, len(flat)):
             number = int(command)
 
 

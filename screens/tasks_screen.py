@@ -3,7 +3,7 @@ from datetime import datetime
 from core import dates, editor, sources, tasks, waypoints
 from screens.help_screen import show_help
 from ui.format import day_label
-from ui.interface import clear_screen, dim, error, haptic, is_back, pause, read_command, red, nav_line
+from ui.interface import clear_screen, dim, error, haptic, is_back, pause, pick, read_command, red, nav_line
 from screens.sources_screen import lists_screen, source_setup, unreadable
 
 _CHECK_RE = re.compile(r'x\s*(\d+)')
@@ -39,7 +39,7 @@ def tasks_screen(source):
                 _add(source, text, lists, chosen)
         elif check and 1 <= int(check.group(1)) <= len(flat):
             _complete(source, flat[int(check.group(1)) - 1])
-        elif low.isdigit() and 1 <= int(low) <= len(flat):
+        elif pick(low, len(flat)):
             _open(source, flat, int(low))
 
 
@@ -111,7 +111,7 @@ def _open(source, flat, number):
             number = len(flat)
         elif command == 'pp':
             number = 1
-        elif command.isdigit() and 1 <= int(command) <= len(flat):
+        elif pick(command, len(flat)):
             number = int(command)
 
 

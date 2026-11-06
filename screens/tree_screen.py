@@ -5,7 +5,7 @@ from core import archives, editor, favorites, tree
 from core.settings import archive_path, excalidraw_path, new_cases_path, page_rows, vault_path
 from screens.help_screen import show_help
 from ui.format import plural
-from ui.interface import clear_screen, dim, haptic, num, read_command, nav_line
+from ui.interface import clear_screen, dim, haptic, num, pick, read_command, nav_line
 from screens.search_screen import add_card, by_name, list_rows, open_case, search_screen
 
 NAME_MAX = 40
@@ -75,7 +75,7 @@ def tree_screen(start=None, before=False, after=False):
         elif command == '':
             archives.load(force=True)
             root = _build()
-        elif command.isdigit() and 1 <= int(command) <= len(items):
+        elif pick(command, len(items)):
             item = items[int(command) - 1]
             if not tree.is_branch(node):
                 _read(items, int(command))

@@ -7,7 +7,7 @@ from core.commands import HELP_SECTIONS
 from screens.help_screen import render_help
 from screens.search_screen import MIN_QUERY, open_case, first_line, highlight, highlight_links, dim_links
 from ui.interface import (Spinner, clear_screen, dim, fill, haptic, input_block, input_rows, nav_line, num, pause,
-                          read_command, wait)
+                          pick, read_command, wait)
 from ui.markdown import code_blocks, is_code, paint_code
 
 NAV_ROWS = 2
@@ -301,10 +301,8 @@ def keeper_screen(case=None):
         if wide:
             command = turns[-1]['question']
             _redraw(turns, records, case, command)
-        elif command.isdigit():
+        elif pick(command, len(records)):
             number = int(command)
-            if not 1 <= number <= len(records):
-                continue
             results = [(0, c) for c in records]
             new = open_case(results, number, _terms_for(turns, number), rerun=False)
             if not new or new == 'l' or len(new) < MIN_QUERY:

@@ -3,7 +3,7 @@ from core import clocks, schedule, zones
 from core.dates import DAYS, monday, parse_date, parse_periods
 from ui.format import date_span, day_runs, days_summary, periods, plural, week_span
 from core.system import copy_text
-from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, num, pause, read_command, red, nav_line
+from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, num, pause, pick, read_command, red, nav_line
 import re
 
 
@@ -29,7 +29,7 @@ def _pick_days(text):
     picked = set()
     for part in text.replace(',', ' ').split():
         a, sep, b = part.partition('-')
-        if not a.isdigit() or (sep and not b.isdigit()):
+        if not pick(a, 7) or (sep and not pick(b, 7)):
             return []
         first, last = int(a), int(b) if sep else int(a)
         if not 1 <= first <= last <= 7:
@@ -133,7 +133,7 @@ def _weeks_screen():
             if confirm(f'Remove week {len(weeks)}?'):
                 schedule.save_weeks(weeks[:-1])
                 haptic('toggle')
-        elif command.isdigit() and 1 <= int(command) <= len(weeks):
+        elif pick(command, len(weeks)):
             _week_screen(int(command) - 1)
 
 
@@ -156,7 +156,7 @@ def _current_week_screen():
         command = read_command('week> ')
         if is_back(command):
             return
-        if command.isdigit() and 1 <= int(command) <= len(weeks):
+        if pick(command, len(weeks)):
             schedule.set_current_week(int(command))
             haptic('toggle')
             return
@@ -210,7 +210,7 @@ def _vacations_screen():
             return
         if command == '+':
             _add_vacation(vacations)
-        elif command.isdigit() and 1 <= int(command) <= len(vacations):
+        elif pick(command, len(vacations)):
             i = int(command) - 1
             if confirm(f'Remove {date_span(*vacations[i])}?'):
                 schedule.save_vacations(vacations[:i] + vacations[i + 1:])
@@ -389,7 +389,7 @@ def _zone_screen():
             continue
         if not command:
             continue
-        if found and command.isdigit():
+        if found and command.isascii() and command.isdigit():
             n = int(command)
             if 1 <= n <= len(found):
                 _pick(found[n - 1], adding)

@@ -285,6 +285,13 @@ def is_back(command):
     return command.strip().lower() in ('b', 'back')
 
 
+def pick(text, total):
+    text = text.strip()
+    if text.isascii() and text.isdigit() and 1 <= int(text) <= total:
+        return int(text)
+    return None
+
+
 def confirm(question):
     return read_command(f'{question} [y/N] ').lower() == 'y'
 

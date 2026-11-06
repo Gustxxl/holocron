@@ -1,7 +1,7 @@
 from urllib.parse import urlsplit
 
 from core.config import load, save
-from ui.interface import clear_screen
+from ui.interface import clear_screen, pick
 from ui.clean_path import clean_input_path
 
 
@@ -186,7 +186,7 @@ def update_home_order(items):
 
 def reorder(items, text):
     picks = text.replace(' ', '')
-    if not picks.isdigit() or len(set(picks)) != len(picks) or not all(1 <= int(c) <= len(items) for c in picks):
+    if not picks or len(set(picks)) != len(picks) or not all(pick(c, len(items)) for c in picks):
         return None
     first = [items[int(c) - 1] for c in picks]
     return [*first, *(i for i in items if i not in first)]

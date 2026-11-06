@@ -8,8 +8,8 @@ from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path, page_rows, search_separator
 from core.system import copy_text
 from screens.help_screen import render_help
-from ui.interface import (clear_screen, confirm, dim, error, pause, read_command, haptic, underline, nav_line, num,
-                          input_block)
+from ui.interface import (clear_screen, confirm, dim, error, pause, pick, read_command, haptic, underline, nav_line,
+                          num, input_block)
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, rules, table_cells
 from ui.note import drop_title, plain, render_note
 from ui.format import plural
@@ -270,7 +270,7 @@ def search_screen(initial_query=None):
         if low == 'pp' and results:
             page = 0
             continue
-        if command.isdigit() and results:
+        if pick(command, len(results)):
             new_query = open_case(results, int(command), query)
             if not new_query and any(_deleted(c) for _, c in results):
                 archives.load(force=True)
@@ -410,7 +410,7 @@ def _move(case):
         print(f'{num(i, digits)}{title}{here}')
     print()
     choice = read_command('move to> ')
-    if not choice.isdigit() or not 1 <= int(choice) <= len(lanes):
+    if not pick(choice, len(lanes)):
         return
     board = kanban.move(text, case['lane'], case['raw'], int(choice) - 1)
     if board == text:
@@ -579,7 +579,7 @@ def open_case(results, number, query, rerun=True, trail=()):
         if low == 'pp':
             number = 1
             continue
-        if command.isdigit():
+        if pick(command, len(results)):
             number = int(command)
             continue
 
