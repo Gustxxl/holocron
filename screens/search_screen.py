@@ -17,7 +17,8 @@ from ui.format import plural
 
 _HL = '\033[38;2;116;167;254m'
 _MARK = '\033[38;2;20;20;20;48;2;116;167;254m'
-_RESET = '\033[0m'
+_HL_OFF = '\033[39m'
+_MARK_OFF = '\033[39m\033[49m'
 
 PAGE = 10
 ASKED_INDENT = '   '
@@ -89,7 +90,7 @@ def highlight(text, *queries):
     def repl(m):
         word = m.group(0)
         if any(_hl_match(t, word.lower()) for t in terms):
-            return f'{_HL}{word}{_RESET}'
+            return f'{_HL}{word}{_HL_OFF}'
         return word
 
     def soft(part):
@@ -110,7 +111,7 @@ def highlight(text, *queries):
     out, pos = [], 0
     for m in phrase.finditer(text):
         out.append(soft_no_urls(text[pos:m.start()]))
-        out.append(f'{_MARK}{m.group(0)}{_RESET}')
+        out.append(f'{_MARK}{m.group(0)}{_MARK_OFF}')
         pos = m.end()
     out.append(soft_no_urls(text[pos:]))
     return ''.join(out)

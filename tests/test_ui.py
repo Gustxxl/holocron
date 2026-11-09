@@ -40,13 +40,13 @@ class Highlight(unittest.TestCase):
 
     def test_part_of_underscored_name(self):
         result = highlight('XY_AB12 - z', 'AB12')
-        self.assertIn(f'{search_screen._HL}AB12{search_screen._RESET}', result)
+        self.assertIn(f'{search_screen._HL}AB12{search_screen._HL_OFF}', result)
 
     def test_underscore_and_space_same_phrase(self):
         for query in ('AB12 CD', 'AB12_CD'):
             with self.subTest(query=query):
                 result = highlight('AB12_CD - x', query)
-                self.assertIn(f'{search_screen._MARK}AB12_CD{search_screen._RESET}', result)
+                self.assertIn(f'{search_screen._MARK}AB12_CD{search_screen._MARK_OFF}', result)
 
     def test_phrase_not_inside_longer_name(self):
         self.assertNotIn(search_screen._MARK, highlight('AB12_CD_EF', 'AB12 CD'))
@@ -55,7 +55,7 @@ class Highlight(unittest.TestCase):
         for query in ('ЛЕС_ДОМ', 'лёс дом'):
             with self.subTest(query=query):
                 result = highlight('ЛЕС_ДОМ - x', query)
-                self.assertIn(f'{search_screen._MARK}ЛЕС_ДОМ{search_screen._RESET}', result)
+                self.assertIn(f'{search_screen._MARK}ЛЕС_ДОМ{search_screen._MARK_OFF}', result)
 
 
 class HighlightLinks(unittest.TestCase):

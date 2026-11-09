@@ -69,7 +69,7 @@ def paint_code(text):
     out = []
     for ln in text.split('\n'):
         if is_code(ln):
-            body = ln[1:].replace('\033[0m', '\033[0m' + _CODE_BG)
+            body = ln[1:].replace('\033[0m', '\033[0m' + _CODE_BG).replace('\033[49m', '\033[49m' + _CODE_BG)
             ln = f'{_CODE_BG}{body}\033[K\033[0m'
         out.append(ln)
     return '\n'.join(out)
