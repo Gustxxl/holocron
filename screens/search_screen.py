@@ -2,7 +2,7 @@ import re
 import shutil
 import textwrap
 from pathlib import Path
-from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks, keeper, kanban
+from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks, keeper, kanban, history
 from core.archives.vault import Vault, save_note, create_note, read_note, renamed, rename_note, trash_note
 from core.commands import HELP_SECTIONS
 from core.settings import new_cases_path, page_rows, search_separator
@@ -166,6 +166,11 @@ def _run(cases, text):
     return results, groups, text, False
 
 
+def _remember(results, query, list_mode):
+    if results and not list_mode:
+        history.add(query)
+
+
 def _again(cases, query, list_mode):
     if list_mode:
         return _all(cases), None
@@ -187,7 +192,7 @@ def _exact(results, query, list_mode):
     return sum(1 for score, _ in results if search.is_exact(score))
 
 
-def search_screen(initial_query=None):
+def search_screen(initial_query=None, remember=True):
     cases = archives.cases()
     if not cases:
         clear_screen()
@@ -207,6 +212,8 @@ def search_screen(initial_query=None):
         return
     if query:
         results, groups, query, list_mode = _run(cases, query)
+        if remember:
+            _remember(results, query, list_mode)
     while True:
         if query and not results:
             clear_screen()
@@ -284,6 +291,7 @@ def search_screen(initial_query=None):
                 archives.load()
                 cases = archives.cases()
                 results, groups, query, list_mode = _run(cases, new_query)
+                _remember(results, query, list_mode)
                 page = 0
             continue
         if _too_short(command):
@@ -294,6 +302,7 @@ def search_screen(initial_query=None):
         archives.load()
         cases = archives.cases()
         results, groups, query, list_mode = _run(cases, command)
+        _remember(results, query, list_mode)
         page, back = 0, None
 
 
@@ -533,7 +542,7 @@ def open_case(results, number, query, rerun=True, trail=()):
         if m:
             n = int(m.group(1)) if m.group(1) else (1 if len(jumps) == 1 else 0)
             if 1 <= n <= len(jumps) and isinstance(jumps[n - 1], str):
-                search_screen(_as_query(jumps[n - 1]))
+                search_screen(_as_query(jumps[n - 1]), remember=False)
                 results = _refresh(results, query, False)
             elif 1 <= n <= len(jumps):
                 target = [(0, c) for c in jumps[n - 1]]

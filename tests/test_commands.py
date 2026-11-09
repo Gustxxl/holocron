@@ -85,6 +85,21 @@ class Keeper(unittest.TestCase):
         screen.assert_called_once_with()
 
 
+class History(unittest.TestCase):
+    def test_names(self):
+        for name in ('y', 'Y', 'history'):
+            with self.subTest(name):
+                self.assertEqual(commands.lookup(name).name, 'history')
+
+    def test_help(self):
+        self.assertEqual(_entry('Commands', 'history / y').help, 'searches from this session')
+
+    def test_opens_history(self):
+        with patch('screens.history_screen.history_screen') as screen:
+            commands.lookup('y').run('y')
+        screen.assert_called_once_with()
+
+
 class Sources(unittest.TestCase):
     def _source(self, ready=True, add=True):
         source = SimpleNamespace(available=lambda: ready)

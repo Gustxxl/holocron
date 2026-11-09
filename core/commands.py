@@ -120,6 +120,11 @@ def _cmd_favorites(raw):
     favorites_screen()
 
 
+def _cmd_history(raw):
+    from screens.history_screen import history_screen
+    history_screen()
+
+
 def _cmd_hyperspace(raw):
     from ui.hyperspace import hyperspace
     hyperspace()
@@ -153,6 +158,7 @@ COMMANDS = [
     Command('reminders',  _cmd_reminders,  ('r',),        'open reminders', _has_reminders),
     Command('waypoints',  _cmd_waypoints,  ('wp',),       'places for location reminders', remindctl.available),
     Command('favorites',  _cmd_favorites,  ('f', 'fav'),  'pinned records'),
+    Command('history',    _cmd_history,    ('y',),        'searches from this session'),
     Command('tree',       _cmd_tree,       (),            'browse the archive by folder', archives.is_loaded),
     Command('note',       _cmd_note,       (),            'write a new note', _can_write_note),
     Command('settings',   _cmd_settings,   ('s',),        'operator name / archives / schedule / Keeper'),
