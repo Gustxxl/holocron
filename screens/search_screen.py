@@ -9,7 +9,7 @@ from core.settings import new_cases_path, page_rows, search_separator
 from core.system import copy_text
 from screens.help_screen import render_help
 from ui.interface import (clear_screen, confirm, dim, error, pause, pick, read_command, haptic, underline, nav_line,
-                          num, input_block)
+                          num, input_block, map_text)
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, rules, table_cells
 from ui.note import drop_title, plain, render_note
 from ui.format import plural
@@ -106,15 +106,19 @@ def highlight(text, *queries):
         return ''.join(out)
 
     phrase = _phrase_re(queries)
-    if not phrase:
-        return soft_no_urls(text)
-    out, pos = [], 0
-    for m in phrase.finditer(text):
-        out.append(soft_no_urls(text[pos:m.start()]))
-        out.append(f'{_MARK}{m.group(0)}{_MARK_OFF}')
-        pos = m.end()
-    out.append(soft_no_urls(text[pos:]))
-    return ''.join(out)
+
+    def paint(part):
+        if not phrase:
+            return soft_no_urls(part)
+        out, pos = [], 0
+        for m in phrase.finditer(part):
+            out.append(soft_no_urls(part[pos:m.start()]))
+            out.append(f'{_MARK}{m.group(0)}{_MARK_OFF}')
+            pos = m.end()
+        out.append(soft_no_urls(part[pos:]))
+        return ''.join(out)
+
+    return map_text(text, paint)
 
 
 def _all(cases):

@@ -201,6 +201,18 @@ class Loading(unittest.TestCase):
         self.assertIn('·' * 20, out.getvalue())
 
 
+class MapText(unittest.TestCase):
+    def test_codes_kept(self):
+        self.assertEqual(interface.map_text('\033[1mab\033[0m cd', str.upper), '\033[1mAB\033[0m CD')
+
+    def test_link_target_kept(self):
+        self.assertEqual(interface.map_text(interface.hyperlink('https://x.io', 'go'), str.upper),
+                         '\033]8;;https://x.io\033\\GO\033]8;;\033\\')
+
+    def test_plain_text(self):
+        self.assertEqual(interface.map_text('ab', str.upper), 'AB')
+
+
 class Clip(unittest.TestCase):
     def test_fits_unchanged(self):
         line = interface.dim('Standup · today 10:00 #Work')

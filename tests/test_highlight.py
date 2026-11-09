@@ -3,7 +3,7 @@ import unittest
 from screens import search_screen
 from screens.search_screen import highlight
 from ui import markdown
-from ui.interface import bold
+from ui.interface import bold, dim
 from ui.note import render_note
 
 MARK, MARK_OFF = search_screen._MARK, search_screen._MARK_OFF
@@ -34,6 +34,27 @@ class Bold(unittest.TestCase):
 
     def test_no_match_unchanged(self):
         self.assertEqual(highlight(bold('Alpha Beta'), 'Omega'), bold('Alpha Beta'))
+
+
+class FirstWord(unittest.TestCase):
+    def test_heading(self):
+        out = highlight(render_note('# Alpha Beta', 80), 'Alpha')
+        self.assertEqual(out, f'\033[1m{MARK}Alpha{MARK_OFF} Beta\033[0m')
+
+    def test_inline_bold(self):
+        out = highlight(render_note('Run **Alpha Beta** now', 80), 'Alpha')
+        self.assertEqual(out, f'Run \033[1m{MARK}Alpha{MARK_OFF} Beta\033[22m now')
+
+    def test_word_after_code(self):
+        out = highlight(bold('Alpha_XY'), 'Alpha')
+        self.assertEqual(out, f'\033[1m{HL}Alpha{HL_OFF}_XY\033[0m')
+
+    def test_dim(self):
+        self.assertEqual(highlight(dim('Alpha'), 'Alpha'), f'\033[2m{MARK}Alpha{MARK_OFF}\033[0m')
+
+    def test_cyrillic(self):
+        out = highlight(render_note('# Альфа Бета', 80), 'Альфа')
+        self.assertEqual(out, f'\033[1m{MARK}Альфа{MARK_OFF} Бета\033[0m')
 
 
 class Code(unittest.TestCase):

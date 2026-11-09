@@ -49,6 +49,10 @@ def visible(text):
     return _ESC.sub('', text)
 
 
+def map_text(text, fn):
+    return ''.join(part if i % 2 else fn(part) for i, part in enumerate(_ESC.split(text)))
+
+
 def _cells(text):
     return sum(0 if unicodedata.combining(c) else 2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in text)
 
