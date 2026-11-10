@@ -28,6 +28,7 @@ _URL_RE = re.compile(r'https?://\S+')
 _CHECK_RE = re.compile(r'x\s*(\d+)')
 _JUMP_RE = re.compile(r'j\s*(\d*)')
 _LINK_RE = re.compile('\xa0\x03(\\d+)\x04')
+_GAP = r'(?:[^\w\n]|_)+'
 
 
 def _link_mark(shown, n):
@@ -73,9 +74,9 @@ def _hl_match(qw, tw):
 def _phrase_re(queries):
     patterns = []
     for query in queries:
-        parts = [re.escape(p) for p in re.split(r'[\s_]+', query.lower().replace('ё', 'е')) if p]
+        parts = [re.escape(p) for p in search._WORD_RE.findall(search._normalize_search_text(query))]
         if parts:
-            patterns.append(r'[ \t_]+'.join(parts).replace('е', '[её]'))
+            patterns.append(_GAP.join(parts).replace('е', '[её]'))
     if not patterns:
         return None
     patterns.sort(key=len, reverse=True)

@@ -1,6 +1,6 @@
 import unittest
 
-from core.search import _norm_words, score_case, search, suggest
+from core.search import _norm_words, _query, score_case, search, suggest
 
 
 def _case(text):
@@ -66,6 +66,29 @@ class ScoreCase(unittest.TestCase):
         target = {'text': 'заметка\n' + 'длинный текст ' * 300, 'filename': '02 Jun 2026'}
         other = {'text': 'коротко', 'filename': '18 Jun 2026'}
         self.assertGreater(score_case(target, '02 Jun 2026'), score_case(other, '02 Jun 2026'))
+
+
+class Phrase(unittest.TestCase):
+    def test_query_keeps_only_words(self):
+        for query, flat in (('Alpha, "Beta" — gamma.', ' alpha beta gamma '), ('Альфа «Бёта»', ' альфа бета '),
+                            ('AB12_CD', ' ab12 cd '), ('"…"', '')):
+            with self.subTest(query=query):
+                self.assertEqual(_query(query)[1], flat)
+
+    def test_exact_phrase_wins_over_length(self):
+        near = {'text': "Item No. 'ITE...' does not exist."}
+        exact = {'text': 'Item No. " does not exist\n' + 'Detail line. ' * 40}
+        results = search([near, exact], 'Item No. " does not exist.')
+        self.assertEqual([c for _, c in results], [exact, near])
+
+    def test_quote_and_dash_kinds_equal(self):
+        for typed, written in (('Run "Alpha" now', 'Run «Alpha» now'), ('Alpha - Beta now', 'Alpha — Beta now')):
+            with self.subTest(written=written):
+                self.assertEqual(score_case(_case(written), typed), score_case(_case(typed), typed))
+
+    def test_filename_ignores_punctuation(self):
+        case = {'text': 'body', 'filename': '02 Jun 2026'}
+        self.assertEqual(score_case(case, '02 Jun, 2026.'), score_case(case, '02 Jun 2026'))
 
 
 class Search(unittest.TestCase):

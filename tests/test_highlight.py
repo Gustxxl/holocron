@@ -57,6 +57,22 @@ class FirstWord(unittest.TestCase):
         self.assertEqual(out, f'\033[1m{MARK}Альфа{MARK_OFF} Бета\033[0m')
 
 
+class Phrase(unittest.TestCase):
+    def test_punctuation_between_words(self):
+        out = highlight('Item No. " does not exist', 'Item No. " does not exist.')
+        self.assertEqual(out, f'{MARK}Item No. " does not exist{MARK_OFF}')
+
+    def test_quote_kinds(self):
+        self.assertEqual(highlight('Run «Alpha» now', 'run "alpha" now'), f'{MARK}Run «Alpha» now{MARK_OFF}')
+
+    def test_not_across_lines(self):
+        self.assertEqual(highlight('Alpha\nBeta', 'Alpha Beta'), f'{HL}Alpha{HL_OFF}\n{HL}Beta{HL_OFF}')
+
+    def test_extra_word_breaks_phrase(self):
+        out = highlight("Item No. 'ITE' does", 'item no does')
+        self.assertEqual(out, f"{HL}Item{HL_OFF} {HL}No{HL_OFF}. 'ITE' {HL}does{HL_OFF}")
+
+
 class Code(unittest.TestCase):
     def test_phrase_keeps_background(self):
         out = markdown.paint_code(highlight(markdown.code_blocks('```\nAlpha Beta\n```'), 'Beta'))

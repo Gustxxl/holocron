@@ -27,6 +27,11 @@ def _normalize_search_text(text):
     return text
 
 
+def _seq(text):
+    words = _WORD_RE.findall(text)
+    return " " + " ".join(words) + " " if words else ""
+
+
 def _doc_prefixes(text):
     prefixes = set()
     for m in _ALNUM_RE.finditer(text):
@@ -47,7 +52,7 @@ def _prep(case):
         searchable = filename + "\n" + case["text"] if filename else case["text"]
         low = _normalize_search_text(searchable)
         case["_low"] = low
-        case["_flat"] = re.sub(r"\s+", " ", low)
+        case["_flat"] = _seq(low)
         tokens = set(_WORD_RE.findall(low))
         tokens |= _doc_prefixes(low)
         case["_tokens"] = tokens
@@ -75,8 +80,7 @@ def _norm_words(query):
 
 @lru_cache(maxsize=256)
 def _query(query):
-    flat = re.sub(r"\s+", " ", _normalize_search_text(query)).strip()
-    return tuple(_norm_words(query)), flat
+    return tuple(_norm_words(query)), _seq(_normalize_search_text(query))
 
 
 @lru_cache(maxsize=65536)
@@ -163,7 +167,7 @@ def _longest_phrase_run(words, flat, cap=8):
     for size in range(2, limit + 1):
         needle_found = False
         for i in range(len(words) - size + 1):
-            if " ".join(words[i:i + size]) in flat:
+            if " " + " ".join(words[i:i + size]) + " " in flat:
                 needle_found = True
                 break
         if not needle_found:
@@ -182,7 +186,7 @@ def _score(case, hit, weights, words, q_flat):
     total = sum(weights)
     got = sum(w for w, h in zip(weights, hit) if h)
     coverage = got / total if total else 0
-    run = _longest_phrase_run(words, case["_flat"]) if len(words) > 2 else 1
+    run = _longest_phrase_run(q_flat.split(), case["_flat"]) if len(words) > 2 else 1
     if len(words) > 2 and coverage < MIN_COVERAGE and run < PHRASE_MIN:
         return 0
 
@@ -201,13 +205,13 @@ def _score(case, hit, weights, words, q_flat):
     if title_hits:
         base += 0.4 * (title_hits / len(words))
 
-    title_flat = re.sub(r"\s+", " ", title_low)
+    title_flat = _seq(title_low)
     if q_flat and q_flat in case["_flat"]:
         base += 0.5
         if q_flat in title_flat:
             base += 1.0
         filename = case.get("filename", "")
-        if filename and _normalize_search_text(filename).strip() == q_flat:
+        if filename and _seq(_normalize_search_text(filename)) == q_flat:
             base += 1.0
     elif len(words) > 2:
         if run > 1:
