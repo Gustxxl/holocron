@@ -31,7 +31,9 @@ You don't need to remember how you wrote something. Holocron catches:
 - missing words: a long query still matches if most of it is there
 - `ё` and `е`, hyphens and underscores, all treated the same
 
-Codes and short words are matched exactly, so `ERR504` won't turn up `ERR503`. Hits in a block's title rank higher, and an exact phrase goes to the top. If nothing matches, Holocron suggests a corrected query from words that are actually in your archive.
+Codes and short words are matched exactly, so `ERR504` won't turn up `ERR503`. Hits in a block's title rank higher, and an exact phrase goes to the top even if its quotes, dashes or periods differ. If nothing matches, Holocron suggests a corrected query from words that are actually in your archive.
+
+Forgot what you searched for? `y` lists this session's searches, newest first, and a number runs one again. The list lives only while Holocron is open, so nothing you pasted ends up on disk.
 
 To look for several things at once, put `;` between them: `nginx; ERR504`. Each part is searched on its own and gets its own group, and every group starts on the first page. A record that matches more than one part shows up once. If `;` gets in the way of what you paste, change the symbol or turn it off in settings (`s` > Archive > Search separator).
 
@@ -51,6 +53,7 @@ Point Holocron to an Obsidian vault and every Markdown note becomes searchable n
 - `[[Wikilinks]]` in a note get numbers. Type `j 2` to jump to the second one and `b` to come back.
 - Checkboxes like `- [ ]` can be ticked with `x 3` without leaving the note.
 - `note` opens your editor and saves a new note to the folder you chose. The first line becomes the file name, and the name follows it when you change the first line later. If other records link to the note, the name stays, so no link breaks. Clear a note's text in the editor to move it to the trash. Holocron asks first and warns if other records link to it.
+- Headings keep their level. `#` and `##` get a line under them, `###` is bold and deeper ones are bold italic.
 - `tree` browses the archive by folder and opens kanban boards list by list.
 - `f` pins the open record to favorites, or the board you're browsing in `tree`.
 
@@ -117,6 +120,7 @@ Type `h` in Holocron for the full list. The main ones:
 | `r`, `reminders`    | Apple Reminders                                      |
 | `wp`, `waypoints`   | places for location reminders                        |
 | `f`, `favorites`    | pinned records                                       |
+| `y`, `history`      | searches from this session                           |
 | `tree`              | browse by folder and board                           |
 | `note`              | write a new note                                     |
 | `s`, `settings`     | name, archive, schedule, Keeper, reminders, calendar |
