@@ -9,7 +9,7 @@ from core.settings import new_cases_path, page_rows, search_separator
 from core.system import copy_text
 from screens.help_screen import render_help
 from ui.interface import (clear_screen, confirm, dim, error, pause, pick, read_command, haptic, underline, nav_line,
-                          num, input_block, map_text)
+                          num, input_block, map_text, sub_text)
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, rules, table_cells
 from ui.note import drop_title, plain, render_note
 from ui.format import plural
@@ -35,8 +35,12 @@ def _link_mark(shown, n):
     return f'{shown}\xa0\x03{n}\x04'
 
 
+def _faint(text, strong):
+    return dim(text) + ('\033[1m' if strong else '')
+
+
 def _marks(text):
-    return _LINK_RE.sub(lambda m: ' ' + dim(f'[{m.group(1)}]'), text)
+    return sub_text(text, _LINK_RE, lambda m, strong: ' ' + _faint(f'[{m.group(1)}]', strong))
 
 
 _TRAIL = '.,;:!?\'"»”’>]}'
@@ -50,18 +54,18 @@ def _url_end(url):
 
 
 def _links(text, paint):
-    def repl(m):
+    def repl(m, strong):
         url = _url_end(m.group())
-        return paint(url) + m.group()[len(url):]
-    return _URL_RE.sub(repl, text)
+        return paint(url, strong) + m.group()[len(url):]
+    return sub_text(text, _URL_RE, repl)
 
 
 def highlight_links(text):
-    return _links(text, lambda url: dim(underline(url)))
+    return _links(text, lambda url, strong: _faint(underline(url), strong))
 
 
 def dim_links(text):
-    return dim(_links(text, underline))
+    return dim(_links(text, lambda url, strong: underline(url)))
 
 
 def _hl_match(qw, tw):

@@ -1,9 +1,9 @@
 import unittest
 
 from screens import search_screen
-from screens.search_screen import highlight
+from screens.search_screen import highlight, highlight_links
 from ui import markdown
-from ui.interface import bold, dim
+from ui.interface import bold, dim, underline
 from ui.note import render_note
 
 MARK, MARK_OFF = search_screen._MARK, search_screen._MARK_OFF
@@ -71,6 +71,36 @@ class Phrase(unittest.TestCase):
     def test_extra_word_breaks_phrase(self):
         out = highlight("Item No. 'ITE' does", 'item no does')
         self.assertEqual(out, f"{HL}Item{HL_OFF} {HL}No{HL_OFF}. 'ITE' {HL}does{HL_OFF}")
+
+
+class Links(unittest.TestCase):
+    LINK = dim(underline('https://x.io'))
+
+    def test_heading_stays_bold_after_link(self):
+        out = highlight_links(render_note('# Alpha https://x.io Beta', 80))
+        self.assertEqual(out, f'\033[1mAlpha {self.LINK}\033[1m Beta\033[0m')
+
+    def test_inline_bold_stays_bold_after_link(self):
+        out = highlight_links(render_note('Run **Alpha https://x.io Beta** now', 80))
+        self.assertEqual(out, f'Run \033[1mAlpha {self.LINK}\033[1m Beta\033[22m now')
+
+    def test_text_after_bold_not_bold(self):
+        out = highlight_links(render_note('**Alpha** https://x.io', 80))
+        self.assertEqual(out, f'\033[1mAlpha\033[22m {self.LINK}')
+
+    def test_link_ends_before_reset(self):
+        self.assertEqual(highlight_links(bold('https://x.io')), f'\033[1m{self.LINK}\033[1m\033[0m')
+
+    def test_cyrillic(self):
+        out = highlight_links(render_note('# Альфа https://x.io Бета', 80))
+        self.assertEqual(out, f'\033[1mАльфа {self.LINK}\033[1m Бета\033[0m')
+
+    def test_link_number_keeps_bold(self):
+        out = search_screen._marks(bold(search_screen._link_mark('Alpha', 1) + ' Beta'))
+        self.assertEqual(out, f'\033[1mAlpha {dim("[1]")}\033[1m Beta\033[0m')
+
+    def test_plain_text_unchanged(self):
+        self.assertEqual(highlight_links('Alpha https://x.io'), f'Alpha {self.LINK}')
 
 
 class Code(unittest.TestCase):

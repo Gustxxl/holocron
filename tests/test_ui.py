@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import unittest
 from contextlib import redirect_stdout
 from datetime import datetime
@@ -211,6 +212,23 @@ class MapText(unittest.TestCase):
 
     def test_plain_text(self):
         self.assertEqual(interface.map_text('ab', str.upper), 'AB')
+
+
+class SubText(unittest.TestCase):
+    WORD = re.compile('ab')
+
+    def sub(self, text):
+        return interface.sub_text(text, self.WORD, lambda m, strong: 'B' if strong else 'p')
+
+    def test_tracks_bold(self):
+        self.assertEqual(self.sub('ab \033[1mab\033[22m ab \033[1mab\033[0m ab'),
+                         'p \033[1mB\033[22m p \033[1mB\033[0m p')
+
+    def test_other_codes_keep_state(self):
+        self.assertEqual(self.sub('\033[1m\033[2mab\033[39m ab'), '\033[1m\033[2mB\033[39m B')
+
+    def test_match_not_across_codes(self):
+        self.assertEqual(self.sub('a\033[1mb'), 'a\033[1mb')
 
 
 class Clip(unittest.TestCase):

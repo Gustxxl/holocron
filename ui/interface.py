@@ -53,6 +53,19 @@ def map_text(text, fn):
     return ''.join(part if i % 2 else fn(part) for i, part in enumerate(_ESC.split(text)))
 
 
+def sub_text(text, pattern, fn):
+    out, strong = [], False
+    for i, part in enumerate(_ESC.split(text)):
+        if not i % 2:
+            part = pattern.sub(lambda m: fn(m, strong), part)
+        elif part == '\033[1m':
+            strong = True
+        elif part in ('\033[0m', '\033[22m'):
+            strong = False
+        out.append(part)
+    return ''.join(out)
+
+
 def _cells(text):
     return sum(0 if unicodedata.combining(c) else 2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in text)
 
