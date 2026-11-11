@@ -227,6 +227,10 @@ class SubText(unittest.TestCase):
     def test_other_codes_keep_state(self):
         self.assertEqual(self.sub('\033[1m\033[2mab\033[39m ab'), '\033[1m\033[2mB\033[39m B')
 
+    def test_tracks_italic(self):
+        out = interface.sub_text('\033[1m\033[3mab\033[23m ab\033[0m ab', self.WORD, lambda m, style: f'[{style}]')
+        self.assertEqual(out, '\033[1m\033[3m[\033[1m\033[3m]\033[23m [\033[1m]\033[0m []')
+
     def test_match_not_across_codes(self):
         self.assertEqual(self.sub('a\033[1mb'), 'a\033[1mb')
 

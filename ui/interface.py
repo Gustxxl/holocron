@@ -36,6 +36,8 @@ def underline(text):
     return f'\033[4m{text}\033[24m'
 
 
+def italic(text):
+    return f'\033[3m{text}\033[23m'
 
 
 def hyperlink(url, text):
@@ -53,15 +55,20 @@ def map_text(text, fn):
     return ''.join(part if i % 2 else fn(part) for i, part in enumerate(_ESC.split(text)))
 
 
+_STYLE_OFF = {'\033[22m': '\033[1m', '\033[23m': '\033[3m'}
+
+
 def sub_text(text, pattern, fn):
-    out, strong = [], False
+    out, style = [], []
     for i, part in enumerate(_ESC.split(text)):
         if not i % 2:
-            part = pattern.sub(lambda m: fn(m, strong), part)
-        elif part == '\033[1m':
-            strong = True
-        elif part in ('\033[0m', '\033[22m'):
-            strong = False
+            part = pattern.sub(lambda m: fn(m, ''.join(style)), part)
+        elif part == '\033[0m':
+            style = []
+        elif part in _STYLE_OFF:
+            style = [s for s in style if s != _STYLE_OFF[part]]
+        elif part in _STYLE_OFF.values():
+            style.append(part)
         out.append(part)
     return ''.join(out)
 

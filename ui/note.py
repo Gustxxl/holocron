@@ -1,13 +1,13 @@
 import re
 import textwrap
-from ui.interface import bold, dim
+from ui.interface import bold, dim, italic
 from ui.markdown import code_blocks, is_code, is_rule, links, render_tables, rules
 
 _B_ON, _B_OFF = '\x01', '\x02'
 
 _FRONT_RE = re.compile(r'\A---\n.*?\n---[ \t]*(?:\n|\Z)', re.S)
 _COMMENT_RE = re.compile(r'%%.*?%%', re.S)
-_HEADING_RE = re.compile(r'^\s{0,3}#{1,6}\s+(.*?)(?:\s+#+)?\s*$')
+_HEADING_RE = re.compile(r'^\s{0,3}(#{1,6})\s+(.*?)(?:\s+#+)?\s*$')
 _TASK_RE = re.compile(r'^(\s*)[-*+]\s+\[(.)\]\s+(.*)$')
 _BULLET_RE = re.compile(r'^(\s*)[-*+]\s+(.*)$')
 _ORDERED_RE = re.compile(r'^(\s*)(\d+[.)])\s+(.*)$')
@@ -55,6 +55,18 @@ def _fill(text, width, first, rest):
                          break_long_words=False, break_on_hyphens=False)
 
 
+def _heading(level, text, width):
+    text = _fill(plain(text), width, '', '')
+    if not text:
+        return ''
+    if level > 3:
+        return '\n' + bold(italic(text))
+    if level == 3:
+        return '\n' + bold(text)
+    rule = '─' * min(max(len(row) for row in text.split('\n')), width)
+    return f'\n{bold(text)}\n{dim(rule)}'
+
+
 def _task(m, width, n, digits):
     indent, state, body = m.groups()
     done = state.lower() == 'x'
@@ -73,7 +85,7 @@ def _line(ln, width):
         return ln.strip()
     m = _HEADING_RE.match(ln)
     if m:
-        return bold(_fill(plain(m.group(1)), width, '', ''))
+        return _heading(len(m.group(1)), m.group(2), width)
     m = _QUOTE_RE.match(ln)
     if m:
         callout = _CALLOUT_RE.match(m.group(1))

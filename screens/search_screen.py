@@ -35,12 +35,12 @@ def _link_mark(shown, n):
     return f'{shown}\xa0\x03{n}\x04'
 
 
-def _faint(text, strong):
-    return dim(text) + ('\033[1m' if strong else '')
+def _faint(text, style):
+    return dim(text) + style
 
 
 def _marks(text):
-    return sub_text(text, _LINK_RE, lambda m, strong: ' ' + _faint(f'[{m.group(1)}]', strong))
+    return sub_text(text, _LINK_RE, lambda m, style: ' ' + _faint(f'[{m.group(1)}]', style))
 
 
 _TRAIL = '.,;:!?\'"»”’>]}'
@@ -54,18 +54,18 @@ def _url_end(url):
 
 
 def _links(text, paint):
-    def repl(m, strong):
+    def repl(m, style):
         url = _url_end(m.group())
-        return paint(url, strong) + m.group()[len(url):]
+        return paint(url, style) + m.group()[len(url):]
     return sub_text(text, _URL_RE, repl)
 
 
 def highlight_links(text):
-    return _links(text, lambda url, strong: _faint(underline(url), strong))
+    return _links(text, lambda url, style: _faint(underline(url), style))
 
 
 def dim_links(text):
-    return dim(_links(text, lambda url, strong: underline(url)))
+    return dim(_links(text, lambda url, style: underline(url)))
 
 
 def _hl_match(qw, tw):
