@@ -3,7 +3,6 @@ from datetime import date, datetime, timedelta
 from core import dates, tasks
 
 LENGTH = timedelta(hours=1)
-_WHEN = re.compile(r'\d{1,2}:\d{2}(?:[-–]\d{1,2}:\d{2})?')
 _LINK = re.compile(r'https?://[^\s<>"\']+')
 _MEETINGS = ('zoom.us', 'meet.google.com', 'teams.microsoft.com', 'teams.live.com',
              'webex.com', 'whereby.com', 'meet.jit.si', 'telemost')
@@ -39,14 +38,7 @@ def _links(event):
 def parse_add(text, lists, default, today=None):
     today = today or date.today()
     tags, text = tasks.split_tags(text, lists)
-    day, when, words = None, None, []
-    for word in text.split():
-        if when is None and _WHEN.fullmatch(word):
-            when = word
-        elif day is None and dates.parse_date(word, today):
-            day = dates.parse_date(word, today)
-        else:
-            words.append(word)
+    day, when, words = dates.split_when(text, today)
     if not words:
         return None, 'Type the event title'
     if len(tags) > 1:

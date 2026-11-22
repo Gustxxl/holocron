@@ -201,7 +201,7 @@ HELP_SECTIONS = [
         HelpEntry('[number]',     'open a reminder', _has_reminders),
         HelpEntry('x number',     'mark a reminder done', _has_reminders),
         HelpEntry('e',            'edit the open reminder', _can_edit_reminder),
-        HelpEntry('a',            'add a reminder; #list and @place are optional', _has_reminders),
+        HelpEntry('a',            'add a reminder: title, optional time, date, #list and @place', _has_reminders),
     ]),
     ('Waypoints', [
         HelpEntry('a',              'add a waypoint', remindctl.available),

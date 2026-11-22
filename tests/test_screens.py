@@ -181,6 +181,24 @@ class Tasks(Screen):
         self.assertEqual(text.count('── 2/2'), 1)
         self.assertIn('Call vendor', text)
 
+    def _add(self, text):
+        source = Mock(KEY='remindctl')
+        source.add.return_value = True
+        with patch.object(tasks_screen, 'error') as error:
+            self.open(tasks_screen, lambda: tasks_screen._add(source, text, LISTS, ['l1']), [],
+                      {'core.sources.default': 'l1', 'core.waypoints.load': {}})
+        return source.add, error
+
+    def test_add_passes_time(self):
+        add, error = self._add('Check 22:05 24-12-2030')
+        add.assert_called_once_with('Check', 'l1', None, datetime(2030, 12, 24, 22, 5))
+        error.assert_not_called()
+
+    def test_add_bad_time_adds_nothing(self):
+        add, error = self._add('Check 25:00')
+        add.assert_not_called()
+        error.assert_called_once_with('No such time: 25:00')
+
 
 POINT = {'address': 'Main st 1', 'proximity': 'arriving', 'radius': 100}
 

@@ -1,7 +1,7 @@
 import copy
 import subprocess
 import unittest
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -132,6 +132,26 @@ class Changes(unittest.TestCase):
             remindctl.add('Lock up', 'L1', place)
         run.assert_called_once_with('remindctl', 'add', '--title', 'Lock up', '--list-id', 'L1',
                                     '--location', 'Main 1', '--radius', '50', '--leaving')
+
+    def test_add_due(self):
+        with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:
+            remindctl.add('Check', 'L1', due=datetime(2026, 10, 11, 0, 5))
+        run.assert_called_once_with('remindctl', 'add', '--title', 'Check', '--list-id', 'L1',
+                                    '--due', '2026-10-11 00:05')
+
+    def test_add_all_day(self):
+        with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:
+            remindctl.add('Renew', 'L1', due=date(2026, 10, 20))
+        run.assert_called_once_with('remindctl', 'add', '--title', 'Renew', '--list-id', 'L1',
+                                    '--due', '2026-10-20')
+
+    def test_add_place_and_due(self):
+        place = {'address': 'Main 1', 'radius': 50, 'proximity': 'leaving'}
+        with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:
+            remindctl.add('Lock up', 'L1', place, datetime(2026, 10, 11, 22, 5))
+        run.assert_called_once_with('remindctl', 'add', '--title', 'Lock up', '--list-id', 'L1',
+                                    '--location', 'Main 1', '--radius', '50', '--leaving',
+                                    '--due', '2026-10-11 22:05')
 
     def test_edit(self):
         with patch.object(remindctl.cli, 'run_ok', return_value=True) as run:

@@ -5,6 +5,7 @@ DAYS = ('Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su')
 
 _TIME_RE = re.compile(r'^(\d{1,2})(?::?(\d{2}))?$')
 _PERIOD_RE = re.compile(r'^\s*([\d:]+)\s*[-–—]\s*([\d:]+)\s*$')
+_WHEN_RE = re.compile(r'\d{1,2}:\d{2}(?:[-–]\d{1,2}:\d{2})?')
 _DATE_FORMATS = ('%Y-%m-%d', '%d-%m-%Y', '%d.%m.%Y', '%d/%m/%Y')
 _SHORT_FORMATS = ('%d-%m', '%d.%m', '%d/%m')
 
@@ -54,6 +55,18 @@ def parse_date(text, today=None):
         except ValueError:
             continue
     return None
+
+
+def split_when(text, today):
+    day, when, words = None, None, []
+    for word in text.split():
+        if when is None and _WHEN_RE.fullmatch(word):
+            when = word
+        elif day is None and parse_date(word, today):
+            day = parse_date(word, today)
+        else:
+            words.append(word)
+    return day, when, words
 
 
 def monday(d):

@@ -1,5 +1,6 @@
 import re
-from datetime import datetime
+from datetime import date, datetime
+from core import dates
 
 _TAG = re.compile(r'(?<!\S)#(\S+)')
 _PLACE = re.compile(r'(?<!\S)@(\S+)')
@@ -42,11 +43,12 @@ def split_tags(text, lists):
     return tags + _TAG.findall(text), _TAG.sub(' ', text)
 
 
-def parse_add(text, lists, default, points=None):
+def parse_add(text, lists, default, points=None, today=None):
+    today = today or date.today()
     tags, text = split_tags(text, lists)
     places = _PLACE.findall(text)
-    title = ' '.join(_PLACE.sub(' ', text).split())
-    if not title:
+    day, when, words = dates.split_when(_PLACE.sub(' ', text), today)
+    if not words:
         return None, 'Type the reminder text'
     if len(tags) > 1:
         return None, 'Use one #list'
@@ -55,10 +57,13 @@ def parse_add(text, lists, default, points=None):
     place = (points or {}).get(places[0].lower()) if places else None
     if places and place is None:
         return None, f'No waypoint @{places[0]}'
+    due, problem = _due(day, when, today)
+    if problem:
+        return None, problem
     list_id, problem = pick_list(tags[0] if tags else None, lists, default)
     if problem:
         return None, problem
-    return {'title': title, 'list': list_id, 'place': place}, None
+    return {'title': ' '.join(words), 'list': list_id, 'place': place, 'due': due}, None
 
 
 def to_text(task):
@@ -91,6 +96,17 @@ def pick_list(tag, lists, default, kind='list'):
     if len(found) > 1:
         return None, f'#{tag} matches several {kind}s'
     return found[0]['id'], None
+
+
+def _due(day, when, today):
+    if when is None:
+        return day, None
+    if dates.parse_period(when):
+        return None, 'Use one time, e.g. 22:05'
+    start = dates.parse_time(when)
+    if start is None:
+        return None, f'No such time: {when}'
+    return datetime.combine(day or today, dates.to_time(start)), None
 
 
 def _key(text):

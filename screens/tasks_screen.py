@@ -169,7 +169,7 @@ def _add(source, text, lists, chosen):
     if problem:
         error(problem)
         return
-    if not source.add(draft['title'], draft['list'], draft['place']):
+    if not source.add(draft['title'], draft['list'], draft['place'], draft['due']):
         error('Could not add the reminder')
         return
     if draft['list'] in chosen:

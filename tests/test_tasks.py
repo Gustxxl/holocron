@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime
+from datetime import date, datetime
 
 from core import tasks
 
@@ -97,7 +97,7 @@ POINTS = {'home': {'address': 'Main 1', 'radius': 100, 'proximity': 'arriving'}}
 
 class ParseAdd(unittest.TestCase):
     def _add(self, text, default='L1'):
-        return tasks.parse_add(text, LISTS, default, POINTS)
+        return tasks.parse_add(text, LISTS, default, POINTS, NOW.date())
 
     def _ok(self, text, default='L1'):
         draft, problem = self._add(text, default)
@@ -149,6 +149,61 @@ class ParseAdd(unittest.TestCase):
 
     def test_two_places(self):
         self.assertEqual(self._problem('bread @home @home'), 'Use one @waypoint')
+
+    def _due(self, text):
+        draft, problem = self._add(text)
+        self.assertIsNone(problem)
+        return draft['title'], draft['due']
+
+    def test_time_today(self):
+        self.assertEqual(self._due('Check 22:05'), ('Check', datetime(2026, 10, 11, 22, 5)))
+
+    def test_time_and_date_anywhere(self):
+        self.assertEqual(self._due('0:05 Check tomorrow backups'), ('Check backups', datetime(2026, 10, 12, 0, 5)))
+
+    def test_date_only_is_all_day(self):
+        title, due = self._due('Renew 20-10')
+        self.assertEqual((title, due), ('Renew', date(2026, 10, 20)))
+        self.assertNotIsInstance(due, datetime)
+
+    def test_no_time(self):
+        self.assertEqual(self._due('bread'), ('bread', None))
+
+    def test_bounds(self):
+        self.assertEqual(self._due('Check 0:00')[1], datetime(2026, 10, 11, 0, 0))
+        self.assertEqual(self._due('Check 23:59')[1], datetime(2026, 10, 11, 23, 59))
+        self.assertEqual(self._due('Check 24:00')[1], datetime(2026, 10, 11, 0, 0))
+
+    def test_second_time_and_date_stay_in_text(self):
+        self.assertEqual(self._due('Swap 10:00 11:00 today tomorrow'),
+                         ('Swap 11:00 tomorrow', datetime(2026, 10, 11, 10, 0)))
+
+    def test_with_list_and_place(self):
+        draft, _ = self._add('Lock up 22:05 @home #pets')
+        self.assertEqual((draft['title'], draft['list'], draft['place'], draft['due']),
+                         ('Lock up', 'L5', POINTS['home'], datetime(2026, 10, 11, 22, 5)))
+
+    def test_cyrillic(self):
+        draft, _ = self._add('Проверить Альфа 00:05 #Покупки')
+        self.assertEqual((draft['title'], draft['list'], draft['due']),
+                         ('Проверить Альфа', 'L3', datetime(2026, 10, 11, 0, 5)))
+
+    def test_bad_time(self):
+        for when in ('25:00', '23:60'):
+            with self.subTest(when=when):
+                self.assertEqual(self._problem(f'Check {when}'), f'No such time: {when}')
+
+    def test_period(self):
+        for text in ('Check 22:00-23:00', 'Check 22:00–23:00'):
+            with self.subTest(text=text):
+                self.assertEqual(self._problem(text), 'Use one time, e.g. 22:05')
+
+    def test_time_alone(self):
+        self.assertEqual(self._problem('22:05 tomorrow #work'), 'Type the reminder text')
+
+    def test_odd_digits(self):
+        self.assertEqual(self._due('Check ²2:05'), ('Check ²2:05', None))
+        self.assertEqual(self._due('Check ٢٢:٠٥')[1], datetime(2026, 10, 11, 22, 5))
 
 
 class EditText(unittest.TestCase):

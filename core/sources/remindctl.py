@@ -1,3 +1,4 @@
+from datetime import datetime
 from core import system
 from . import cli, macos
 
@@ -50,12 +51,14 @@ def complete(task_id):
     return cli.run_ok(PROGRAM, 'complete', task_id)
 
 
-def add(title, list_id, place=None):
+def add(title, list_id, place=None, due=None):
     args = ['add', '--title', title, '--list-id', list_id]
     if place:
         args += ['--location', place['address'], '--radius', str(place['radius'])]
         if place['proximity'] == 'leaving':
             args.append('--leaving')
+    if due is not None:
+        args += ['--due', _stamp(due)]
     return cli.run_ok(PROGRAM, *args)
 
 
@@ -79,6 +82,10 @@ def parse_items(data):
     if not isinstance(data, list):
         return None
     return [t for t in map(_task, data) if t]
+
+
+def _stamp(due):
+    return f'{due:%Y-%m-%d %H:%M}' if isinstance(due, datetime) else due.isoformat()
 
 
 def _task(raw):
