@@ -149,10 +149,13 @@ class PluginScreen(unittest.TestCase):
             self.state = 'off'
             return True
 
-        self.source = SimpleNamespace(NAME='Menu bar', APP='SwiftBar', status=lambda: self.state,
+        self.source = SimpleNamespace(NAME='Menu bar', APP='SwiftBar', KEY='swiftbar', status=lambda: self.state,
                                       owned=lambda: owned, folder=lambda: '/Альфа/SwiftBar',
-                                      plugin=lambda: '/Альфа/SwiftBar/holocron.1m.sh', remove=mock.Mock(side_effect=remove))
+                                      plugin=lambda: '/Альфа/SwiftBar/holocron.1m.sh', remove=mock.Mock(side_effect=remove),
+                                      shortcut=lambda: '', keys=registry.swiftbar.keys, refresh=mock.Mock())
         with mock.patch.object(sources_screen, 'clear_screen'), \
+             mock.patch.object(sources_screen, 'error') as self.error, \
+             mock.patch.object(sources_screen.sources, 'set_option') as self.stored, \
              mock.patch.object(sources_screen, 'haptic'), \
              mock.patch.object(sources_screen, 'wait', side_effect=lambda text, fn, *a: fn(*a)), \
              mock.patch.object(sources_screen, 'read_command', side_effect=commands), \
@@ -170,6 +173,21 @@ class PluginScreen(unittest.TestCase):
     def test_remove_asks_first(self):
         self._open(['d', 'b'], agreed=False)
         self.source.remove.assert_not_called()
+
+    def test_shortcut_set(self):
+        out = self._open(['k', 'Option+R', 'b'])
+        self.assertIn('New reminder shortcut', out)
+        self.stored.assert_called_once_with('swiftbar', 'shortcut', 'option+r')
+        self.source.refresh.assert_called_once_with()
+
+    def test_shortcut_off(self):
+        self._open(['k', 'off', 'b'])
+        self.stored.assert_called_once_with('swiftbar', 'shortcut', '')
+
+    def test_bad_shortcut_saves_nothing(self):
+        self._open(['k', 'shift+r', 'k', '', 'b'])
+        self.stored.assert_not_called()
+        self.error.assert_called_once_with('Type keys like option+r, or off')
 
     def test_remove_closes_screen(self):
         self._open(['d'])

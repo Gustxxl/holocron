@@ -6,12 +6,16 @@ if sys.version_info < (3, 12):
 from core.check_requirements import ensure_environment
 ensure_environment()
 
+from core import launch
+from core.sources import swiftbar
+
+TYPED = swiftbar.ask(swiftbar.NEW_ASK) if launch.parse(sys.argv[1:])[0] == 'new' else ''
+
 import colorama
 colorama.init()
 
 
 from core import archives
-from core import launch
 from screens.main_screen import bar_add, bar_frame, bar_toggle, main_frame, main_screen
 from ui.interface import Spinner, clear_screen, disconnect, pause
 from core import updater
@@ -31,7 +35,7 @@ def start():
         bar_toggle(action, value)
         return
     if action == 'new':
-        bar_add()
+        bar_add(TYPED)
         return
     if action == 'unknown':
         print(f'Unknown option {value}. Run holo --help', file=sys.stderr)

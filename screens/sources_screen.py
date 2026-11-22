@@ -267,11 +267,16 @@ def plugin_screen(source):
         print('  Holocron is in the menu bar')
         print(dim(f'  {source.plugin()}'))
         print()
-        print(dim(nav_line([('d', 'remove from the menu bar', 'd', 'remove'), ('b', 'back')])))
+        print(f'  New reminder shortcut   {dim(source.shortcut() or "off")}')
+        print()
+        print(dim(nav_line([('k', 'shortcut'), ('d', 'remove from the menu bar', 'd', 'remove'), ('b', 'back')])))
         print()
         command = read_command(f'{source.NAME.lower()}> ').lower()
         if is_back(command):
             return
+        if command == 'k':
+            _shortcut(source)
+            continue
         if command != 'd':
             continue
         tidy = source.owned()
@@ -284,3 +289,17 @@ def plugin_screen(source):
             haptic('success')
         else:
             error(f'Could not remove. Quit {source.APP} and try again' if tidy else f'Could not delete {source.plugin()}')
+
+
+def _shortcut(source):
+    print(dim('  Keys like option+r or ctrl+shift+n, off to turn it off'))
+    text = read_command('keys> ').strip().lower()
+    if not text:
+        return
+    combo = '' if text == 'off' else source.keys(text)
+    if text != 'off' and not combo:
+        error('Type keys like option+r, or off')
+        return
+    sources.set_option(source.KEY, 'shortcut', combo)
+    source.refresh()
+    haptic('toggle')

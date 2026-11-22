@@ -49,6 +49,7 @@ class Bar(unittest.TestCase):
              patch.object(main, 'home_order', return_value=order), \
              patch.object(main, 'finished_today', return_value=list(finished)), \
              patch.object(main, 'duty_line', return_value=duty), \
+             patch.object(main.swiftbar, 'shortcut', return_value=''), \
              patch.object(main.swiftbar, 'render', side_effect=lambda *a: a):
             on, title, alert, self.blocks, add = main.bar_frame(NOW)
         return on, title, alert, dict(zip(order, self.blocks)), add
@@ -56,7 +57,7 @@ class Bar(unittest.TestCase):
     def test_calm(self):
         self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 13, 0))]),
                          (False, '', False, {'calendar': [], 'schedule': [],
-                                             'reminders': [('today', [('○ 13:00 Alpha', False, ('done', 'Alpha'))])]}, True))
+                                             'reminders': [('today', [('○ 13:00 Alpha', False, ('done', 'Alpha'))])]}, ''))
 
     def test_soon_in_title(self):
         self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 30))])[1:3], ('12:30 Alpha', False))
@@ -119,7 +120,7 @@ class Bar(unittest.TestCase):
 
     def test_no_source(self):
         self.assertEqual(self._bar([], source=False),
-                         (False, '', False, {'calendar': [], 'schedule': [], 'reminders': []}, False))
+                         (False, '', False, {'calendar': [], 'schedule': [], 'reminders': []}, None))
 
     def test_plans_routines(self):
         self._bar([])
@@ -154,35 +155,45 @@ class Bar(unittest.TestCase):
 
 
 class BarAdd(unittest.TestCase):
-    def _add(self, answers, added=True, source=True):
-        self.source = SimpleNamespace(KEY='remindctl', available=lambda: True, lists=lambda: [{'id': 'L1', 'title': 'Work'}],
+    def _add(self, text, answers=(), added=True, source=True, lists=True):
+        found = [{'id': 'L1', 'title': 'Work'}] if lists else None
+        self.source = SimpleNamespace(KEY='remindctl', NAME='Reminders', available=lambda: True, lists=lambda: found,
                                       add=Mock(return_value=added)) if source else None
         with patch.object(main.registry, 'active', return_value=self.source), \
              patch.object(main.sources, 'default', return_value='L1'), \
              patch.object(main.waypoints, 'load', return_value=[]), \
              patch.object(main.swiftbar, 'ask', side_effect=list(answers)) as self.ask:
-            return main.bar_add(NOW.date())
+            return main.bar_add(text, NOW)
 
-    def test_adds(self):
-        self.assertTrue(self._add(['Alpha #Work']))
+    def test_adds_without_asking_again(self):
+        self.assertTrue(self._add('Alpha #Work'))
         self.assertEqual(self.source.add.call_args.args[:2], ('Alpha', 'L1'))
-        self.ask.assert_called_once_with(main.BAR_ASK, '')
+        self.ask.assert_not_called()
+
+    def test_in_five_minutes(self):
+        self._add('Alpha +5')
+        self.assertEqual(self.source.add.call_args.args[3], datetime(2026, 11, 22, 12, 5))
 
     def test_error_asks_again_with_text(self):
-        self.assertTrue(self._add(['Alpha 25:00', 'Alpha 23:00']))
-        self.assertEqual(self.ask.call_args_list[1].args, ('No such time: 25:00', 'Alpha 25:00'))
+        self.assertTrue(self._add('Alpha 25:00', ['Alpha 23:00']))
+        self.ask.assert_called_once_with('No such time: 25:00', 'Alpha 25:00')
         self.assertEqual(self.source.add.call_count, 1)
 
     def test_cancel(self):
-        self.assertFalse(self._add(['']))
-        self.source.add.assert_not_called()
+        self.assertFalse(self._add(''))
+        self.ask.assert_not_called()
 
     def test_failed_add_says_so(self):
-        self.assertFalse(self._add(['Alpha', ''], added=False))
-        self.assertEqual(self.ask.call_args_list[1].args, ('Could not add the reminder', 'Alpha'))
+        self.assertFalse(self._add('Alpha', [''], added=False))
+        self.ask.assert_called_once_with('Could not add the reminder', 'Alpha')
+
+    def test_unreadable_keeps_text(self):
+        self.assertFalse(self._add('Альфа', [''], lists=False))
+        self.ask.assert_called_once_with('Could not read Reminders. Copy your text and try again', 'Альфа')
+        self.source.add.assert_not_called()
 
     def test_no_source_no_dialog(self):
-        self.assertFalse(self._add([], source=False))
+        self.assertFalse(self._add('Alpha', source=False))
         self.ask.assert_not_called()
 
 

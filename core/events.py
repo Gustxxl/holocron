@@ -1,5 +1,5 @@
 import re
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from core import dates, tasks
 
 LENGTH = timedelta(hours=1)
@@ -35,8 +35,9 @@ def _links(event):
     return [u.rstrip('.,;)>') for u in _LINK.findall(text)]
 
 
-def parse_add(text, lists, default, today=None):
-    today = today or date.today()
+def parse_add(text, lists, default, today=None, now=None):
+    now = now or datetime.now()
+    today = today or now.date()
     tags, text = tasks.split_tags(text, lists)
     day, when, words = dates.split_when(text, today)
     if not words:
@@ -45,7 +46,10 @@ def parse_add(text, lists, default, today=None):
         return None, 'Use one #calendar'
     if when is None:
         return None, 'Add a time, e.g. 14:30 or 14:30-15:00'
-    span = _span(when, day or today)
+    later = dates.after(when, now)
+    if later and day:
+        return None, dates.BOTH
+    span = (later, later + LENGTH) if later else _span(when, day or today)
     if span is None:
         return None, f'No such time: {when}'
     list_id, problem = tasks.pick_list(tags[0] if tags else None, lists, default, 'calendar')

@@ -34,9 +34,12 @@ LENGTH = 40
 _PLAIN = 'symbolize=false emojize=false'
 _ID = re.compile(r'[\w:/.-]+')
 _URL = re.compile(r'https://[^\s"\'|]+')
-_ASK = ('on run argv', 'activate',
-        'set found to display dialog (item 1 of argv) default answer (item 2 of argv) '
-        'with title "Holocron" giving up after 120',
+_KEYS = re.compile(r'(?:(?:cmd|command|ctrl|control|opt|option|shift)\+)+[a-z0-9]')
+NEW_ASK = 'New reminder: title, optional 14:30 or +5, a date, #list and @place'
+_DIALOG = ('set found to display dialog (item 1 of argv) default answer (item 2 of argv) '
+           'with title "Holocron" giving up after 120')
+_ASK = ('on run argv', 'try', 'tell application "System Events"', 'activate', _DIALOG, 'end tell',
+        'on error number -1743', 'activate', _DIALOG, 'end try',
         'if gave up of found then return ""', 'return text returned of found', 'end run')
 _ASK_WAIT = 130
 
@@ -198,13 +201,24 @@ def _refresh():
         system.run(['open', '-g', REFRESH], timeout=cli.TIMEOUT)
 
 
+def keys(text):
+    combo = text.replace(' ', '').lower()
+    if not _KEYS.fullmatch(combo) or set(combo.split('+')[:-1]) == {'shift'}:
+        return ''
+    return combo
+
+
+def shortcut():
+    return keys(sources.text(KEY, 'shortcut'))
+
+
 def ask(prompt, text=''):
     script = [part for line in _ASK for part in ('-e', line)]
     out = system.run(['osascript', *script, prompt, text], timeout=_ASK_WAIT)
     return out.stdout.strip() if out and out.returncode == 0 else ''
 
 
-def render(on, title, alert, blocks, add=False):
+def render(on, title, alert, blocks, add=None):
     lines = [_line(f'{DUTY if on else ICON} {title}', alert, f'length={LENGTH}')]
     for groups in blocks:
         if groups:
@@ -213,8 +227,8 @@ def render(on, title, alert, blocks, add=False):
             if head:
                 lines.append(_line(head, extra=f'size={HEAD}'))
             lines += [_row(*row) for row in rows]
-    if add:
-        lines += ['---', _line('+ New reminder', extra=_run('--new'))]
+    if add is not None:
+        lines += ['---', _line('+ New reminder', extra=_run('--new') + (f' shortcut={add}' if add else ''))]
     return '\n'.join(lines)
 
 

@@ -1,5 +1,5 @@
 import re
-from datetime import date, datetime
+from datetime import datetime
 from core import dates
 
 _TAG = re.compile(r'(?<!\S)#(\S+)')
@@ -53,8 +53,9 @@ def split_tags(text, lists):
     return tags + _TAG.findall(text), _TAG.sub(' ', text)
 
 
-def parse_add(text, lists, default, points=None, today=None):
-    today = today or date.today()
+def parse_add(text, lists, default, points=None, today=None, now=None):
+    now = now or datetime.now()
+    today = today or now.date()
     tags, text = split_tags(text, lists)
     places = _PLACE.findall(text)
     day, when, words = dates.split_when(_PLACE.sub(' ', text), today)
@@ -67,7 +68,7 @@ def parse_add(text, lists, default, points=None, today=None):
     place = (points or {}).get(places[0].lower()) if places else None
     if places and place is None:
         return None, f'No waypoint @{places[0]}'
-    due, problem = _due(day, when, today)
+    due, problem = _due(day, when, today, now)
     if problem:
         return None, problem
     list_id, problem = pick_list(tags[0] if tags else None, lists, default)
@@ -108,9 +109,12 @@ def pick_list(tag, lists, default, kind='list'):
     return found[0]['id'], None
 
 
-def _due(day, when, today):
+def _due(day, when, today, now):
     if when is None:
         return day, None
+    later = dates.after(when, now)
+    if later:
+        return (None, dates.BOTH) if day else (later, None)
     if dates.parse_period(when):
         return None, 'Use one time, e.g. 22:05'
     start = dates.parse_time(when)

@@ -6,6 +6,8 @@ DAYS = ('Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su')
 _TIME_RE = re.compile(r'^(\d{1,2})(?::?(\d{2}))?$')
 _PERIOD_RE = re.compile(r'^\s*([\d:]+)\s*[-–—]\s*([\d:]+)\s*$')
 _WHEN_RE = re.compile(r'\d{1,2}:\d{2}(?:[-–]\d{1,2}:\d{2})?')
+_IN_RE = re.compile(r'\+(?:(\d{1,2})h(\d{1,2})?|(\d{1,3})m?)')
+BOTH = 'Use +5 or a date, not both'
 _DATE_FORMATS = ('%Y-%m-%d', '%d-%m-%Y', '%d.%m.%Y', '%d/%m/%Y')
 _SHORT_FORMATS = ('%d-%m', '%d.%m', '%d/%m')
 
@@ -60,13 +62,24 @@ def parse_date(text, today=None):
 def split_when(text, today):
     day, when, words = None, None, []
     for word in text.split():
-        if when is None and _WHEN_RE.fullmatch(word):
+        if when is None and (_WHEN_RE.fullmatch(word) or _IN_RE.fullmatch(word)):
             when = word
         elif day is None and parse_date(word, today):
             day = parse_date(word, today)
         else:
             words.append(word)
     return day, when, words
+
+
+def after(text, now):
+    m = _IN_RE.fullmatch(text)
+    if not m:
+        return None
+    hours, minutes, alone = m.groups()
+    if int(minutes or 0) > 59:
+        return None
+    ahead = timedelta(hours=int(hours or 0), minutes=int(minutes or alone or 0))
+    return (now + ahead).replace(second=0, microsecond=0) if ahead else None
 
 
 def monday(d):

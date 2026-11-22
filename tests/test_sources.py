@@ -654,6 +654,13 @@ class SwiftbarAsk(unittest.TestCase):
         self.assertEqual(args[0], 'osascript')
         self.assertEqual(args[-2:], ['Альфа "x"', 'Todo'])
 
+    def test_fast_dialog_with_fallback(self):
+        self._ask(_done(0, ''))
+        script = '\n'.join(self.run.call_args.args[0])
+        self.assertIn('tell application "System Events"', script)
+        self.assertIn('on error number -1743', script)
+        self.assertEqual(script.count('display dialog'), 2)
+
     def test_cancel_or_failure(self):
         for result in (None, _done(1, '')):
             with self.subTest(result=result):
@@ -662,11 +669,28 @@ class SwiftbarAsk(unittest.TestCase):
     def test_new_reminder_item(self):
         with patch.object(swiftbar.sys, 'executable', '/Альфа/python'), \
              patch.object(swiftbar, 'MAIN', '/Альфа/main.py'):
-             lines = swiftbar.render(False, '', False, [], True).splitlines()
+             lines = swiftbar.render(False, '', False, [], '').splitlines()
              calm = swiftbar.render(False, '', False, []).splitlines()
         self.assertEqual(lines[-2:], ['---', '+ New reminder | bash="/Альфа/python" param1="/Альфа/main.py" '
                                              'param2=--new terminal=false refresh=true symbolize=false emojize=false'])
         self.assertFalse(any('New reminder' in line for line in calm))
+
+
+class SwiftbarKeys(unittest.TestCase):
+    def test_keys(self):
+        for text, expected in (('option+r', 'option+r'), ('Ctrl + Shift + N', 'ctrl+shift+n'), ('cmd+1', 'cmd+1'),
+                               ('shift+r', ''), ('r', ''), ('option+', ''), ('option+r bash=x', ''), ('alt+r', '')):
+            with self.subTest(text):
+                self.assertEqual(swiftbar.keys(text), expected)
+
+    def test_saved_shortcut_checked(self):
+        with patch.object(swiftbar.sources, 'text', return_value='option+r color=red'):
+            self.assertEqual(swiftbar.shortcut(), '')
+
+    def test_new_reminder_shortcut(self):
+        line = swiftbar.render(False, '', False, [], 'option+r').splitlines()[-1]
+        self.assertTrue(line.startswith('+ New reminder | bash='))
+        self.assertIn(' refresh=true shortcut=option+r ', line)
 
 
 class MenuBarCheck(unittest.TestCase):

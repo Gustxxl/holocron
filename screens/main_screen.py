@@ -19,7 +19,6 @@ LOGO = APP_DIR / "ui" / "logo.txt"
 LOGO_TEXT = "HOLOCRON"
 BAR_SOON = timedelta(minutes=30)
 BAR_ROWS = 10
-BAR_ASK = 'New reminder: title, optional time, date, #list and @place'
 
 
 def main_screen(first=None, query=None):
@@ -80,23 +79,24 @@ def bar_frame(now=None):
     blocks = {'calendar': days, 'schedule': [('', [(visible(duty), False, None)])] if duty else [], 'reminders': groups}
     source = registry.active('tasks')
     ready = bool(source and source.available())
-    return swiftbar.render(on, _bar_title(late, soon), bool(late), [blocks[key] for key in home_order()], ready)
+    return swiftbar.render(on, _bar_title(late, soon), bool(late), [blocks[key] for key in home_order()],
+                           swiftbar.shortcut() if ready else None)
 
 
-def bar_add(today=None):
+def bar_add(text, now=None):
     source = registry.active('tasks')
-    lists = source.lists() if source and source.available() else None
-    if not lists:
+    if source is None or not text:
         return False
-    prompt, text = BAR_ASK, ''
-    while True:
-        text = swiftbar.ask(prompt, text)
-        if not text:
-            return False
-        draft, problem = tasks.parse_add(text, lists, sources.default(source.KEY, lists), waypoints.load(), today)
+    lists = source.lists() if source.available() else None
+    if lists is None:
+        swiftbar.ask(f'Could not read {source.NAME}. Copy your text and try again', text)
+        return False
+    while text:
+        draft, problem = tasks.parse_add(text, lists, sources.default(source.KEY, lists), waypoints.load(), now=now)
         if not problem and source.add(draft['title'], draft['list'], draft['place'], draft['due']):
             return True
-        prompt = problem or 'Could not add the reminder'
+        text = swiftbar.ask(problem or 'Could not add the reminder', text)
+    return False
 
 
 def bar_toggle(action, task_id, now=None):
