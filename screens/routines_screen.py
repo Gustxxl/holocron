@@ -26,6 +26,9 @@ def routines_screen(source):
         if low in ('h', 'help'):
             show_help()
         elif low == 'a':
+            zone = schedule.load().zone
+            if zone and zones.differs(zone):
+                print(dim(f'Time in {zones.label(zone)}, z in the card switches to yours'))
             text = read_command('text> ')
             if text:
                 _add(source, text, lists)
