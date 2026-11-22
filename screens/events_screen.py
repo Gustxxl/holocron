@@ -3,7 +3,8 @@ from core import dates, events, sources
 from screens.help_screen import show_help
 from screens.sources_screen import lists_screen, source_setup, unreadable
 from ui.format import day_label, time_range
-from ui.interface import clear_screen, dim, error, haptic, hyperlink, is_back, pause, pick, read_command, nav_line, underline
+from ui.interface import (clear_screen, clip, dim, error, haptic, hyperlink, is_back, line_width, pause, pick, read_command,
+                          nav_line, squeeze, underline)
 
 
 def events_screen(source):
@@ -49,7 +50,7 @@ def agenda(source, now=None):
     shown = [e for e in events.upcoming(found, chosen, now) if dates.within(e['start'], now, ahead)]
     lines = []
     for event in shown[:limit]:
-        lines.append(f'◇ {event['title']}' + dim(f' · {_when(event, now)} #{event['list_name']}'))
+        lines.append(squeeze(f'◇ {event['title']}', dim(f' · {_when(event, now)} #{event['list_name']}'), line_width()))
         link = events.meeting(event)
         if link:
             lines.append(f'  {dim(underline(hyperlink(link, 'link')))}')
@@ -70,7 +71,7 @@ def _frame(source, chosen, flat, now):
         lines.append(dim(day_label(day, now.date())))
         for event in items:
             n += 1
-            lines.append(f'  {dim(str(n).rjust(digits))} {_time(event, now).ljust(11)}  {event["title"]}')
+            lines.append(clip(f'  {dim(str(n).rjust(digits))} {_time(event, now).ljust(11)}  {event["title"]}', line_width()))
             link = events.meeting(event)
             if link:
                 lines.append(f'  {" " * digits} {" " * 11}  {dim(underline(link))}')

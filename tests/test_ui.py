@@ -256,3 +256,31 @@ class Clip(unittest.TestCase):
     def test_hyperlink(self):
         self.assertEqual(interface.hyperlink('https://example.com', 'link'),
                          '\033]8;;https://example.com\033\\link\033]8;;\033\\')
+
+
+from ui import interface as ui_interface
+
+
+class Squeeze(unittest.TestCase):
+    TAIL = '\033[2m · tomorrow 07:30–08:00 #work\033[0m'
+
+    def _squeeze(self, head, width):
+        return ui_interface.squeeze(head, self.TAIL, width)
+
+    def test_fits_unchanged(self):
+        self.assertEqual(ui_interface.visible(self._squeeze('◇ Alpha', 80)), '◇ Alpha · tomorrow 07:30–08:00 #work')
+
+    def test_title_shortened_tail_kept(self):
+        line = ui_interface.visible(self._squeeze('◇ ASAP - Обучение по ИБ. Блок-напоминание для прохождения курсов', 50))
+        self.assertTrue(line.endswith('… · tomorrow 07:30–08:00 #work'))
+        self.assertEqual(ui_interface._cells(line), 50)
+
+    def test_wide_chars(self):
+        line = ui_interface.visible(self._squeeze('◇ 漢字漢字漢字漢字漢字漢字', 40))
+        self.assertLessEqual(ui_interface._cells(line), 40)
+        self.assertTrue(line.endswith(' · tomorrow 07:30–08:00 #work'))
+
+    def test_narrow_cuts_everything(self):
+        line = ui_interface.visible(self._squeeze('◇ Alpha', 20))
+        self.assertLessEqual(ui_interface._cells(line), 20)
+        self.assertTrue(line.startswith('◇ Alpha'))

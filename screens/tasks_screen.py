@@ -3,7 +3,8 @@ from datetime import datetime
 from core import dates, editor, schedule, sources, tasks, waypoints
 from screens.help_screen import show_help
 from ui.format import day_label
-from ui.interface import clear_screen, dim, error, haptic, is_back, pause, pick, read_command, red, nav_line
+from ui.interface import (clear_screen, dim, error, haptic, is_back, line_width, pause, pick, read_command, red, nav_line,
+                          squeeze)
 from screens.sources_screen import lists_screen, source_setup, unreadable
 from screens.routines_screen import routines_screen
 
@@ -63,12 +64,10 @@ def open_tasks(source, now, limit):
 def summary(source, now=None):
     now = now or datetime.now()
     shown, rest = open_tasks(source, now, sources.option(source.KEY, 'shown', source.SHOWN))
-    lines = []
+    lines, width = [], line_width()
     for task in shown:
-        line = f'○ {task_line(task, now)}'
-        if task.get('list_name'):
-            line += dim(f' #{task['list_name']}')
-        lines.append(line)
+        tail = _tail(task, now) + (dim(f' #{task['list_name']}') if task.get('list_name') else '')
+        lines.append(squeeze(f'○ {task["title"]}', tail, width))
     if rest:
         lines.append(dim(f'+{rest} more'))
     done = finished_today(source, sources.selected(source.KEY), now) if source.available() else []
@@ -93,18 +92,19 @@ def _frame(source, chosen, groups, now, finished=()):
     elif not groups:
         lines += [dim('No open tasks'), '']
     digits = len(str(sum(len(items) for _, items in groups) + len(finished)))
-    n = 0
+    n, width = 0, line_width()
     for title, items in groups:
         lines.append(dim(f'#{title}'))
         for task in items:
             n += 1
-            lines.append(f'  {dim(str(n).rjust(digits))} ○ {task_line(task, now)}')
+            lines.append(squeeze(f'  {dim(str(n).rjust(digits))} ○ {task["title"]}', _tail(task, now), width))
         lines.append('')
     if finished:
         lines.append(dim('done today'))
         for task in finished:
             n += 1
-            lines.append(dim(f'  {str(n).rjust(digits)} ✓ {task["title"]} · {task["finished"]:%H:%M}'))
+            lines.append(squeeze(dim(f'  {str(n).rjust(digits)} ✓ {task["title"]}'),
+                                    dim(f' · {task["finished"]:%H:%M}'), width))
         lines.append('')
     mark = 'done/undo' if finished else 'done'
     nav = [('number', 'open', '#', 'open'), ('x number', mark, 'x#', mark)] if n else []
@@ -221,8 +221,12 @@ def _add(source, text, lists, chosen):
 
 
 def task_line(task, now):
+    return task['title'] + _tail(task, now)
+
+
+def _tail(task, now):
     label = _label(task, now)
-    return task['title'] + (dim(' · ') + label if label else '')
+    return dim(' · ') + label if label else ''
 
 
 def when(task, now):

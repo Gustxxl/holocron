@@ -575,15 +575,15 @@ class SwiftbarRender(unittest.TestCase):
         self.assertEqual(lines[1:], [
             '---', '● ON DUTY | symbolize=false emojize=false', '---',
             'overdue | size=12 symbolize=false emojize=false',
-            'Todo | symbolize=false emojize=false color=#af5f5f',
+            'Todo | length=40 symbolize=false emojize=false color=#af5f5f',
             'today | size=12 symbolize=false emojize=false',
-            '09:00 Alpha | symbolize=false emojize=false',
+            '09:00 Alpha | length=40 symbolize=false emojize=false',
         ])
 
     def test_done_action(self):
         line = self._lines(groups=[('today', [('09:00 Alpha', False, ('done', 'A-1'))])])[-1]
         self.assertEqual(line, '09:00 Alpha | bash="/Альфа/python" param1="/Альфа/main.py" param2=--done '
-                               'param3=A-1 terminal=false refresh=true symbolize=false emojize=false')
+                               'param3=A-1 terminal=false refresh=true length=40 symbolize=false emojize=false')
 
     def test_undo_action(self):
         line = self._lines(groups=[('done today', [('✓ 09:00 Alpha', False, ('undo', 'A-1'))])])[-1]
@@ -592,13 +592,13 @@ class SwiftbarRender(unittest.TestCase):
 
     def test_strange_id_has_no_action(self):
         line = self._lines(groups=[('today', [('09:00 Alpha', False, ('done', 'A1 color=red'))])])[-1]
-        self.assertEqual(line, '09:00 Alpha | symbolize=false emojize=false')
+        self.assertEqual(line, '09:00 Alpha | length=40 symbolize=false emojize=false')
 
     def test_text_cannot_break_menu(self):
         lines = self._lines(title='--- Alpha | color=red', groups=[('---', [('Альфа\n---\nTodo', False, None)])])
         self.assertEqual(lines[0].split(' | ')[0], '◇ --- Alpha ¦ color=red')
         self.assertEqual(lines[2], ' | size=12 symbolize=false emojize=false')
-        self.assertEqual(lines[3], 'Альфа --- Todo | symbolize=false emojize=false')
+        self.assertEqual(lines[3], 'Альфа --- Todo | length=40 symbolize=false emojize=false')
         self.assertEqual(sum(line == '---' for line in lines), 1)
 
 

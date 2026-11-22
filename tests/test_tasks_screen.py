@@ -100,3 +100,16 @@ class Summary(unittest.TestCase):
     def test_offline_skips_history(self):
         self._summary([_task('Todo', done=True)], ready=False)
         self.read.assert_not_called()
+
+
+class Narrow(unittest.TestCase):
+    def test_summary_keeps_time(self):
+        task = dict(_task('Позвонить поставщику по поводу договора и счетов'), due=datetime(2026, 11, 22, 23, 0),
+                    list_name='work')
+        source = SimpleNamespace(KEY='remindctl', SHOWN=3, available=lambda: False)
+        with mock.patch.object(tasks_screen, 'open_tasks', return_value=([task], 0)), \
+             mock.patch.object(tasks_screen.sources, 'option', return_value=3), \
+             mock.patch('shutil.get_terminal_size', return_value=os.terminal_size((41, 24))):
+            line = visible(tasks_screen.summary(source, NOW)[0])
+        self.assertTrue(line.endswith('… · today 23:00 #work'))
+        self.assertLessEqual(len(line), 40)

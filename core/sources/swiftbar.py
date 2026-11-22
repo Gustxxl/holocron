@@ -197,10 +197,10 @@ def render(on, title, alert, duty, groups, add=False):
 
 
 def _row(text, late, action):
-    if action is None or not _ID.fullmatch(action[1]):
-        return _line(text, late)
-    kind, task_id = action
-    return _line(text, late, _run(f'--{kind}', task_id))
+    extra = f'length={LENGTH}'
+    if action is not None and _ID.fullmatch(action[1]):
+        extra = f'{_run(f"--{action[0]}", action[1])} {extra}'
+    return _line(text, late, extra)
 
 
 def _run(*args):

@@ -93,6 +93,19 @@ def clip(text, width):
     return ''.join(out)
 
 
+def squeeze(head, tail, width):
+    room = width - _cells(visible(tail))
+    if _cells(visible(head)) <= room:
+        return head + tail
+    if room < 2:
+        return clip(head + tail, width)
+    return clip(head, room) + tail
+
+
+def line_width():
+    return shutil.get_terminal_size().columns - 1
+
+
 class Home(BaseException):
     pass
 
