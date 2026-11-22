@@ -2,7 +2,7 @@ from datetime import date
 from pathlib import Path
 import shutil
 
-from core import archives
+from core import archives, routines
 from core.commands import lookup
 from core.settings import home_order, operator_name
 from core.sources import registry
@@ -55,7 +55,14 @@ def _handle(raw):
     search_screen(raw)
 
 
+def _plan():
+    source = registry.active('tasks')
+    if source and source.available():
+        routines.plan(source)
+
+
 def _frame():
+    _plan()
     lines = [dim(date.today().strftime('%a %b %d %Y'))]
     operator = operator_name()
     if operator:

@@ -5,6 +5,7 @@ from screens.help_screen import show_help
 from ui.format import day_label
 from ui.interface import clear_screen, dim, error, haptic, is_back, pause, pick, read_command, red, nav_line
 from screens.sources_screen import lists_screen, source_setup, unreadable
+from screens.routines_screen import routines_screen
 
 _CHECK_RE = re.compile(r'x\s*(\d+)')
 
@@ -33,6 +34,8 @@ def tasks_screen(source):
             show_help()
         elif low in ('s', 'settings'):
             lists_screen(source)
+        elif low == 't':
+            routines_screen(source)
         elif low == 'a':
             text = read_command('text> ')
             if text:
@@ -81,7 +84,7 @@ def _frame(source, chosen, groups, now):
             lines.append(f'  {dim(str(n).rjust(digits))} ○ {_line(task, now)}')
         lines.append('')
     nav = [('number', 'open', '#', 'open'), ('x number', 'done', 'x#', 'done')] if n else []
-    nav += [('a', 'add'), ('s', 'lists'), ('b', 'back'), ('h', 'help')]
+    nav += [('a', 'add'), ('t', 'routines'), ('s', 'lists'), ('b', 'back'), ('h', 'help')]
     lines += [dim(nav_line(nav)), '']
     return lines
 

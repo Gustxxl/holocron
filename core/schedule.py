@@ -103,10 +103,13 @@ class Schedule:
                     return sh
         return None
 
+    def horizon(self, today):
+        away = sum((b - max(a, today)).days + 1 for a, b in self.vacations if b >= today)
+        return self.cycle_days + away + 2
+
     def next_shift(self, now):
         today = now.date()
-        away = sum((b - max(a, today)).days + 1 for a, b in self.vacations if b >= today)
-        for i in range(self.cycle_days + away + 2):
+        for i in range(self.horizon(today)):
             for sh in self.shifts_on(today + timedelta(days=i)):
                 if sh.start > now:
                     return sh

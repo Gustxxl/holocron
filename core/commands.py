@@ -145,6 +145,11 @@ def _cmd_waypoints(raw):
     waypoints_screen()
 
 
+def _cmd_routines(raw):
+    from screens.routines_screen import routines_screen
+    routines_screen(registry.active('tasks'))
+
+
 def _cmd_check(raw):
     from screens.diagnostics_screen import diagnostics_screen
     diagnostics_screen()
@@ -157,6 +162,7 @@ COMMANDS = [
     Command('calendar',   _cmd_calendar,   ('c', 'cal'),  'upcoming calendar events', _has_calendar),
     Command('reminders',  _cmd_reminders,  ('r',),        'open reminders', _has_reminders),
     Command('waypoints',  _cmd_waypoints,  ('wp',),       'places for location reminders', remindctl.available),
+    Command('routines',   _cmd_routines,   ('rt',),       'reminders by time or shift', _has_reminders),
     Command('favorites',  _cmd_favorites,  ('f', 'fav'),  'pinned records'),
     Command('history',    _cmd_history,    ('y',),        'searches from this session'),
     Command('tree',       _cmd_tree,       (),            'browse the archive by folder', archives.is_loaded),
@@ -202,6 +208,15 @@ HELP_SECTIONS = [
         HelpEntry('x number',     'mark a reminder done', _has_reminders),
         HelpEntry('e',            'edit the open reminder', _can_edit_reminder),
         HelpEntry('a',            'add a reminder: title, optional time, date, #list and @place', _has_reminders),
+        HelpEntry('t',            'routines', _has_reminders),
+    ]),
+    ('Routines', [
+        HelpEntry('a',            'add a routine: title, time and optional #list', _has_reminders),
+        HelpEntry('r',            'remind now', _has_reminders),
+        HelpEntry('t',            'on shift / every day / by hand', _has_reminders),
+        HelpEntry('z',            'team time / my time', _has_reminders),
+        HelpEntry('e',            'edit the open routine', _can_edit_reminder),
+        HelpEntry('d',            'delete the open routine', _has_reminders),
     ]),
     ('Waypoints', [
         HelpEntry('a',              'add a waypoint', remindctl.available),

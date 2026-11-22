@@ -9,9 +9,13 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from ui.interface import visible
 
+from datetime import date
+from zoneinfo import ZoneInfo
+from unittest.mock import ANY, call
+from core import schedule
 from screens import (diagnostics_screen, events_screen, favorites_screen, help_screen, keeper_screen,
-                     schedule_screen, schedule_settings_screen, settings_screen, sources_screen,
-                     tasks_screen, waypoints_screen)
+                     routines_screen, schedule_screen, schedule_settings_screen, settings_screen,
+                     sources_screen, tasks_screen, waypoints_screen)
 
 WIDE = os.terminal_size((200, 50))
 
@@ -201,6 +205,104 @@ class Tasks(Screen):
 
 
 POINT = {'address': 'Main st 1', 'proximity': 'arriving', 'radius': 100}
+ROUTINES = [
+    {'title': 'Check', 'time': '00:05', 'zone': 'Asia/Dubai', 'rule': 'shift', 'list': 'L1', 'last': None},
+    {'title': 'Альфа ok', 'time': '23:59', 'zone': '', 'rule': 'manual', 'list': 'L9', 'last': None},
+]
+R_LISTS = [{'id': 'L1', 'title': 'Todo'}]
+NIGHTS = schedule.Schedule(enabled=True, shifts={'N': [['20:00', '08:00']]}, weeks=('N------',),
+                           start=date(2026, 11, 23))
+MON = datetime(2026, 11, 23, 12, 0)
+
+
+class Routines(Screen):
+    def _source(self, lists=R_LISTS):
+        return SimpleNamespace(KEY='remindctl', lists=lambda: lists)
+
+    def _card(self, routine, sched):
+        with patch.object(routines_screen.zones, '_local', return_value=ZoneInfo('Europe/Berlin')), \
+             patch('core.editor.available', return_value=False):
+            return [visible(l) for l in routines_screen._card(routine, 1, 2, MON, sched, R_LISTS)]
+
+    def test_frame(self):
+        lines = [visible(l) for l in routines_screen._frame(ROUTINES)]
+        self.assertEqual(lines[:4], ['Routines', '', '  1 Check      00:05 Dubai · on shift',
+                                     '  2 Альфа ok   23:59 · by hand'])
+        self.assertIn('open', lines[5])
+
+    def test_empty(self):
+        lines = [visible(l) for l in routines_screen._frame([])]
+        self.assertEqual(lines[2], 'No routines')
+        self.assertIn('add', lines[4])
+        self.assertNotIn('open', lines[4])
+
+    def test_card_shift_in_team_time(self):
+        lines = self._card(ROUTINES[0], NIGHTS)
+        self.assertEqual(lines[2:6], ['Check', '00:05 Dubai · 21:05 here', 'on shift · next today 21:05', '#Todo'])
+        self.assertIn('remind now', lines[7])
+        self.assertNotIn('team / my time', lines[7])
+        self.assertNotIn('prev', lines[7])
+
+    def test_card_manual_local(self):
+        lines = self._card(ROUTINES[1], NIGHTS)
+        self.assertEqual(lines[2:6], ['Альфа ok', '23:59', 'by hand', ''])
+
+    def test_card_without_schedule(self):
+        lines = self._card(ROUTINES[0], schedule.Schedule(zone='Asia/Dubai'))
+        self.assertEqual(lines[4], 'on shift · schedule not set')
+        self.assertIn('team / my time', lines[7])
+
+    def _list(self, inputs, lists=R_LISTS, items=()):
+        return self.open(routines_screen, lambda: routines_screen.routines_screen(self._source(lists)), inputs, {
+            'screens.routines_screen.source_setup': True,
+            'core.routines.load': list(items),
+            'core.schedule.load': schedule.Schedule(zone='Asia/Dubai'),
+            'core.sources.default': 'L1',
+        })
+
+    def test_add(self):
+        with patch.object(routines_screen.routines, 'add', return_value=True) as add:
+            self._list(['a', 'Check 00:05', 'b'])
+        add.assert_called_once_with('Check', '00:05', 'L1', 'Asia/Dubai')
+
+    def test_add_problem_saves_nothing(self):
+        with patch.object(routines_screen.routines, 'add') as add, patch.object(routines_screen, 'error') as error:
+            self._list(['a', 'Check', 'b'])
+        add.assert_not_called()
+        error.assert_called_once_with('Type one time, e.g. 00:05')
+
+    def test_wrong_numbers_open_nothing(self):
+        with patch.object(routines_screen, '_open') as opened:
+            self._list(['²', '0', '3', '', 'b'], items=ROUTINES)
+        opened.assert_not_called()
+
+    def test_unreadable_lists(self):
+        with patch.object(routines_screen, 'unreadable') as unreadable:
+            self._list([], lists=None)
+        unreadable.assert_called_once()
+
+    def _keys(self, inputs, confirmed=False):
+        source = self._source()
+        with patch.object(routines_screen.routines, 'change') as change, \
+             patch.object(routines_screen.routines, 'remove') as remove, \
+             patch.object(routines_screen.routines, 'remind', return_value=(MON, None)) as remind, \
+             patch.object(routines_screen, 'confirm', return_value=confirmed):
+            self.open(routines_screen, lambda: routines_screen._open(source, R_LISTS, 1), inputs, {
+                'core.routines.load': ROUTINES,
+                'core.schedule.load': schedule.Schedule(zone='Asia/Dubai'),
+                'core.editor.available': False,
+            })
+        return source, change, remove, remind
+
+    def test_card_keys(self):
+        source, change, remove, remind = self._keys(['t', 'z', 'r', 'd', 'e', 'x', 'b'])
+        self.assertEqual(change.call_args_list, [call(1, rule='daily'), call(1, zone='')])
+        remind.assert_called_once_with(source, 1, ANY)
+        remove.assert_not_called()
+
+    def test_delete(self):
+        _, _, remove, _ = self._keys(['d'], confirmed=True)
+        remove.assert_called_once_with(1)
 
 
 class Waypoints(Screen):

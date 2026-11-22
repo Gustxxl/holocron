@@ -167,6 +167,19 @@ class Sources(unittest.TestCase):
                  patch.object(commands.editor, 'available', return_value=has_editor):
                 self.assertEqual(_entry('Reminders', 'e').when(), has_editor)
 
+    def test_routines_follow_reminders(self):
+        for ready, found in ((True, 'routines'), (False, None)):
+            with self.subTest(ready), self._active(tasks=self._source(ready=ready)):
+                self.assertEqual(getattr(commands.lookup('rt'), 'name', None), found)
+                for name in ('a', 'r', 't', 'z', 'd'):
+                    self.assertEqual(_entry('Routines', name).when(), ready)
+
+    def test_routines_open_active_source(self):
+        source = self._source()
+        with self._active(tasks=source), patch('screens.routines_screen.routines_screen') as screen:
+            commands.lookup('rt').run('rt')
+        screen.assert_called_once_with(source)
+
     def test_waypoints_stay_with_apple_reminders(self):
         with self._active(tasks=self._source()), patch.object(commands.remindctl.system, 'IS_MACOS', False):
             self.assertIsNone(commands.lookup('wp'))

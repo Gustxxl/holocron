@@ -150,6 +150,12 @@ class TestVacations(unittest.TestCase):
         self.assertEqual(st.vacation, (date(2026, 10, 5), date(2026, 10, 11)))
         self.assertEqual(st.shift.start, datetime(2026, 10, 14, 20, 0))
 
+    def test_horizon_counts_vacation_ahead(self):
+        s = replace(S, vacations=((date(2026, 10, 1), date(2026, 10, 3)), (date(2026, 11, 1), date(2026, 11, 14))))
+        self.assertEqual(S.horizon(date(2026, 11, 10)), 44)
+        self.assertEqual(s.horizon(date(2026, 11, 10)), 49)
+        self.assertEqual(s.horizon(date(2026, 10, 20)), 58)
+
     def test_vacation_longer_than_cycle(self):
         s = replace(S, vacations=((date(2026, 10, 5), date(2027, 3, 1)),))
         sh = s.next_shift(datetime(2026, 10, 5, 0, 0))
