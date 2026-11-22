@@ -61,7 +61,7 @@ def run(progress=lambda done, total, name: None):
 def _tool(source):
     if source is None or not source.available():
         return None
-    return getattr(source, 'PROGRAM', source.NAME)
+    return getattr(source, 'PROGRAM', getattr(source, 'APP', source.NAME))
 
 
 def system_info():
@@ -76,6 +76,7 @@ def system_info():
         ('Hyperspace', 'curses' if system.CURSES else None),
         ('Reminders', _tool(registry.active('tasks'))),
         ('Calendar', _tool(registry.active('events'))),
+        ('Menu bar', _tool(registry.active('bar'))),
         ('Keeper', {'server': 'server', 'local': 'this computer'}.get(conn['slot']) if conn else None),
         ('Archive', f'{archives.count()} cases' if archives.is_loaded() else None),
     ]

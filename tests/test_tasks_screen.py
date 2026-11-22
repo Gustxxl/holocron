@@ -79,3 +79,24 @@ class FinishedToday(unittest.TestCase):
 
     def test_source_without_history(self):
         self.assertEqual(self._found(read=False), [])
+
+
+class Summary(unittest.TestCase):
+    def _summary(self, done, ready=True):
+        source = SimpleNamespace(KEY='remindctl', SHOWN=3, available=lambda: ready)
+        with mock.patch.object(tasks_screen, 'open_tasks', return_value=([_task('Alpha')], 0)), \
+             mock.patch.object(tasks_screen, 'finished_today', return_value=done) as self.read, \
+             mock.patch.object(tasks_screen.sources, 'option', return_value=3), \
+             mock.patch.object(tasks_screen.sources, 'selected', return_value=['L1']):
+            return [visible(line) for line in tasks_screen.summary(source, NOW)]
+
+    def test_counts_done_today(self):
+        lines = self._summary([_task('Todo', done=True), _task('Альфа', done=True)])
+        self.assertEqual(lines[-1], '✓ 2 done today')
+
+    def test_nothing_done_no_line(self):
+        self.assertFalse(any('done today' in line for line in self._summary([])))
+
+    def test_offline_skips_history(self):
+        self._summary([_task('Todo', done=True)], ready=False)
+        self.read.assert_not_called()

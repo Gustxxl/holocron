@@ -41,7 +41,7 @@ class Bar(unittest.TestCase):
 
     def test_calm(self):
         self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 13, 0))]),
-                         (False, '', False, '', [('today', [('○ 13:00 Alpha', False, ('done', 'Alpha'))])]))
+                         (False, '', False, '', [('today', [('○ 13:00 Alpha', False, ('done', 'Alpha'))])], True))
 
     def test_soon_in_title(self):
         self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 30))])[1:3], ('12:30 Alpha', False))
@@ -49,7 +49,7 @@ class Bar(unittest.TestCase):
 
     def test_overdue_wins(self):
         todo = _task('Todo', datetime(2026, 11, 22, 11, 0))
-        _, title, alert, _, groups = self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 10)), todo])
+        _, title, alert, _, groups, _ = self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 10)), todo])
         self.assertEqual((title, alert), ('11:00 Todo', True))
         self.assertEqual(groups, [('overdue', [(f'○ {main.when(todo, NOW)} Todo', True, ('done', 'Todo'))]),
                                   ('today', [('○ 12:10 Alpha', False, ('done', 'Alpha'))])])
@@ -65,7 +65,7 @@ class Bar(unittest.TestCase):
         self.assertEqual([head for head, _ in groups], ['tomorrow', main.day_label(date(2026, 11, 24), NOW.date())])
 
     def test_on_duty_groups_shift(self):
-        on, _, _, _, groups = self._bar([_task('Alpha', datetime(2026, 11, 22, 23, 0)),
+        on, _, _, _, groups, _ = self._bar([_task('Alpha', datetime(2026, 11, 22, 23, 0)),
                                          _task('Todo', datetime(2026, 11, 23, 9, 0))],
                                         end=datetime(2026, 11, 23, 8, 0))
         self.assertTrue(on)
@@ -96,11 +96,44 @@ class Bar(unittest.TestCase):
         self.assertEqual(self._bar(None)[4], [('', [('Could not read Reminders', True, None)])])
 
     def test_no_source(self):
-        self.assertEqual(self._bar([], source=False), (False, '', False, '', []))
+        self.assertEqual(self._bar([], source=False), (False, '', False, '', [], False))
 
     def test_plans_routines(self):
         self._bar([])
         self.planned.assert_called_once_with()
+
+
+class BarAdd(unittest.TestCase):
+    def _add(self, answers, added=True, source=True):
+        self.source = SimpleNamespace(KEY='remindctl', available=lambda: True, lists=lambda: [{'id': 'L1', 'title': 'Work'}],
+                                      add=Mock(return_value=added)) if source else None
+        with patch.object(main.registry, 'active', return_value=self.source), \
+             patch.object(main.sources, 'default', return_value='L1'), \
+             patch.object(main.waypoints, 'load', return_value=[]), \
+             patch.object(main.swiftbar, 'ask', side_effect=list(answers)) as self.ask:
+            return main.bar_add(NOW.date())
+
+    def test_adds(self):
+        self.assertTrue(self._add(['Alpha #Work']))
+        self.assertEqual(self.source.add.call_args.args[:2], ('Alpha', 'L1'))
+        self.ask.assert_called_once_with(main.BAR_ASK, '')
+
+    def test_error_asks_again_with_text(self):
+        self.assertTrue(self._add(['Alpha 25:00', 'Alpha 23:00']))
+        self.assertEqual(self.ask.call_args_list[1].args, ('No such time: 25:00', 'Alpha 25:00'))
+        self.assertEqual(self.source.add.call_count, 1)
+
+    def test_cancel(self):
+        self.assertFalse(self._add(['']))
+        self.source.add.assert_not_called()
+
+    def test_failed_add_says_so(self):
+        self.assertFalse(self._add(['Alpha', ''], added=False))
+        self.assertEqual(self.ask.call_args_list[1].args, ('Could not add the reminder', 'Alpha'))
+
+    def test_no_source_no_dialog(self):
+        self.assertFalse(self._add([], source=False))
+        self.ask.assert_not_called()
 
 
 class BarToggle(unittest.TestCase):

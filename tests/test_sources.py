@@ -600,3 +600,37 @@ class SwiftbarRender(unittest.TestCase):
         self.assertEqual(lines[2], ' | size=12 symbolize=false emojize=false')
         self.assertEqual(lines[3], 'Альфа --- Todo | symbolize=false emojize=false')
         self.assertEqual(sum(line == '---' for line in lines), 1)
+
+
+class SwiftbarAsk(unittest.TestCase):
+    def _ask(self, result):
+        with patch.object(swiftbar.system, 'run', return_value=result) as self.run:
+            return swiftbar.ask('Альфа "x"', 'Todo')
+
+    def test_text_returned(self):
+        self.assertEqual(self._ask(_done(0, 'Alpha 09:00\n')), 'Alpha 09:00')
+        args = self.run.call_args.args[0]
+        self.assertEqual(args[0], 'osascript')
+        self.assertEqual(args[-2:], ['Альфа "x"', 'Todo'])
+
+    def test_cancel_or_failure(self):
+        for result in (None, _done(1, '')):
+            with self.subTest(result=result):
+                self.assertEqual(self._ask(result), '')
+
+    def test_new_reminder_item(self):
+        with patch.object(swiftbar.sys, 'executable', '/Альфа/python'), \
+             patch.object(swiftbar, 'MAIN', '/Альфа/main.py'):
+            lines = swiftbar.render(False, '', False, '', [], True).splitlines()
+            calm = swiftbar.render(False, '', False, '', []).splitlines()
+        self.assertEqual(lines[-2:], ['---', '+ New reminder | bash="/Альфа/python" param1="/Альфа/main.py" '
+                                             'param2=--new terminal=false refresh=true symbolize=false emojize=false'])
+        self.assertFalse(any('New reminder' in line for line in calm))
+
+
+class MenuBarCheck(unittest.TestCase):
+    def test_check_names_app(self):
+        from core import diagnostics
+        source = SimpleNamespace(NAME='Menu bar', APP='SwiftBar', available=lambda: True)
+        self.assertEqual(diagnostics._tool(source), 'SwiftBar')
+        self.assertIsNone(diagnostics._tool(SimpleNamespace(NAME='Menu bar', APP='SwiftBar', available=lambda: False)))

@@ -205,7 +205,7 @@ HELP_SECTIONS = [
     ]),
     ('Reminders', [
         HelpEntry('[number]',     'open a reminder', _has_reminders),
-        HelpEntry('x number',     'mark a reminder done', _has_reminders),
+        HelpEntry('x number',     'mark done, or undo in done today', _has_reminders),
         HelpEntry('e',            'edit the open reminder', _can_edit_reminder),
         HelpEntry('a',            'add a reminder: title, optional time, date, #list and @place', _has_reminders),
         HelpEntry('t',            'routines', _has_reminders),

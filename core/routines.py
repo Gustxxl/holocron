@@ -1,7 +1,15 @@
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from core import config, dates, schedule, tasks, zones
 
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
 KEY = 'routines'
+LOCK = Path(config.DATA_DIR) / 'routines.lock'
 RULES = ('shift', 'daily', 'manual')
 SOON = 2
 
@@ -45,30 +53,48 @@ def _save(items):
     config.save(cfg)
 
 
+@contextmanager
+def _turn(wait=True):
+    if fcntl is None:
+        yield True
+        return
+    config.ensure_data_dir()
+    with open(LOCK, 'a') as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX if wait else fcntl.LOCK_EX | fcntl.LOCK_NB)
+            mine = True
+        except OSError:
+            mine = False
+        yield mine
+
+
 def add(title, at, list_id, zone=''):
     rec = _record({'title': title, 'time': at, 'zone': zone, 'list': list_id})
     if rec is None:
         return False
-    _save([*load(), rec])
+    with _turn():
+        _save([*load(), rec])
     return True
 
 
 def change(n, **fields):
-    items = load()
-    if not 1 <= n <= len(items):
-        return False
-    items[n - 1].update(fields)
-    if 'time' in fields or 'zone' in fields:
-        items[n - 1]['last'] = None
-    _save(items)
+    with _turn():
+        items = load()
+        if not 1 <= n <= len(items):
+            return False
+        items[n - 1].update(fields)
+        if 'time' in fields or 'zone' in fields:
+            items[n - 1]['last'] = None
+        _save(items)
     return True
 
 
 def remove(n):
-    items = load()
-    if not 1 <= n <= len(items):
-        return False
-    _save(items[:n - 1] + items[n:])
+    with _turn():
+        items = load()
+        if not 1 <= n <= len(items):
+            return False
+        _save(items[:n - 1] + items[n:])
     return True
 
 
@@ -136,21 +162,25 @@ def _place(source, items, n, moment):
 
 
 def plan(source, now=None, sched=None):
-    now = now or datetime.now()
-    items = load()
-    found = pending(items, now, sched or schedule.load())
-    placed = sum(_place(source, items, n, moment) for n, moment in found)
-    if placed:
-        _save(items)
+    with _turn(wait=False) as mine:
+        if not mine:
+            return 0
+        now = now or datetime.now()
+        items = load()
+        found = pending(items, now, sched or schedule.load())
+        placed = sum(_place(source, items, n, moment) for n, moment in found)
+        if placed:
+            _save(items)
     return placed
 
 
 def remind(source, n, now=None):
-    items = load()
-    moment = soonest(items[n - 1], now or datetime.now())
-    if moment == items[n - 1]['last']:
-        return moment, 'Already set'
-    if not _place(source, items, n, moment):
-        return None, 'Could not add the reminder'
-    _save(items)
+    with _turn():
+        items = load()
+        moment = soonest(items[n - 1], now or datetime.now())
+        if moment == items[n - 1]['last']:
+            return moment, 'Already set'
+        if not _place(source, items, n, moment):
+            return None, 'Could not add the reminder'
+        _save(items)
     return moment, None

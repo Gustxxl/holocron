@@ -106,6 +106,13 @@ class Parse(unittest.TestCase):
                 with self.subTest(args):
                     self.assertEqual(launch.parse(args), ('unknown', '--done'))
 
+    def test_new_on_macos_only(self):
+        with patch.object(launch.system, 'IS_MACOS', True):
+            self.assertEqual(launch.parse(['--new']), ('new', None))
+            self.assertEqual(launch.parse(['--new', 'Alpha']), ('unknown', '--new'))
+        with patch.object(launch.system, 'IS_MACOS', False):
+            self.assertEqual(launch.parse(['--new']), ('unknown', '--new'))
+
     def test_toggles_unknown_elsewhere(self):
         with patch.object(launch.system, 'IS_MACOS', False):
             self.assertEqual(launch.parse(['--done', 'A1']), ('unknown', '--done'))

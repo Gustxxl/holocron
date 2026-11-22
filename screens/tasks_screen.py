@@ -71,6 +71,9 @@ def summary(source, now=None):
         lines.append(line)
     if rest:
         lines.append(dim(f'+{rest} more'))
+    done = finished_today(source, sources.selected(source.KEY), now) if source.available() else []
+    if done:
+        lines.append(dim(f'✓ {len(done)} done today'))
     return lines
 
 

@@ -31,6 +31,11 @@ RED = '#af5f5f'
 LENGTH = 40
 _PLAIN = 'symbolize=false emojize=false'
 _ID = re.compile(r'[\w:/.-]+')
+_ASK = ('on run argv', 'activate',
+        'set found to display dialog (item 1 of argv) default answer (item 2 of argv) '
+        'with title "Holocron" giving up after 120',
+        'if gave up of found then return ""', 'return text returned of found', 'end run')
+_ASK_WAIT = 130
 
 supported = macos.supported
 
@@ -170,7 +175,13 @@ def finish(opened):
         stop()
 
 
-def render(on, title, alert, duty, groups):
+def ask(prompt, text=''):
+    script = [part for line in _ASK for part in ('-e', line)]
+    out = system.run(['osascript', *script, prompt, text], timeout=_ASK_WAIT)
+    return out.stdout.strip() if out and out.returncode == 0 else ''
+
+
+def render(on, title, alert, duty, groups, add=False):
     lines = [_line(f'{DUTY if on else ICON} {title}', alert, f'length={LENGTH}')]
     if duty:
         lines += ['---', _line(duty)]
@@ -180,6 +191,8 @@ def render(on, title, alert, duty, groups):
         if head:
             lines.append(_line(head, extra=f'size={HEAD}'))
         lines += [_row(*row) for row in rows]
+    if add:
+        lines += ['---', _line('+ New reminder', extra=_run('--new'))]
     return '\n'.join(lines)
 
 
@@ -187,8 +200,12 @@ def _row(text, late, action):
     if action is None or not _ID.fullmatch(action[1]):
         return _line(text, late)
     kind, task_id = action
-    run = f'bash="{sys.executable}" param1="{MAIN}" param2=--{kind} param3={task_id} terminal=false refresh=true'
-    return _line(text, late, run)
+    return _line(text, late, _run(f'--{kind}', task_id))
+
+
+def _run(*args):
+    params = ' '.join(f'param{i}={arg}' for i, arg in enumerate(args, 2))
+    return f'bash="{sys.executable}" param1="{MAIN}" {params} terminal=false refresh=true'
 
 
 def _line(text, alert=False, extra=''):

@@ -1,5 +1,7 @@
 import copy
+import tempfile
 import unittest
+from pathlib import Path
 from dataclasses import replace
 from datetime import date, datetime
 from unittest.mock import Mock, call, patch
@@ -21,6 +23,11 @@ def _routine(**fields):
 
 class _Config(unittest.TestCase):
     def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        lock = patch.object(routines, 'LOCK', Path(tmp.name) / 'routines.lock')
+        lock.start()
+        self.addCleanup(lock.stop)
         self.store = {}
         load = patch.object(routines.config, 'load', side_effect=lambda: copy.deepcopy(self.store))
         save = patch.object(routines.config, 'save', side_effect=self._save)
@@ -205,6 +212,16 @@ class Plan(_Config):
         self._stored()
         self.assertEqual(routines.plan(self._source(ok=False), MON, SCHED), 0)
         self.assertEqual(self.store['routines'][0]['last'], '')
+
+    def test_plan_waits_its_turn(self):
+        if routines.fcntl is None:
+            self.skipTest('no file locks here')
+        routines.add('Проверить Альфа', '00:05', 'L1')
+        source = self._source()
+        with routines._turn():
+            self.assertEqual(routines.plan(source, MON, SCHED), 0)
+        source.add.assert_not_called()
+        self.assertEqual(routines.plan(source, MON, SCHED), 1)
 
     def test_manual_not_planned(self):
         self._stored(rule='manual')

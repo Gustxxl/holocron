@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 import shutil
 
-from core import archives, routines, schedule, sources, tasks
+from core import archives, routines, schedule, sources, tasks, waypoints
 from core.commands import lookup
 from core.settings import home_order, operator_name
 from core.sources import registry, swiftbar
@@ -19,6 +19,7 @@ LOGO = APP_DIR / "ui" / "logo.txt"
 LOGO_TEXT = "HOLOCRON"
 BAR_SOON = timedelta(minutes=30)
 BAR_ROWS = 10
+BAR_ASK = 'New reminder: title, optional time, date, #list and @place'
 
 
 def main_screen(first=None, query=None):
@@ -75,7 +76,25 @@ def bar_frame(now=None):
     late = [t for t in found if tasks.is_overdue(t, now)]
     soon = [t for t in found if not t['all_day'] and now <= t['due'] <= now + BAR_SOON]
     head = (late or soon or [None])[0]
-    return swiftbar.render(on, _bar_title(head), bool(late), visible(duty) if duty else '', groups)
+    source = registry.active('tasks')
+    ready = bool(source and source.available())
+    return swiftbar.render(on, _bar_title(head), bool(late), visible(duty) if duty else '', groups, ready)
+
+
+def bar_add(today=None):
+    source = registry.active('tasks')
+    lists = source.lists() if source and source.available() else None
+    if not lists:
+        return False
+    prompt, text = BAR_ASK, ''
+    while True:
+        text = swiftbar.ask(prompt, text)
+        if not text:
+            return False
+        draft, problem = tasks.parse_add(text, lists, sources.default(source.KEY, lists), waypoints.load(), today)
+        if not problem and source.add(draft['title'], draft['list'], draft['place'], draft['due']):
+            return True
+        prompt = problem or 'Could not add the reminder'
 
 
 def bar_toggle(action, task_id, now=None):
