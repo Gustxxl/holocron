@@ -524,6 +524,7 @@ class Swiftbar(unittest.TestCase):
             lines = swiftbar.script().splitlines()
         self.assertEqual(lines[0], '#!/bin/sh')
         self.assertNotIn('# <swiftbar.refreshOnOpen>true</swiftbar.refreshOnOpen>', lines)
+        self.assertIn('# <swiftbar.collapseOnClose>true</swiftbar.collapseOnClose>', lines)
         self.assertEqual(lines[-1], "exec '/Альфа dir/python' '/Альфа dir/main.py' --bar")
 
     def test_off_macos(self):
@@ -576,7 +577,8 @@ class SwiftbarRender(unittest.TestCase):
     def _lines(self, on=False, title='', alert=False, duty='', groups=()):
         with patch.object(swiftbar.sys, 'executable', '/Альфа/python'), \
              patch.object(swiftbar, 'MAIN', '/Альфа/main.py'):
-            return swiftbar.render(on, title, alert, duty, list(groups)).splitlines()
+             blocks = ([[('', [(duty, False, None)])]] if duty else []) + [list(groups)]
+             return swiftbar.render(on, title, alert, blocks).splitlines()
 
     def test_calm_shows_icon(self):
         self.assertEqual(self._lines(), ['◇ | length=40 symbolize=false emojize=false'])
@@ -592,7 +594,7 @@ class SwiftbarRender(unittest.TestCase):
         lines = self._lines(duty='● ON DUTY', groups=[('overdue', [('Todo', True, None)]),
                                                        ('today', [('09:00 Alpha', False, None)])])
         self.assertEqual(lines[1:], [
-            '---', '● ON DUTY | symbolize=false emojize=false', '---',
+            '---', '● ON DUTY | length=40 symbolize=false emojize=false', '---',
             'overdue | size=12 symbolize=false emojize=false',
             'Todo | length=40 symbolize=false emojize=false color=#af5f5f',
             'today | size=12 symbolize=false emojize=false',
@@ -620,6 +622,26 @@ class SwiftbarRender(unittest.TestCase):
         self.assertEqual(lines[3], 'Альфа --- Todo | length=40 symbolize=false emojize=false')
         self.assertEqual(sum(line == '---' for line in lines), 1)
 
+    def test_meeting_link(self):
+        link = 'https://meet.google.com/abc?pwd=1&x=2'
+        line = self._lines(groups=[('today', [('↗ 13:00 Standup', False, ('open', link))])])[-1]
+        self.assertEqual(line, f'↗ 13:00 Standup | href="{link}" length=40 symbolize=false emojize=false')
+
+    def test_strange_link_not_opened(self):
+        for link in ('javascript:alert(1)', 'http://meet.google.com/abc', 'https://a" bash="/bin/sh'):
+            with self.subTest(link):
+                line = self._lines(groups=[('today', [('↗ Alpha', False, ('open', link))])])[-1]
+                self.assertNotIn('href', line)
+                self.assertNotIn('bash', line)
+
+    def test_done_today_submenu(self):
+        rows = [('✓ 09:00 Alpha', False, ('undo', 'A-1')), ('--- Todo', False, None)]
+        lines = self._lines(groups=[('', [('✓ 2 done today', False, ('menu', rows))])])
+        self.assertEqual(lines[2], '✓ 2 done today | fold=true length=40 symbolize=false emojize=false')
+        self.assertTrue(lines[3].startswith('--✓ 09:00 Alpha | bash='))
+        self.assertIn(' param2=--undo param3=A-1 ', lines[3])
+        self.assertEqual(lines[4], '--Todo | length=40 symbolize=false emojize=false')
+
 
 class SwiftbarAsk(unittest.TestCase):
     def _ask(self, result):
@@ -640,8 +662,8 @@ class SwiftbarAsk(unittest.TestCase):
     def test_new_reminder_item(self):
         with patch.object(swiftbar.sys, 'executable', '/Альфа/python'), \
              patch.object(swiftbar, 'MAIN', '/Альфа/main.py'):
-            lines = swiftbar.render(False, '', False, '', [], True).splitlines()
-            calm = swiftbar.render(False, '', False, '', []).splitlines()
+             lines = swiftbar.render(False, '', False, [], True).splitlines()
+             calm = swiftbar.render(False, '', False, []).splitlines()
         self.assertEqual(lines[-2:], ['---', '+ New reminder | bash="/Альфа/python" param1="/Альфа/main.py" '
                                              'param2=--new terminal=false refresh=true symbolize=false emojize=false'])
         self.assertFalse(any('New reminder' in line for line in calm))

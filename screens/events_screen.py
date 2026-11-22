@@ -70,7 +70,7 @@ def _frame(source, chosen, flat, now):
         lines.append(dim(day_label(day, now.date())))
         for event in items:
             n += 1
-            lines.append(clip(f'  {dim(str(n).rjust(digits))} {_time(event, now).ljust(11)}  {event["title"]}', line_width()))
+            lines.append(clip(f'  {dim(str(n).rjust(digits))} {event_time(event, now).ljust(11)}  {event["title"]}', line_width()))
             link = events.meeting(event)
             if link:
                 lines.append(f'  {" " * digits} {" " * 11}  {dim(underline(link))}')
@@ -141,7 +141,7 @@ def _add(source, text, lists, chosen):
     pause(feedback='success')
 
 
-def _time(event, now):
+def event_time(event, now):
     if event['all_day']:
         return 'all day'
     if event['start'] <= now:
@@ -151,5 +151,5 @@ def _time(event, now):
 
 def _when(event, now):
     if event['start'] <= now and not event['all_day']:
-        return _time(event, now)
-    return f'{day_label(max(event["start"].date(), now.date()), now.date())} {_time(event, now)}'
+        return event_time(event, now)
+    return f'{day_label(max(event["start"].date(), now.date()), now.date())} {event_time(event, now)}'

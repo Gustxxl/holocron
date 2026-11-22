@@ -2,11 +2,11 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 import shutil
 
-from core import archives, routines, schedule, sources, tasks, waypoints
+from core import archives, dates, events, routines, schedule, sources, tasks, waypoints
 from core.commands import lookup
 from core.settings import home_order, operator_name
 from core.sources import registry, swiftbar
-from screens.events_screen import agenda
+from screens.events_screen import agenda, event_time
 from core.updater import pending_update
 from screens.schedule_screen import duty_line
 from screens.search_screen import search_screen
@@ -72,13 +72,15 @@ def bar_frame(now=None):
     status = sched.status(now)
     on = bool(status and status.on)
     found, groups = _bar_tasks(now, status.shift.end if on else None)
+    meetings, days = _bar_events(now)
     duty = duty_line(now, sched)
     late = [t for t in found if tasks.is_overdue(t, now)]
-    soon = [t for t in found if not t['all_day'] and now <= t['due'] <= now + BAR_SOON]
-    head = (late or soon or [None])[0]
+    soon = sorted([(t['due'], t['title']) for t in found if not t['all_day'] and now <= t['due'] <= now + BAR_SOON]
+                  + [(e['start'], e['title']) for e in meetings if not e['all_day'] and now <= e['start'] <= now + BAR_SOON])
+    blocks = {'calendar': days, 'schedule': [('', [(visible(duty), False, None)])] if duty else [], 'reminders': groups}
     source = registry.active('tasks')
     ready = bool(source and source.available())
-    return swiftbar.render(on, _bar_title(head), bool(late), visible(duty) if duty else '', groups, ready)
+    return swiftbar.render(on, _bar_title(late, soon), bool(late), [blocks[key] for key in home_order()], ready)
 
 
 def bar_add(today=None):
@@ -118,14 +120,36 @@ def _bar_tasks(now, end):
     if found is None:
         return [], [('', [(f'Could not read {source.NAME}', True, None)])]
     chosen = sources.selected(source.KEY)
-    shown, _ = tasks.upcoming([t for t in found if t['due']], chosen, BAR_ROWS)
+    ahead = sources.option(source.KEY, 'ahead', source.AHEAD)
+    shown, _ = tasks.upcoming([t for t in found if t['due'] and dates.within(t['due'], now, ahead)], chosen, BAR_ROWS)
     groups = {}
     for task in shown:
         groups.setdefault(_bar_group(task, now, end), []).append(_bar_row(task, now))
-    finished = finished_today(source, chosen, now)[-BAR_ROWS:]
+    finished = finished_today(source, chosen, now)
     if finished:
-        groups['done today'] = [(f'✓ {t["finished"]:%H:%M} {t["title"]}', False, ('undo', t['id'])) for t in finished]
+        rows = [(f'✓ {t["finished"]:%H:%M} {t["title"]}', False, ('undo', t['id'])) for t in finished[-BAR_ROWS:]]
+        groups[''] = [(f'✓ {len(finished)} done today', False, ('menu', rows))]
     return shown, list(groups.items())
+
+
+def _bar_events(now):
+    source = registry.active('events')
+    chosen = sources.selected(source.KEY) if source else []
+    if not chosen or not source.available():
+        return [], []
+    found = source.items()
+    if found is None:
+        return [], [('', [(f'Could not read {source.NAME}', True, None)])]
+    ahead = sources.option(source.KEY, 'ahead', source.AHEAD)
+    shown = [e for e in events.upcoming(found, chosen, now) if dates.within(e['start'], now, ahead)][:BAR_ROWS]
+    days = events.by_day(shown, now)
+    return shown, [(day_label(day, now.date()), [_bar_event(e, now) for e in items]) for day, items in days]
+
+
+def _bar_event(event, now):
+    link = events.meeting(event)
+    text = f'{"↗" if link else "◇"} {event_time(event, now)} {event["title"]}'
+    return text, False, ('open', link) if link else None
 
 
 def _bar_group(task, now, end):
@@ -145,10 +169,11 @@ def _bar_row(task, now):
     return ' '.join(p for p in ('○', stamp, task['title']) if p), late, ('done', task['id'])
 
 
-def _bar_title(task):
-    if task is None:
-        return ''
-    return task['title'] if task['all_day'] else f'{task["due"]:%H:%M} {task["title"]}'
+def _bar_title(late, soon):
+    if late:
+        task = late[0]
+        return task['title'] if task['all_day'] else f'{task["due"]:%H:%M} {task["title"]}'
+    return f'{soon[0][0]:%H:%M} {soon[0][1]}' if soon else ''
 
 
 def _frame():

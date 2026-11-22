@@ -22,7 +22,7 @@ HOME = '~/SwiftBar'
 APPS = ('/Applications', '~/Applications')
 MAIN = str(Path(config.APP_DIR) / 'main.py')
 REFRESH = f'swiftbar://refreshplugin?name={FILE.split(".")[0]}'
-_TAGS = ('hideAbout', 'hideRunInTerminal', 'hideLastUpdated')
+_TAGS = ('hideAbout', 'hideRunInTerminal', 'hideLastUpdated', 'collapseOnClose')
 _LEFTOVERS = ('.DS_Store', f'.{FILE}.tmp')
 _RUNNING = f'application id "{DOMAIN}" is running'
 _WAIT = 15
@@ -33,6 +33,7 @@ RED = '#af5f5f'
 LENGTH = 40
 _PLAIN = 'symbolize=false emojize=false'
 _ID = re.compile(r'[\w:/.-]+')
+_URL = re.compile(r'https://[^\s"\'|]+')
 _ASK = ('on run argv', 'activate',
         'set found to display dialog (item 1 of argv) default answer (item 2 of argv) '
         'with title "Holocron" giving up after 120',
@@ -203,25 +204,29 @@ def ask(prompt, text=''):
     return out.stdout.strip() if out and out.returncode == 0 else ''
 
 
-def render(on, title, alert, duty, groups, add=False):
+def render(on, title, alert, blocks, add=False):
     lines = [_line(f'{DUTY if on else ICON} {title}', alert, f'length={LENGTH}')]
-    if duty:
-        lines += ['---', _line(duty)]
-    if groups:
-        lines.append('---')
-    for head, rows in groups:
-        if head:
-            lines.append(_line(head, extra=f'size={HEAD}'))
-        lines += [_row(*row) for row in rows]
+    for groups in blocks:
+        if groups:
+            lines.append('---')
+        for head, rows in groups:
+            if head:
+                lines.append(_line(head, extra=f'size={HEAD}'))
+            lines += [_row(*row) for row in rows]
     if add:
         lines += ['---', _line('+ New reminder', extra=_run('--new'))]
     return '\n'.join(lines)
 
 
 def _row(text, late, action):
+    kind, value = action or ('', '')
     extra = f'length={LENGTH}'
-    if action is not None and _ID.fullmatch(action[1]):
-        extra = f'{_run(f"--{action[0]}", action[1])} {extra}'
+    if kind == 'menu':
+        return '\n'.join([_line(text, late, f'fold=true {extra}'), *(f'--{_row(*row)}' for row in value)])
+    if kind == 'open' and _URL.fullmatch(value):
+        extra = f'href="{value}" {extra}'
+    elif kind in ('done', 'undo') and _ID.fullmatch(value):
+        extra = f'{_run(f"--{kind}", value)} {extra}'
     return _line(text, late, extra)
 
 
