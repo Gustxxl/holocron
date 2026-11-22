@@ -93,7 +93,9 @@ def clip(text, width):
     return ''.join(out)
 
 
-def squeeze(head, tail, width):
+def squeeze(head, tail, width, tag=''):
+    if tag and _cells(visible(head + tail + tag)) <= width:
+        return head + tail + tag
     room = width - _cells(visible(tail))
     if _cells(visible(head)) <= room:
         return head + tail

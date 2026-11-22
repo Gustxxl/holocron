@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from core import dates, editor, schedule, sources, tasks, waypoints
+from core.sources import registry
 from screens.help_screen import show_help
 from ui.format import day_label
 from ui.interface import (clear_screen, dim, error, haptic, is_back, line_width, pause, pick, read_command, red, nav_line,
@@ -66,13 +67,13 @@ def summary(source, now=None):
     shown, rest = open_tasks(source, now, sources.option(source.KEY, 'shown', source.SHOWN))
     lines, width = [], line_width()
     for task in shown:
-        tail = _tail(task, now) + (dim(f' #{task['list_name']}') if task.get('list_name') else '')
-        lines.append(squeeze(f'○ {task["title"]}', tail, width))
-    if rest:
-        lines.append(dim(f'+{rest} more'))
+        tag = dim(f' #{task['list_name']}') if task.get('list_name') else ''
+        lines.append(squeeze(f'○ {task["title"]}', _tail(task, now), width, tag))
     done = finished_today(source, sources.selected(source.KEY), now) if source.available() else []
-    if done:
-        lines.append(dim(f'✓ {len(done)} done today'))
+    more = [f'+{rest} more'] if rest else []
+    more += [f'✓ {len(done)} done today'] if done else []
+    if more:
+        lines.append(dim(' · '.join(more)))
     return lines
 
 
@@ -170,6 +171,7 @@ def _card(task, number, total, now, points):
 def _complete(source, task):
     if source.complete(task['id']):
         haptic('toggle')
+        _refresh_bar()
         return True
     error(f'Could not complete: {task["title"]}')
     return False
@@ -180,9 +182,16 @@ def _toggle(source, task):
         return _complete(source, task)
     if source.reopen(task['id']):
         haptic('toggle')
+        _refresh_bar()
         return True
     error(f'Could not reopen: {task["title"]}')
     return False
+
+
+def _refresh_bar():
+    bar = registry.active('bar')
+    if bar is not None:
+        bar.refresh()
 
 
 def _edit(source, task):
@@ -201,6 +210,7 @@ def _edit(source, task):
         return
     task.update(found)
     haptic('success')
+    _refresh_bar()
 
 
 def _add(source, text, lists, chosen):
@@ -211,6 +221,7 @@ def _add(source, text, lists, chosen):
     if not source.add(draft['title'], draft['list'], draft['place'], draft['due']):
         error('Could not add the reminder')
         return
+    _refresh_bar()
     if draft['list'] in chosen:
         haptic('success')
         return

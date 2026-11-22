@@ -190,7 +190,7 @@ class Tasks(Screen):
         source.add.return_value = True
         with patch.object(tasks_screen, 'error') as error:
             self.open(tasks_screen, lambda: tasks_screen._add(source, text, LISTS, ['l1']), [],
-                      {'core.sources.default': 'l1', 'core.waypoints.load': {}})
+                      {'core.sources.default': 'l1', 'core.waypoints.load': {}, 'screens.tasks_screen._refresh_bar': None})
         return source.add, error
 
     def test_add_passes_time(self):
@@ -433,10 +433,9 @@ class Calendar(Screen):
 
     def test_agenda_shows_link(self):
         lines = self._agenda(datetime(2030, 1, 1, 9))
-        self.assertIn('Standup', lines[0])
-        self.assertTrue(visible(lines[0]).endswith(' #Work'))
-        self.assertEqual(visible(lines[1]).strip(), 'link')
-        self.assertIn('https://meet.google.com/abc', lines[1])
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(visible(lines[0]), '◇ Standup ↗ · today 10:00–11:00 #Work')
+        self.assertIn('https://meet.google.com/abc', lines[0])
 
     def test_agenda_tomorrow_counts(self):
         self.assertTrue(self._agenda(datetime(2029, 12, 31, 9)))

@@ -451,6 +451,25 @@ class Swiftbar(unittest.TestCase):
         self.assertFalse(self._start(state='off'))
         self.assertEqual(self.calls, [])
 
+    def test_start_updates_old_plugin(self):
+        old = swiftbar.script().replace('#!/bin/sh\n', '#!/bin/sh\n# <swiftbar.refreshOnOpen>true</swiftbar.refreshOnOpen>\n')
+        (self.folder / swiftbar.FILE).write_text(old, encoding='utf-8')
+        self.assertFalse(swiftbar.added())
+        self._start()
+        self.assertTrue(swiftbar.added())
+
+    def test_start_keeps_foreign_plugin(self):
+        (self.folder / swiftbar.FILE).write_text('Alpha', encoding='utf-8')
+        self._start(state='off')
+        self.assertEqual((self.folder / swiftbar.FILE).read_text(encoding='utf-8'), 'Alpha')
+
+    def test_refresh_only_running_app(self):
+        swiftbar._refresh()
+        self.assertFalse(any(c[0] == 'open' for c in self.calls))
+        self.on = True
+        swiftbar._refresh()
+        self.assertIn(['open', '-g', 'swiftbar://refreshplugin?name=holocron'], self.calls)
+
     def _finish(self, opened, mine):
         self.mine, self.on = (str(self.folder) if mine else ''), True
         swiftbar.add()
@@ -504,7 +523,7 @@ class Swiftbar(unittest.TestCase):
              patch.object(swiftbar, 'MAIN', '/Альфа dir/main.py'):
             lines = swiftbar.script().splitlines()
         self.assertEqual(lines[0], '#!/bin/sh')
-        self.assertIn('# <swiftbar.refreshOnOpen>true</swiftbar.refreshOnOpen>', lines)
+        self.assertNotIn('# <swiftbar.refreshOnOpen>true</swiftbar.refreshOnOpen>', lines)
         self.assertEqual(lines[-1], "exec '/Альфа dir/python' '/Альфа dir/main.py' --bar")
 
     def test_off_macos(self):

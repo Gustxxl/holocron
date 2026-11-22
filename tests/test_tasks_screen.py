@@ -38,6 +38,7 @@ class Toggle(unittest.TestCase):
     def _toggle(self, task, ok=True):
         self.source = SimpleNamespace(complete=mock.Mock(return_value=ok), reopen=mock.Mock(return_value=ok))
         with mock.patch.object(tasks_screen, 'haptic'), \
+             mock.patch.object(tasks_screen, '_refresh_bar') as self.refreshed, \
              mock.patch.object(tasks_screen, 'error') as self.error:
             return tasks_screen._toggle(self.source, task)
 
@@ -54,6 +55,11 @@ class Toggle(unittest.TestCase):
     def test_failed_reopen_reported(self):
         self.assertFalse(self._toggle(_task('Todo', done=True), ok=False))
         self.error.assert_called_once_with('Could not reopen: Todo')
+        self.refreshed.assert_not_called()
+
+    def test_change_refreshes_menu_bar(self):
+        self._toggle(_task('Alpha'))
+        self.refreshed.assert_called_once()
 
 
 class FinishedToday(unittest.TestCase):
@@ -82,9 +88,9 @@ class FinishedToday(unittest.TestCase):
 
 
 class Summary(unittest.TestCase):
-    def _summary(self, done, ready=True):
+    def _summary(self, done, ready=True, rest=0):
         source = SimpleNamespace(KEY='remindctl', SHOWN=3, available=lambda: ready)
-        with mock.patch.object(tasks_screen, 'open_tasks', return_value=([_task('Alpha')], 0)), \
+        with mock.patch.object(tasks_screen, 'open_tasks', return_value=([_task('Alpha')], rest)), \
              mock.patch.object(tasks_screen, 'finished_today', return_value=done) as self.read, \
              mock.patch.object(tasks_screen.sources, 'option', return_value=3), \
              mock.patch.object(tasks_screen.sources, 'selected', return_value=['L1']):
@@ -93,6 +99,11 @@ class Summary(unittest.TestCase):
     def test_counts_done_today(self):
         lines = self._summary([_task('Todo', done=True), _task('Альфа', done=True)])
         self.assertEqual(lines[-1], '✓ 2 done today')
+
+    def test_more_and_done_share_line(self):
+        lines = self._summary([_task('Todo', done=True), _task('Альфа', done=True)], rest=48)
+        self.assertEqual(lines[-1], '+48 more · ✓ 2 done today')
+        self.assertEqual(len(lines), 2)
 
     def test_nothing_done_no_line(self):
         self.assertFalse(any('done today' in line for line in self._summary([])))
@@ -111,5 +122,5 @@ class Narrow(unittest.TestCase):
              mock.patch.object(tasks_screen.sources, 'option', return_value=3), \
              mock.patch('shutil.get_terminal_size', return_value=os.terminal_size((41, 24))):
             line = visible(tasks_screen.summary(source, NOW)[0])
-        self.assertTrue(line.endswith('… · today 23:00 #work'))
+        self.assertTrue(line.endswith('… · today 23:00'))
         self.assertLessEqual(len(line), 40)

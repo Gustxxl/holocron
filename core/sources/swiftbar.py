@@ -2,6 +2,7 @@ import os
 import re
 import shlex
 import sys
+import threading
 import time
 from pathlib import Path
 from core import config, sources, system
@@ -20,7 +21,8 @@ FILE = 'holocron.1m.sh'
 HOME = '~/SwiftBar'
 APPS = ('/Applications', '~/Applications')
 MAIN = str(Path(config.APP_DIR) / 'main.py')
-_TAGS = ('refreshOnOpen', 'hideAbout', 'hideRunInTerminal', 'hideLastUpdated')
+REFRESH = f'swiftbar://refreshplugin?name={FILE.split(".")[0]}'
+_TAGS = ('hideAbout', 'hideRunInTerminal', 'hideLastUpdated')
 _LEFTOVERS = ('.DS_Store', f'.{FILE}.tmp')
 _RUNNING = f'application id "{DOMAIN}" is running'
 _WAIT = 15
@@ -82,6 +84,15 @@ def added():
         return path is not None and path.read_text(encoding='utf-8') == script()
     except OSError:
         return False
+
+
+def stale():
+    path = plugin()
+    try:
+        text = path.read_text(encoding='utf-8') if path else ''
+    except OSError:
+        return False
+    return text != script() and text.startswith('#!/bin/sh') and f'{shlex.quote(MAIN)} --bar' in text
 
 
 def owned():
@@ -164,6 +175,8 @@ def remove():
 
 
 def start():
+    if stale():
+        add()
     if status() != 'ready' or running():
         return False
     system.run(['open', '-g', str(app())], timeout=cli.TIMEOUT)
@@ -173,6 +186,15 @@ def start():
 def finish(opened):
     if opened or owned():
         stop()
+
+
+def refresh():
+    threading.Thread(target=_refresh, daemon=True).start()
+
+
+def _refresh():
+    if running():
+        system.run(['open', '-g', REFRESH], timeout=cli.TIMEOUT)
 
 
 def ask(prompt, text=''):

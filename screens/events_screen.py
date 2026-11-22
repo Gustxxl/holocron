@@ -48,12 +48,11 @@ def agenda(source, now=None):
     now = now or datetime.now()
     ahead = sources.option(source.KEY, 'ahead', source.AHEAD)
     shown = [e for e in events.upcoming(found, chosen, now) if dates.within(e['start'], now, ahead)]
-    lines = []
+    lines, width = [], line_width()
     for event in shown[:limit]:
-        lines.append(squeeze(f'◇ {event['title']}', dim(f' · {_when(event, now)} #{event['list_name']}'), line_width()))
         link = events.meeting(event)
-        if link:
-            lines.append(f'  {dim(underline(hyperlink(link, 'link')))}')
+        tail = (' ' + dim(hyperlink(link, '↗')) if link else '') + dim(f' · {_when(event, now)}')
+        lines.append(squeeze(f'◇ {event['title']}', tail, width, dim(f' #{event['list_name']}')))
     if len(shown) > limit:
         lines.append(dim(f'+{len(shown) - limit} more'))
     return lines

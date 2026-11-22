@@ -284,3 +284,9 @@ class Squeeze(unittest.TestCase):
         line = ui_interface.visible(self._squeeze('◇ Alpha', 20))
         self.assertLessEqual(ui_interface._cells(line), 20)
         self.assertTrue(line.startswith('◇ Alpha'))
+
+    def test_tag_only_when_title_fits(self):
+        tail, tag = ' · 09:00', ' #work'
+        self.assertEqual(ui_interface.squeeze('◇ Alpha', tail, 80, tag), '◇ Alpha · 09:00 #work')
+        self.assertEqual(ui_interface.squeeze('◇ Alpha', tail, 18, tag), '◇ Alpha · 09:00')
+        self.assertEqual(ui_interface.visible(ui_interface.squeeze('◇ Альфа Alpha', tail, 15, tag)), '◇ Альф… · 09:00')
