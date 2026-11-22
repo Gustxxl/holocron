@@ -6,6 +6,7 @@ from ui.interface import clear_screen, confirm, dim, error, haptic, is_back, num
 
 _DEFAULT_RE = re.compile(r'd\s*(\d+)')
 _STEPS = ['old_macos', 'missing', 'denied']
+_BAR_STEPS = ['old_macos', 'missing', 'no_folder', 'off']
 _MAIN_RE = re.compile(r'm\s*(\d+)')
 _AHEAD_RE = re.compile(r't\s*(\d+)')
 _AHEAD = {0: 'any day', 1: 'today', 2: 'today and tomorrow'}
@@ -32,9 +33,7 @@ def _macos_setup(source):
         print(f'  Holocron shows and adds {source.ABOUT} through {source.PROGRAM},')
         print('  a free command-line tool.')
         print()
-        for i, name in enumerate(names):
-            mark = dim('✓') if i < current else '→'
-            print(f'  {mark} {name}' if i <= current else dim(f'  · {name}'))
+        _steps(names, current)
         print()
 
         nav = []
@@ -93,7 +92,82 @@ def _macos_setup(source):
             macos.open_url(source.PRIVACY_URL)
 
 
-_SETUPS = {'macos': _macos_setup}
+def _swiftbar_setup(source):
+    while True:
+        state = source.status()
+        if state == 'ready':
+            return True
+        brew = cli.available('brew')
+        clear_screen()
+        print(dim(f'Settings > {source.NAME}'))
+        print()
+        print('  Holocron shows upcoming reminders and your shift')
+        print(f'  in the macOS menu bar through {source.APP}, a free app.')
+        print()
+        _steps([f'macOS {source.MACOS} or later', source.APP, 'Plugin folder', 'Holocron in the menu bar'],
+               _BAR_STEPS.index(state))
+        print()
+
+        nav = []
+        if state == 'old_macos':
+            print(f'  {source.APP} needs macOS {source.MACOS} or later.')
+            print(dim(f'  This Mac runs macOS {system.version() or "unknown"}.'))
+        elif state == 'missing':
+            print(f'  Download {source.APP}: {source.RELEASES}')
+            if brew:
+                print(dim(f'  Or install it with Homebrew: brew install {source.TAP}'))
+            nav.append(('o', 'open the download page', 'o', 'download'))
+            if brew:
+                nav.append(('brew', 'install with Homebrew', 'brew', 'brew'))
+        elif state == 'no_folder':
+            print(f'  {source.APP} needs a folder for its plugins.')
+            print(f'  Holocron can create {source.HOME} and set it for you.')
+            print(dim(f'  {source.APP} restarts if it is open.'))
+            nav += [('f', 'create the folder', 'f', 'create'), ('o', f'open {source.APP}', 'o', 'open')]
+        else:
+            print(f'  Holocron adds {source.FILE} to the {source.APP} plugin folder:')
+            print(dim(f'  {source.folder()}'))
+            nav.append(('a', 'add to the menu bar', 'a', 'add'))
+        print()
+        nav += [('↵', 'check again', '↵', 'check'), ('b', 'back')]
+        print(dim(nav_line(nav)))
+        print()
+
+        command = read_command(f'{source.NAME.lower()}> ').lower()
+        if is_back(command):
+            return False
+        if command == 'o' and state == 'missing':
+            macos.open_url(source.RELEASES)
+        elif command == 'o' and state == 'no_folder':
+            macos.open_url(str(source.app()))
+        elif command == 'f' and state == 'no_folder':
+            result = wait(f'Setting up {source.APP}', source.create)
+            if result == 'ok':
+                haptic('success')
+            elif result == 'running':
+                error(f'{source.APP} did not quit. Quit it, then press f again')
+            else:
+                error(f'Could not create {source.HOME}')
+        elif command == 'brew' and state == 'missing' and brew:
+            print()
+            ok = macos.install(source.TAP) == 'ok'
+            print()
+            print('Installed.' if ok else 'Installation did not finish. See the output above.')
+            pause(feedback='success' if ok else 'error')
+        elif command == 'a' and state == 'off':
+            if source.add():
+                haptic('success')
+            else:
+                error(f'Could not write to {source.folder()}')
+
+
+def _steps(names, current):
+    for i, name in enumerate(names):
+        mark = dim('✓') if i < current else '→'
+        print(f'  {mark} {name}' if i <= current else dim(f'  · {name}'))
+
+
+_SETUPS = {'macos': _macos_setup, 'swiftbar': _swiftbar_setup}
 
 
 def tool_screen(source):
@@ -183,3 +257,30 @@ def lists_screen(source):
 
 def unreadable(source):
     error(source.HINT if not source.authorized() else f'Could not read {source.NAME}')
+
+
+def plugin_screen(source):
+    while source.status() == 'ready':
+        clear_screen()
+        print(dim(f'Settings > {source.NAME}'))
+        print()
+        print('  Holocron is in the menu bar')
+        print(dim(f'  {source.plugin()}'))
+        print()
+        print(dim(nav_line([('d', 'remove from the menu bar', 'd', 'remove'), ('b', 'back')])))
+        print()
+        command = read_command(f'{source.NAME.lower()}> ').lower()
+        if is_back(command):
+            return
+        if command != 'd':
+            continue
+        tidy = source.owned()
+        question = 'Remove Holocron from the menu bar?'
+        if tidy:
+            question = f'Remove Holocron from the menu bar, quit {source.APP} and delete {source.folder()}?'
+        if not confirm(question):
+            continue
+        if wait('Removing', source.remove):
+            haptic('success')
+        else:
+            error(f'Could not remove. Quit {source.APP} and try again' if tidy else f'Could not delete {source.plugin()}')

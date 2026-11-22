@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from core import launch
 
@@ -85,6 +86,32 @@ class Parse(unittest.TestCase):
         for text in ('holo words', 'holo schedule', 'holo "nginx; ERR504"', 'holo -- -words'):
             with self.subTest(text):
                 self.assertIn(text, launch.USAGE)
+
+    def test_bar_on_macos(self):
+        with patch.object(launch.system, 'IS_MACOS', True):
+            self.assertEqual(launch.parse(['--bar']), ('bar', None))
+
+    def test_bar_unknown_elsewhere(self):
+        with patch.object(launch.system, 'IS_MACOS', False):
+            self.assertEqual(launch.parse(['--bar']), ('unknown', '--bar'))
+
+    def test_bar_later_is_search(self):
+        self.assertEqual(launch.parse(['nginx', '--bar']), ('search', 'nginx --bar'))
+
+    def test_toggles_on_macos(self):
+        with patch.object(launch.system, 'IS_MACOS', True):
+            self.assertEqual(launch.parse(['--done', 'A1']), ('done', 'A1'))
+            self.assertEqual(launch.parse(['--undo', 'A1']), ('undo', 'A1'))
+            for args in (['--done'], ['--done', 'A1', 'A2']):
+                with self.subTest(args):
+                    self.assertEqual(launch.parse(args), ('unknown', '--done'))
+
+    def test_toggles_unknown_elsewhere(self):
+        with patch.object(launch.system, 'IS_MACOS', False):
+            self.assertEqual(launch.parse(['--done', 'A1']), ('unknown', '--done'))
+
+    def test_bar_not_in_usage(self):
+        self.assertNotIn('--bar', launch.USAGE)
 
     def test_usage_has_no_paths(self):
         self.assertNotIn('.md', launch.USAGE)

@@ -51,6 +51,14 @@ def complete(task_id):
     return cli.run_ok(PROGRAM, 'complete', task_id)
 
 
+def reopen(task_id):
+    return cli.run_ok(PROGRAM, 'edit', task_id, '--incomplete')
+
+
+def completed():
+    return parse_items(cli.run_json(PROGRAM, 'completed', '--json'))
+
+
 def add(title, list_id, place=None, due=None):
     args = ['add', '--title', title, '--list-id', list_id]
     if place:
@@ -102,4 +110,5 @@ def _task(raw):
         'notes': str(raw.get('notes') or '').strip(),
         'place': str(trigger.get('address') or '').strip() if isinstance(trigger, dict) else '',
         'done': raw.get('isCompleted') is True,
+        'finished': cli.parse_time(raw.get('completionDate')),
     }

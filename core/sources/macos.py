@@ -29,9 +29,13 @@ def supported():
     return system.IS_MACOS
 
 
-def status(program, version, authorized):
+def outdated(version):
     major = platform.mac_ver()[0].split('.')[0]
-    if not (major.isdigit() and int(major) >= version):
+    return not (major.isdigit() and int(major) >= version)
+
+
+def status(program, version, authorized):
+    if outdated(version):
         return 'old_macos'
     if not cli.available(program):
         return 'missing'

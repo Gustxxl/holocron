@@ -57,6 +57,11 @@ def option(key, name, default):
     return value if isinstance(value, int) and value >= 0 else default
 
 
+def text(key, name):
+    value = _entry(config.load(), key).get(name)
+    return value if isinstance(value, str) else ''
+
+
 def set_option(key, name, value):
     cfg = config.load()
     entry = _entry(cfg, key)

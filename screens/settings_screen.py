@@ -36,7 +36,7 @@ from ui.clean_path import clean_input_path
 from core import system
 from core.archives.vault import folders, relative
 from core.sources import registry
-from screens.sources_screen import lists_screen, source_setup
+from screens.sources_screen import lists_screen, plugin_screen, source_setup
 
 
 def settings_screen():
@@ -56,8 +56,12 @@ def settings_screen():
 
 
 def _open_source(source):
-    if source_setup(source):
+    if not source_setup(source):
+        return
+    if hasattr(source, 'LISTS'):
         lists_screen(source)
+    else:
+        plugin_screen(source)
 
 
 def _mark(path):

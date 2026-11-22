@@ -1,6 +1,6 @@
-from . import ekctl, remindctl
+from . import ekctl, remindctl, swiftbar
 
-ALL = [ekctl, remindctl]
+ALL = [ekctl, remindctl, swiftbar]
 BLOCKS = {'calendar': 'events', 'reminders': 'tasks'}
 
 

@@ -14,6 +14,16 @@ def is_overdue(task, now=None):
     return due.date() < now.date() if task.get('all_day') else due < now
 
 
+def since(now, shift_start=None):
+    start = datetime.combine(now.date(), datetime.min.time())
+    return min(start, shift_start) if shift_start else start
+
+
+def done_today(items, selected, start):
+    found = [t for t in items if t['done'] and t['list'] in selected and t.get('finished') and t['finished'] >= start]
+    return sorted(found, key=lambda t: t['finished'])
+
+
 def group(items, lists, selected):
     by_list = {}
     for task in items:

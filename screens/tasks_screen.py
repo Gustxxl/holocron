@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from core import dates, editor, sources, tasks, waypoints
+from core import dates, editor, schedule, sources, tasks, waypoints
 from screens.help_screen import show_help
 from ui.format import day_label
 from ui.interface import clear_screen, dim, error, haptic, is_back, pause, pick, read_command, red, nav_line
@@ -21,8 +21,10 @@ def tasks_screen(source):
             return
         chosen = sources.selected(source.KEY)
         groups = [(title, items) for title, items in tasks.group(found, lists, chosen) if items]
-        flat = tasks.numbered(groups)
-        frame = '\n'.join(_frame(source, chosen, groups, datetime.now()))
+        now = datetime.now()
+        finished = finished_today(source, chosen, now)
+        flat = tasks.numbered(groups) + finished
+        frame = '\n'.join(_frame(source, chosen, groups, now, finished))
         clear_screen()
         print(frame)
         command = read_command(f'{source.NAME.lower()}> ')
@@ -41,26 +43,29 @@ def tasks_screen(source):
             if text:
                 _add(source, text, lists, chosen)
         elif check and 1 <= int(check.group(1)) <= len(flat):
-            _complete(source, flat[int(check.group(1)) - 1])
+            _toggle(source, flat[int(check.group(1)) - 1])
         elif pick(low, len(flat)):
             _open(source, flat, int(low))
 
 
-def summary(source, now=None):
+def open_tasks(source, now, limit):
     chosen = sources.selected(source.KEY)
-    limit = sources.option(source.KEY, 'shown', source.SHOWN)
     if not chosen or not limit or not source.available():
-        return []
+        return [], 0
     found = source.items()
     if not found:
-        return []
-    now = now or datetime.now()
+        return [], 0
     ahead = sources.option(source.KEY, 'ahead', source.AHEAD)
     found = [t for t in found if dates.within(t['due'], now, ahead)]
-    shown, rest = tasks.upcoming(found, chosen, limit)
+    return tasks.upcoming(found, chosen, limit)
+
+
+def summary(source, now=None):
+    now = now or datetime.now()
+    shown, rest = open_tasks(source, now, sources.option(source.KEY, 'shown', source.SHOWN))
     lines = []
     for task in shown:
-        line = f'○ {_line(task, now)}'
+        line = f'○ {task_line(task, now)}'
         if task.get('list_name'):
             line += dim(f' #{task['list_name']}')
         lines.append(line)
@@ -69,21 +74,37 @@ def summary(source, now=None):
     return lines
 
 
-def _frame(source, chosen, groups, now):
+def finished_today(source, chosen, now):
+    read = getattr(source, 'completed', None)
+    if read is None:
+        return []
+    status = schedule.load().status(now)
+    start = tasks.since(now, status.shift.start if status and status.on else None)
+    return tasks.done_today(read() or [], chosen, start)
+
+
+def _frame(source, chosen, groups, now, finished=()):
     lines = [dim(source.NAME), '']
     if not chosen:
         lines += [dim('No lists selected'), '']
     elif not groups:
         lines += [dim('No open tasks'), '']
-    digits = len(str(sum(len(items) for _, items in groups)))
+    digits = len(str(sum(len(items) for _, items in groups) + len(finished)))
     n = 0
     for title, items in groups:
         lines.append(dim(f'#{title}'))
         for task in items:
             n += 1
-            lines.append(f'  {dim(str(n).rjust(digits))} ○ {_line(task, now)}')
+            lines.append(f'  {dim(str(n).rjust(digits))} ○ {task_line(task, now)}')
         lines.append('')
-    nav = [('number', 'open', '#', 'open'), ('x number', 'done', 'x#', 'done')] if n else []
+    if finished:
+        lines.append(dim('done today'))
+        for task in finished:
+            n += 1
+            lines.append(dim(f'  {str(n).rjust(digits)} ✓ {task["title"]} · {task["finished"]:%H:%M}'))
+        lines.append('')
+    mark = 'done/undo' if finished else 'done'
+    nav = [('number', 'open', '#', 'open'), ('x number', mark, 'x#', mark)] if n else []
     nav += [('a', 'add'), ('t', 'routines'), ('s', 'lists'), ('b', 'back'), ('h', 'help')]
     lines += [dim(nav_line(nav)), '']
     return lines
@@ -102,7 +123,7 @@ def _open(source, flat, number):
         if command in ('h', 'help'):
             show_help()
         elif command == 'x':
-            if _complete(source, task):
+            if _toggle(source, task):
                 return
         elif command == 'e' and editor.available():
             _edit(source, task)
@@ -129,7 +150,9 @@ def _card(task, number, total, now, points):
         lines.append(dim(f'@{name}' if name else task['place']))
     if task.get('notes'):
         lines += ['', task['notes']]
-    nav = [('x', 'done')]
+    if task.get('done') and task.get('finished'):
+        lines.append(dim(f'done {task["finished"]:%H:%M}'))
+    nav = [('x', 'undo' if task.get('done') else 'done')]
     if editor.available():
         nav.append(('e', 'edit'))
     if number < total:
@@ -146,6 +169,16 @@ def _complete(source, task):
         haptic('toggle')
         return True
     error(f'Could not complete: {task["title"]}')
+    return False
+
+
+def _toggle(source, task):
+    if not task['done']:
+        return _complete(source, task)
+    if source.reopen(task['id']):
+        haptic('toggle')
+        return True
+    error(f'Could not reopen: {task["title"]}')
     return False
 
 
@@ -184,16 +217,21 @@ def _add(source, text, lists, chosen):
     pause(feedback='success')
 
 
-def _line(task, now):
+def task_line(task, now):
     label = _label(task, now)
     return task['title'] + (dim(' · ') + label if label else '')
 
 
-def _label(task, now):
+def when(task, now):
     due = task['due']
     if due is None:
         return ''
     text = day_label(due.date(), now.date())
-    if not task['all_day']:
-        text += f' {due:%H:%M}'
+    return text if task['all_day'] else f'{text} {due:%H:%M}'
+
+
+def _label(task, now):
+    text = when(task, now)
+    if not text:
+        return ''
     return red(text) if tasks.is_overdue(task, now) else dim(text)

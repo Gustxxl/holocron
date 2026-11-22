@@ -15,6 +15,124 @@ def _source(key):
     return SimpleNamespace(KIND=main.registry.BLOCKS[key])
 
 
+from datetime import date, datetime
+from unittest.mock import Mock
+
+NOW = datetime(2026, 11, 22, 12, 0)
+
+
+def _task(title, due, all_day=False, list_id='L1'):
+    return {'id': title, 'title': title, 'due': due, 'all_day': all_day, 'list': list_id, 'done': False}
+
+
+class Bar(unittest.TestCase):
+    def _bar(self, found, duty=None, source=True, end=None, finished=()):
+        status = SimpleNamespace(on=True, shift=SimpleNamespace(end=end)) if end else None
+        found_source = SimpleNamespace(KEY='remindctl', NAME='Reminders', available=lambda: True,
+                                       items=lambda: found) if source else None
+        with patch.object(main, '_plan') as self.planned, \
+             patch.object(main.schedule, 'load', return_value=SimpleNamespace(status=lambda now: status)), \
+             patch.object(main.registry, 'active', return_value=found_source), \
+             patch.object(main.sources, 'selected', return_value=['L1']), \
+             patch.object(main, 'finished_today', return_value=list(finished)), \
+             patch.object(main, 'duty_line', return_value=duty), \
+             patch.object(main.swiftbar, 'render', side_effect=lambda *a: a):
+            return main.bar_frame(NOW)
+
+    def test_calm(self):
+        self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 13, 0))]),
+                         (False, '', False, '', [('today', [('○ 13:00 Alpha', False, ('done', 'Alpha'))])]))
+
+    def test_soon_in_title(self):
+        self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 30))])[1:3], ('12:30 Alpha', False))
+        self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 31))])[1], '')
+
+    def test_overdue_wins(self):
+        todo = _task('Todo', datetime(2026, 11, 22, 11, 0))
+        _, title, alert, _, groups = self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 10)), todo])
+        self.assertEqual((title, alert), ('11:00 Todo', True))
+        self.assertEqual(groups, [('overdue', [(f'○ {main.when(todo, NOW)} Todo', True, ('done', 'Todo'))]),
+                                  ('today', [('○ 12:10 Alpha', False, ('done', 'Alpha'))])])
+
+    def test_overdue_all_day(self):
+        self.assertEqual(self._bar([_task('Todo', datetime(2026, 11, 21), all_day=True)])[1:3], ('Todo', True))
+
+    def test_all_day_today_stays_calm(self):
+        self.assertEqual(self._bar([_task('Todo', datetime(2026, 11, 22), all_day=True)])[1:3], ('', False))
+
+    def test_days_grouped(self):
+        groups = self._bar([_task('Alpha', datetime(2026, 11, 23, 9, 0)), _task('Todo', datetime(2026, 11, 24, 9, 0))])[4]
+        self.assertEqual([head for head, _ in groups], ['tomorrow', main.day_label(date(2026, 11, 24), NOW.date())])
+
+    def test_on_duty_groups_shift(self):
+        on, _, _, _, groups = self._bar([_task('Alpha', datetime(2026, 11, 22, 23, 0)),
+                                         _task('Todo', datetime(2026, 11, 23, 9, 0))],
+                                        end=datetime(2026, 11, 23, 8, 0))
+        self.assertTrue(on)
+        self.assertEqual([head for head, _ in groups], ['this shift · until 08:00', 'tomorrow'])
+
+    def test_done_today_last(self):
+        done = dict(_task('Todo', None), done=True, finished=datetime(2026, 11, 22, 11, 5))
+        groups = self._bar([_task('Alpha', datetime(2026, 11, 22, 13, 0))], finished=[done])[4]
+        self.assertEqual(groups[-1], ('done today', [('✓ 11:05 Todo', False, ('undo', 'Todo'))]))
+
+    def test_all_day_row_has_no_time(self):
+        groups = self._bar([_task('Todo', datetime(2026, 11, 23), all_day=True)])[4]
+        self.assertEqual(groups, [('tomorrow', [('○ Todo', False, ('done', 'Todo'))])])
+
+    def test_duty_without_colors(self):
+        self.assertEqual(self._bar([], duty='\033[2m● OFF DUTY\033[0m')[3], '● OFF DUTY')
+
+    def test_limit_and_undated(self):
+        found = [_task(f'Alpha {i}', datetime(2026, 11, 23, 9, i)) for i in range(12)] + [_task('Todo', None)]
+        rows = [row for _, group in self._bar(found)[4] for row in group]
+        self.assertEqual(len(rows), main.BAR_ROWS)
+        self.assertFalse(any('Todo' in text for text, *_ in rows))
+
+    def test_hidden_lists_skipped(self):
+        self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 23, 9, 0), list_id='L2')])[4], [])
+
+    def test_unreadable(self):
+        self.assertEqual(self._bar(None)[4], [('', [('Could not read Reminders', True, None)])])
+
+    def test_no_source(self):
+        self.assertEqual(self._bar([], source=False), (False, '', False, '', []))
+
+    def test_plans_routines(self):
+        self._bar([])
+        self.planned.assert_called_once_with()
+
+
+class BarToggle(unittest.TestCase):
+    def _toggle(self, action, task_id, found=(), finished=()):
+        self.source = SimpleNamespace(KEY='remindctl', available=lambda: True, items=lambda: list(found),
+                                      complete=Mock(return_value=True), reopen=Mock(return_value=True))
+        with patch.object(main.registry, 'active', return_value=self.source), \
+             patch.object(main.sources, 'selected', return_value=['L1']), \
+             patch.object(main, 'finished_today', return_value=list(finished)):
+            return main.bar_toggle(action, task_id, NOW)
+
+    def test_done(self):
+        self.assertTrue(self._toggle('done', 'Alpha', found=[_task('Alpha', None)]))
+        self.source.complete.assert_called_once_with('Alpha')
+
+    def test_done_ignores_unknown(self):
+        self.assertFalse(self._toggle('done', 'Todo', found=[_task('Alpha', None)]))
+        self.source.complete.assert_not_called()
+
+    def test_done_ignores_hidden_list(self):
+        self.assertFalse(self._toggle('done', 'Alpha', found=[_task('Alpha', None, list_id='L2')]))
+        self.source.complete.assert_not_called()
+
+    def test_undo(self):
+        self.assertTrue(self._toggle('undo', 'Todo', finished=[dict(_task('Todo', None), done=True)]))
+        self.source.reopen.assert_called_once_with('Todo')
+
+    def test_undo_ignores_unknown(self):
+        self.assertFalse(self._toggle('undo', 'Alpha', finished=[dict(_task('Todo', None), done=True)]))
+        self.source.reopen.assert_not_called()
+
+
 class Dispatch(unittest.TestCase):
     def _run(self, *inputs, loaded=True, query=None):
         with patch.object(main, '_frame', return_value=[]), \

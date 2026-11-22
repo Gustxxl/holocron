@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from core.sources import registry
-from screens import sources_screen
+from screens import settings_screen, sources_screen
 
 WIDE = os.terminal_size((200, 50))
 
@@ -66,6 +66,144 @@ class Setups(unittest.TestCase):
     def test_setup_result_passed_back(self):
         with mock.patch.dict(sources_screen._SETUPS, {'sample': lambda s: False}):
             self.assertFalse(sources_screen.source_setup(SimpleNamespace(SETUP='sample')))
+
+    def test_swiftbar_setup_registered(self):
+        self.assertIs(sources_screen._SETUPS['swiftbar'], sources_screen._swiftbar_setup)
+
+
+class BarSetupScreen(unittest.TestCase):
+    def _open(self, state, commands=('b',), brew=False, made='ok'):
+        self.source = SimpleNamespace(
+            NAME='Menu bar', SETUP='swiftbar', APP='SwiftBar', TAP='swiftbar', MACOS=12, FILE='holocron.1m.sh',
+            HOME='~/SwiftBar', RELEASES='https://example.com/releases', status=lambda: state,
+            folder=lambda: '/Альфа/Plugins', app=lambda: '/Applications/SwiftBar.app',
+            add=mock.Mock(return_value=True), create=mock.Mock(return_value=made),
+        )
+        with mock.patch.object(sources_screen, 'clear_screen'), \
+             mock.patch.object(sources_screen, 'error') as self.error, \
+             mock.patch.object(sources_screen, 'wait', side_effect=lambda text, fn, *a: fn(*a)), \
+             mock.patch.object(sources_screen, 'pause'), \
+             mock.patch.object(sources_screen, 'haptic'), \
+             mock.patch.object(sources_screen, 'read_command', side_effect=list(commands)), \
+             mock.patch.object(sources_screen.cli, 'available', return_value=brew), \
+             mock.patch.object(sources_screen.macos, 'open_url') as self.opened, \
+             mock.patch.object(sources_screen.macos, 'install', return_value='ok') as self.installed, \
+             mock.patch('shutil.get_terminal_size', return_value=WIDE), \
+             redirect_stdout(io.StringIO()) as out:
+            result = sources_screen.source_setup(self.source)
+        return result, out.getvalue()
+
+    def test_every_step_renders(self):
+        for state in sources_screen._BAR_STEPS:
+            with self.subTest(state=state):
+                result, out = self._open(state)
+                self.assertFalse(result)
+                self.assertIn('Settings > Menu bar', out)
+                self.assertIn('SwiftBar', out)
+
+    def test_ready_skips_screen(self):
+        self.assertEqual(self._open('ready'), (True, ''))
+
+    def test_add_only_by_key(self):
+        _, out = self._open('off', ['a', 'b'])
+        self.assertIn('/Альфа/Plugins', out)
+        self.source.add.assert_called_once_with()
+        self._open('no_folder', ['a', 'b'])
+        self.source.add.assert_not_called()
+        self._open('off')
+        self.source.add.assert_not_called()
+
+    def test_create_folder_by_key(self):
+        _, out = self._open('no_folder', ['f', 'b'])
+        self.assertIn('~/SwiftBar', out)
+        self.source.create.assert_called_once_with()
+        self._open('off', ['f', 'b'])
+        self.source.create.assert_not_called()
+
+    def test_create_reports_open_app(self):
+        self._open('no_folder', ['f', 'b'], made='running')
+        self.error.assert_called_once_with('SwiftBar did not quit. Quit it, then press f again')
+
+    def test_download_page(self):
+        self._open('missing', ['o', 'b'])
+        self.opened.assert_called_once_with('https://example.com/releases')
+
+    def test_open_app_for_folder(self):
+        self._open('no_folder', ['o', 'b'])
+        self.opened.assert_called_once_with('/Applications/SwiftBar.app')
+
+    def test_brew_only_with_homebrew(self):
+        _, out = self._open('missing', ['brew', 'b'])
+        self.assertNotIn('install with Homebrew', out)
+        self.installed.assert_not_called()
+        _, out = self._open('missing', ['brew', 'b'], brew=True)
+        self.assertIn('install with Homebrew', out)
+        self.installed.assert_called_once_with('swiftbar')
+
+
+class PluginScreen(unittest.TestCase):
+    def _open(self, commands, agreed=True, owned=False):
+        self.state = 'ready'
+
+        def remove():
+            self.state = 'off'
+            return True
+
+        self.source = SimpleNamespace(NAME='Menu bar', APP='SwiftBar', status=lambda: self.state,
+                                      owned=lambda: owned, folder=lambda: '/Альфа/SwiftBar',
+                                      plugin=lambda: '/Альфа/SwiftBar/holocron.1m.sh', remove=mock.Mock(side_effect=remove))
+        with mock.patch.object(sources_screen, 'clear_screen'), \
+             mock.patch.object(sources_screen, 'haptic'), \
+             mock.patch.object(sources_screen, 'wait', side_effect=lambda text, fn, *a: fn(*a)), \
+             mock.patch.object(sources_screen, 'read_command', side_effect=commands), \
+             mock.patch.object(sources_screen, 'confirm', return_value=agreed) as self.asked, \
+             mock.patch('shutil.get_terminal_size', return_value=WIDE), \
+             redirect_stdout(io.StringIO()) as out:
+            sources_screen.plugin_screen(self.source)
+        return out.getvalue()
+
+    def test_shows_plugin(self):
+        out = self._open(['b'])
+        self.assertIn('/Альфа/SwiftBar/holocron.1m.sh', out)
+        self.assertIn('remove from the menu bar', out)
+
+    def test_remove_asks_first(self):
+        self._open(['d', 'b'], agreed=False)
+        self.source.remove.assert_not_called()
+
+    def test_remove_closes_screen(self):
+        self._open(['d'])
+        self.source.remove.assert_called_once_with()
+        self.asked.assert_called_once_with('Remove Holocron from the menu bar?')
+
+    def test_confirm_names_own_folder(self):
+        self._open(['d'], owned=True)
+        self.asked.assert_called_once_with('Remove Holocron from the menu bar, quit SwiftBar and delete /Альфа/SwiftBar?')
+
+
+class OpenSource(unittest.TestCase):
+    def _open(self, source, ready=True):
+        with mock.patch.object(settings_screen, 'source_setup', return_value=ready), \
+             mock.patch.object(settings_screen, 'lists_screen') as self.lists, \
+             mock.patch.object(settings_screen, 'plugin_screen') as self.plugin:
+            settings_screen._open_source(source)
+
+    def test_lists_for_list_source(self):
+        source = SimpleNamespace(LISTS='lists')
+        self._open(source)
+        self.lists.assert_called_once_with(source)
+        self.plugin.assert_not_called()
+
+    def test_plugin_without_lists(self):
+        source = SimpleNamespace()
+        self._open(source)
+        self.plugin.assert_called_once_with(source)
+        self.lists.assert_not_called()
+
+    def test_nothing_until_ready(self):
+        self._open(SimpleNamespace(), ready=False)
+        self.lists.assert_not_called()
+        self.plugin.assert_not_called()
 
 
 class ListsScreen(unittest.TestCase):

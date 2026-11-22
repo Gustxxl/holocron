@@ -12,10 +12,11 @@ colorama.init()
 
 from core import archives
 from core import launch
-from screens.main_screen import main_frame, main_screen
+from screens.main_screen import bar_frame, bar_toggle, main_frame, main_screen
 from ui.interface import Spinner, clear_screen, disconnect, pause
 from core import updater
 from core import config
+from core.sources import registry
 
 
 def start():
@@ -23,15 +24,24 @@ def start():
     if action == 'help':
         print(launch.USAGE)
         return
+    if action == 'bar':
+        print(bar_frame())
+        return
+    if action in ('done', 'undo'):
+        bar_toggle(action, value)
+        return
     if action == 'unknown':
         print(f'Unknown option {value}. Run holo --help', file=sys.stderr)
         sys.exit(2)
     updater.check_update_async()
     query = value if action == 'search' else None
+    bar = registry.active('bar')
+    opened = False
     try:
         clear_screen()
         with Spinner('Accessing the archives'):
             archives.load()
+            opened = bar is not None and bar.start()
             updater.pending_update(5)
             first = None if config.broken or query else main_frame()
         if config.broken:
@@ -40,6 +50,9 @@ def start():
         main_screen(first, query)
     except (KeyboardInterrupt, EOFError):
         disconnect()
+    finally:
+        if bar is not None:
+            bar.finish(opened)
 
 
 
