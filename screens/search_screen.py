@@ -11,7 +11,7 @@ from screens.help_screen import render_help
 from ui.interface import (clear_screen, confirm, dim, error, pause, pick, read_command, haptic, underline, nav_line,
                           num, input_block, map_text, sub_text)
 from ui.markdown import code_blocks, is_code, links, paint_code, render_tables, rules, table_cells
-from ui.note import drop_title, plain, render_note
+from ui.note import _HEADING_RE, _heading, drop_title, plain, render_note
 from ui.format import plural
 
 
@@ -697,7 +697,8 @@ def show_case(case, query='', number=None, total=None, trail=()):
     elif first.startswith('|'):
         title, body = name, text
     else:
-        title = (plain(first) if 'lane' in case else first) or '(untitled)'
+        head = _HEADING_RE.sub(r'\2', first)
+        title = (plain(head) if 'lane' in case else head) or '(untitled)'
         body = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ''
 
     width = shutil.get_terminal_size().columns - 1
@@ -758,7 +759,7 @@ def first_line(case):
     if case.get('filename'):
         return case['filename']
     for ln in case['text'].splitlines():
-        ln = ln.strip()
+        ln = _HEADING_RE.sub(r'\2', ln.strip())
         if not ln:
             continue
         if 'lane' in case:
@@ -778,6 +779,11 @@ def _wrap(text, width):
     for ln in text.splitlines():
         if not ln.strip() or is_code(ln) or ln.lstrip().startswith('|'):
             out.append(ln)
+            continue
+        m = _HEADING_RE.match(ln)
+        if m:
+            head = _heading(len(m.group(1)), m.group(2), width)
+            out.append(head if out and out[-1].strip() else head[1:])
             continue
         indent = ln[:len(ln) - len(ln.lstrip())]
         if ln.lstrip().startswith(('- ', '* ', '+ ')):
