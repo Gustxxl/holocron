@@ -201,13 +201,13 @@ HELP_SECTIONS = [
     ]),
     ('Calendar', [
         HelpEntry('[number]', 'open an event', _has_calendar),
-        HelpEntry('a',        'add an event: title, time, optional date and #calendar', _can_add_event),
+        HelpEntry('a',        'add an event: title, time or +15, optional date and #calendar', _can_add_event),
     ]),
     ('Reminders', [
         HelpEntry('[number]',     'open a reminder', _has_reminders),
         HelpEntry('x number',     'mark done, or undo in done today', _has_reminders),
         HelpEntry('e',            'edit the open reminder', _can_edit_reminder),
-        HelpEntry('a',            'add a reminder: title, optional time, date, #list and @place', _has_reminders),
+        HelpEntry('a',            'add a reminder: title, optional time or +5, date, #list and @place', _has_reminders),
         HelpEntry('t',            'routines', _has_reminders),
     ]),
     ('Routines', [
