@@ -62,6 +62,17 @@ class Build(unittest.TestCase):
         root = tree.build(cases, str(self.vault))
         self.assertEqual(_names(root), ['archive', 'Work', 'Alpha', 'beta'])
 
+    def test_symbols_then_digits_then_letters(self):
+        cases = [self.note('beta.md'), self.note('⌨️ keyboard shortcuts.md'), self.note('2026.md'), self.note('Альфа.md'),
+                 self.note('_inbox.md'), self.note('Work', 'a.md'), self.note('📁 Projects', 'b.md')]
+        root = tree.build(cases, str(self.vault))
+        self.assertEqual(_names(root), ['📁 Projects', 'Work', '_inbox', '⌨️ keyboard shortcuts', '2026', 'beta', 'Альфа'])
+
+    def test_numbers_compared_whole(self):
+        cases = [self.note(f'{name}.md') for name in ('Note 10', 'Note a', 'Note 2', 'Note 1', 'Альфа 2²')]
+        root = tree.build(cases, str(self.vault))
+        self.assertEqual(_names(root), ['Note 1', 'Note 2', 'Note 10', 'Note a', 'Альфа 2²'])
+
     def test_counts(self):
         cases = [self.note('Work', 'a.md'), self.note('Work', 'b.md'), self.note('Work', 'Logs', 'c.md'), self.note('d.md')]
         root = tree.build(cases, str(self.vault))

@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 ROOT = 'Archive'
@@ -66,12 +67,17 @@ def is_branch(node):
     return node['kind'] in ('folder', 'kanban')
 
 
+def _order(node):
+    name = node['name'].casefold()
+    head = name[:1]
+    parts = tuple((0, int(p)) if i % 2 else (1, p) for i, p in enumerate(re.split(r'(\d+)', name)) if p)
+    return 0 if not head.isalnum() else 1 if head.isdigit() else 2, parts, name
+
+
 def entries(node):
     if node['kind'] == 'kanban':
         return list(node['files'].values())
-    folders = sorted(node['folders'].values(), key=lambda n: n['name'].casefold())
-    files = sorted(node['files'].values(), key=lambda n: n['name'].casefold())
-    return [*folders, *files]
+    return [*sorted(node['folders'].values(), key=_order), *sorted(node['files'].values(), key=_order)]
 
 
 def count(node):
