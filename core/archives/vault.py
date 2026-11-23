@@ -138,12 +138,37 @@ def _cards(f, text):
     return cases
 
 
+def is_drawing(text):
+    return '## Drawing' in text or 'excalidraw-plugin' in text
+
+
+def note_files():
+    vault = Path(vault_path()).resolve() if vault_path() else None
+    rules = [Path(p).parts for p in vault_exclude()]
+    files, seen = [], set()
+    for root in _roots():
+        base = Path(root)
+        real = base.resolve()
+        own = rules if real == vault else []
+        try:
+            found = sorted(base.rglob('*.md'))
+        except OSError:
+            continue
+        for f in found:
+            rel = f.relative_to(base)
+            if _skipped(rel, own) or real / rel in seen:
+                continue
+            seen.add(real / rel)
+            files.append(f)
+    return files
+
+
 def _note(f):
     try:
         text = f.read_text(encoding='utf-8').strip()
     except (OSError, UnicodeDecodeError):
         return []
-    if '## Drawing' in text or 'excalidraw-plugin' in text:
+    if is_drawing(text):
         return []
     if kanban.is_board(text):
         return _cards(f, text)
@@ -167,22 +192,5 @@ class Vault(Archive):
 
     def _load(self):
         roots = _roots()
-        vault = Path(vault_path()).resolve() if vault_path() else None
-        rules = [Path(p).parts for p in vault_exclude()]
-        files, seen = [], set()
-        for root in roots:
-            base = Path(root)
-            real = base.resolve()
-            own = rules if real == vault else []
-            try:
-                found = sorted(base.rglob('*.md'))
-            except OSError:
-                continue
-            for f in found:
-                rel = f.relative_to(base)
-                if _skipped(rel, own) or real / rel in seen:
-                    continue
-                seen.add(real / rel)
-                files.append(f)
-        self._cases = self._read(files, _note)
+        self._cases = self._read(note_files(), _note)
         self._path = roots[0] if roots else None

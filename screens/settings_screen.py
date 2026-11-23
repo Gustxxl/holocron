@@ -88,7 +88,7 @@ def archive_screen():
         print(f'{num(5)}Notes                     {_mark(p5)}')
         print(f'{num(6)}Search separator          {dim(p6) if p6 else dim("off")}')
         print()
-        print(dim('  [number] open section   [b] back   [q] quit'))
+        print(dim('  [number] open section   [b] back'))
         print()
         command = read_command('settings> ')
         if command == '1':
@@ -199,11 +199,18 @@ def excalidraw_obsidian_screen():
         print(dim('Settings > Archive > Excalidraw for Obsidian'))
         print()
         _print_path(archive_path())
+        if vault_path():
+            print(dim('  Drawings in the vault are found on their own.'))
         print()
-        print(dim('  [enter path] set path   [b] back   [q] quit'))
+        print(dim('  [enter path] set path   [c] clear   [b] back'))
         print()
         command = read_command('path> ')
         if command == 'b':
+            return
+        if command == 'c':
+            update_archive_path('')
+            archives.load()
+            pause(feedback='success')
             return
         cleaned = clean_input_path(command)
         if Path(cleaned).suffix.lower() != '.md' or not Path(cleaned).is_file():
