@@ -100,6 +100,13 @@ class History(unittest.TestCase):
         screen.assert_called_once_with()
 
 
+class Tree(unittest.TestCase):
+    def test_l_is_tree(self):
+        self.assertEqual(commands._INDEX['l'].name, 'tree')
+        self.assertNotIn('list', commands._INDEX)
+        self.assertEqual(_entry('Commands', 'tree / l').help, 'browse and search the archive by folder')
+
+
 class Sources(unittest.TestCase):
     def _source(self, ready=True, add=True):
         source = SimpleNamespace(available=lambda: ready)

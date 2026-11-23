@@ -65,7 +65,6 @@ class Recording(_History):
              mock.patch.object(search_screen.archives, 'load'), \
              mock.patch.object(search_screen.favorites, 'resolve', return_value=[]), \
              mock.patch.object(search_screen, 'search_separator', return_value=';'), \
-             mock.patch.object(search_screen, 'page_rows', return_value=15), \
              mock.patch.object(search_screen, '_find', return_value=(found, None)) as self.find, \
              mock.patch.object(search_screen, '_suggest', return_value=[]), \
              mock.patch.object(search_screen, 'open_case', return_value=opened), \
@@ -82,10 +81,6 @@ class Recording(_History):
 
     def test_nothing_found_is_not_kept(self):
         self.assertEqual(self.search('Gamma', []), [])
-
-    def test_list_is_not_kept(self):
-        self.assertEqual(self.search('l', FOUND), [])
-        self.find.assert_not_called()
 
     def test_typed_query_is_kept(self):
         self.assertEqual(self.search('Alpha', FOUND, ['Beta', 'b']), ['Beta', 'Alpha'])

@@ -205,7 +205,7 @@ class Screens(unittest.TestCase):
     def test_nothing_found(self):
         with _size(80), mock.patch.object(search_screen.archives, 'cases', return_value=[{'text': 'Alpha'}]), \
              mock.patch.object(search_screen, '_too_short', return_value=False), \
-             mock.patch.object(search_screen, '_run', return_value=([], None, 'Gamma\nDelta', False)), \
+             mock.patch.object(search_screen, '_find', return_value=([], None)), \
              mock.patch.object(search_screen, '_suggest', return_value=[]), \
              mock.patch.object(search_screen, 'clear_screen'), mock.patch.object(search_screen, 'haptic'), \
              mock.patch.object(search_screen, 'read_command', side_effect=['b']), \

@@ -166,7 +166,7 @@ def rows_screen():
         print(dim('Settings > Lists'))
         print()
         print(f'Rows per page: {page_rows()}')
-        print(dim('  For l, tree and kanban boards'))
+        print(dim('  For tree and kanban boards'))
         print()
         print(dim(f'  [type] {PAGE_MIN} to {PAGE_MAX}   [d] default {PAGE_ROWS}   [b] back'))
         print()

@@ -90,11 +90,6 @@ def _cmd_help(raw):
     pause()
 
 
-def _cmd_list(raw):
-    from screens.search_screen import search_screen
-    search_screen('l')
-
-
 def _cmd_note(raw):
     from screens.search_screen import create_case
     create_case()
@@ -165,14 +160,13 @@ COMMANDS = [
     Command('routines',   _cmd_routines,   ('rt',),       'reminders by time or shift', _has_reminders),
     Command('favorites',  _cmd_favorites,  ('f', 'fav'),  'pinned records'),
     Command('history',    _cmd_history,    ('y',),        'searches from this session'),
-    Command('tree',       _cmd_tree,       (),            'browse the archive by folder', archives.is_loaded),
+    Command('tree',       _cmd_tree,       ('l',),        'browse and search the archive by folder', archives.is_loaded),
     Command('note',       _cmd_note,       (),            'write a new note', _can_write_note),
     Command('settings',   _cmd_settings,   ('s',),        'operator name / archives / schedule / Keeper'),
     Command('system',     _cmd_system,     ('sys',),      'show OS and version'),
     Command('check',      _cmd_check,      (),            'run diagnostics and tests', diagnostics.available),
     Command('update',     _cmd_update,     (),            'fetch and apply a pending update'),
     Command('hyperspace', _cmd_hyperspace, ('hy',),       'go to hyperspace (any key to return)', _has_curses),
-    Command('list',       _cmd_list,       ('l',)),
     Command('help',       _cmd_help,       ('h',),        'show commands'),
 ]
 
@@ -183,7 +177,6 @@ HELP_SECTIONS = [
         HelpEntry('[number]',     'open a case from the current list'),
         HelpEntry('n / p',        'next / previous page or case'),
         HelpEntry('nn / pp',      'last / first page or case'),
-        HelpEntry('l / list',     'browse all cases'),
         HelpEntry('/word(s)',     'in tree: search the whole archive'),
         HelpEntry('e',            'edit the open case', editor.available),
         HelpEntry('d',            'move the open note to the trash'),

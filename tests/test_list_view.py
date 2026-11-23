@@ -47,16 +47,16 @@ class Rows(unittest.TestCase):
 
 
 class Same(unittest.TestCase):
-    def test_tree_board_matches_list(self):
-        listed = [ln for ln in _printed([(0, c) for c in CASES], compact=True) if 'Block' in ln]
-        self.assertEqual([ln for ln in _tree() if 'Block' in ln], listed)
+    def test_tree_board_matches_rows(self):
+        rows = [_plain(r) for r in search_screen.list_rows(CASES, 0, len(CASES), 80)]
+        self.assertEqual([ln for ln in _tree() if 'Block' in ln], rows)
 
     def test_no_blank_between_rows(self):
-        printed = _printed([(0, c) for c in CASES], compact=True)
-        first = next(i for i, ln in enumerate(printed) if 'Block' in ln)
-        self.assertEqual(printed[first:first + 12], [f'  {n:>2} Block {n}' for n in range(1, 13)])
+        lines = _tree()
+        first = next(i for i, ln in enumerate(lines) if 'Block' in ln)
+        self.assertEqual(lines[first:first + 12], [f'  {n:>2} Block {n}' for n in range(1, 13)])
 
-    def test_blank_between_rows_without_compact(self):
+    def test_blank_between_results(self):
         printed = _printed([(0, c) for c in CASES[:2]])
         first = next(i for i, ln in enumerate(printed) if 'Block' in ln)
         self.assertEqual(printed[first:first + 3], ['  1 Block 1', '', '  2 Block 2'])
@@ -87,13 +87,10 @@ class Order(unittest.TestCase):
     def test_by_name(self):
         self.assertEqual([c['text'] for c in search_screen.by_name(MIXED)], NAMES)
 
-    def test_list_by_name(self):
-        with mock.patch.object(search_screen.favorites, 'resolve', return_value=[]):
-            self.assertEqual([c['text'] for _, c in search_screen._all(MIXED)], NAMES)
-
-    def test_pinned_first(self):
-        with mock.patch.object(search_screen.favorites, 'resolve', return_value=[MIXED[0]]):
-            self.assertEqual([c['text'] for _, c in search_screen._all(MIXED)], ['delta', *NAMES[:3]])
+    def test_by_name_like_tree(self):
+        cases = [{'text': t} for t in ('Note 10', 'Альфа', 'Note 2', '⌨️ Alpha', '2026')]
+        self.assertEqual([c['text'] for c in search_screen.by_name(cases)],
+                         ['⌨️ Alpha', '2026', 'Note 2', 'Note 10', 'Альфа'])
 
     def test_tree_board_by_name(self):
         seen = []

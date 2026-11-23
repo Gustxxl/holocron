@@ -161,6 +161,8 @@ def _frame(stack, items, page, before=False, after=False, query='', trails=None)
     head = ' > '.join(n['name'] for n in stack) + (' · pinned' if pinned else '')
     if query:
         head += f'   "{query}"   {plural(len(items), "result")}'
+    elif len(stack) == 1:
+        head += '   ' + plural(tree.count(stack[0]), 'case')
     elif not folder:
         head += '   ' + plural(len(items), 'card' if stack[-1]['kind'] == 'lane' else 'block')
     head += f'   {page + 1}/{pages}' if pages > 1 else ''

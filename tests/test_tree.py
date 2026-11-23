@@ -332,7 +332,11 @@ class TreeSearch(unittest.TestCase):
 
     def test_enter_leaves_nothing_found(self):
         _, _, out = self.screen(['zzzz', '', 'b'])
-        self.assertIn(dim('Archive'), out.split('Nothing found for')[1])
+        self.assertIn(dim('Archive   4 cases'), out.split('Nothing found for')[1])
+
+    def test_root_shows_case_count(self):
+        frame, _ = tree_screen._frame([self.root], tree.entries(self.root), 0)
+        self.assertEqual(frame.splitlines()[0], dim('Archive   4 cases'))
 
     def test_nothing_found_suggests(self):
         with mock.patch.object(tree_screen, '_suggest', return_value=['keyboard']) as suggest:

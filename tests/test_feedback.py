@@ -161,7 +161,7 @@ class Search(unittest.TestCase):
 
     def test_nothing_found_warns(self):
         _, haptic = self.open('Gamma', [{'text': 'Alpha'}], _too_short=False,
-                              _run=([], None, 'Gamma', False), _suggest=[])
+                              _find=([], None), _suggest=[])
         haptic.assert_called_once_with('warning')
 
 

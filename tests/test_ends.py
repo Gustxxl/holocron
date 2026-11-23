@@ -19,13 +19,14 @@ class SearchList(unittest.TestCase):
         seen = []
         with mock.patch.object(search_screen.archives, 'cases', return_value=CASES), \
              mock.patch.object(search_screen.archives, 'load'), \
-             mock.patch.object(search_screen.favorites, 'resolve', return_value=[]), \
-             mock.patch.object(search_screen, 'page_rows', return_value=15), \
+             mock.patch.object(search_screen, '_find', return_value=([(0, c) for c in CASES], None)), \
+             mock.patch.object(search_screen, '_exact', return_value=None), \
+             mock.patch.object(search_screen, 'search_separator', return_value=';'), \
              mock.patch.object(search_screen, 'clear_screen'), \
              mock.patch.object(search_screen, 'pause') as pause, \
              mock.patch.object(search_screen, 'show_list', side_effect=_pages(seen, 1)), \
              mock.patch.object(search_screen, 'read_command', side_effect=['nn', 'pp', 'nn', 'p', 'b']):
-            search_screen.search_screen('l')
+            search_screen.search_screen('Block')
         self.assertEqual(seen, [0, 30, 0, 30, 0])
         pause.assert_not_called()
 
@@ -39,13 +40,15 @@ class Refresh(unittest.TestCase):
         with ExitStack() as stack:
             stack.enter_context(mock.patch.object(search_screen.archives, 'cases', side_effect=[old, new]))
             load = stack.enter_context(mock.patch.object(search_screen.archives, 'load'))
-            stack.enter_context(mock.patch.object(search_screen.favorites, 'resolve', return_value=[]))
-            stack.enter_context(mock.patch.object(search_screen, 'page_rows', return_value=15))
+            stack.enter_context(mock.patch.object(search_screen, '_find',
+                                                  side_effect=lambda cases, q: ([(0, c) for c in cases], None)))
+            stack.enter_context(mock.patch.object(search_screen, '_exact', return_value=None))
+            stack.enter_context(mock.patch.object(search_screen, 'search_separator', return_value=';'))
             stack.enter_context(mock.patch.object(search_screen, 'show_list', side_effect=show))
             stack.enter_context(mock.patch.object(search_screen, 'read_command', side_effect=commands))
             for patch in patches:
                 stack.enter_context(patch)
-            search_screen.search_screen('l')
+            search_screen.search_screen('Alpha')
         return seen, load
 
     def test_enter_reloads_list(self):

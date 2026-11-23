@@ -5,7 +5,8 @@ from pathlib import Path
 from core import archives, search, excalidraw, favorites, checklist, editor, wikilinks, keeper, kanban, history
 from core.archives.vault import Vault, save_note, create_note, read_note, renamed, rename_note, trash_note
 from core.commands import HELP_SECTIONS
-from core.settings import new_cases_path, page_rows, search_separator
+from core.settings import new_cases_path, search_separator
+from core.tree import order
 from core.system import copy_text
 from screens.help_screen import render_help
 from ui.interface import (clear_screen, confirm, dim, error, pause, pick, read_command, haptic, underline, nav_line,
@@ -126,12 +127,6 @@ def highlight(text, *queries):
     return map_text(text, paint)
 
 
-def _all(cases):
-    pinned = favorites.resolve(cases)
-    ids = {id(c) for c in pinned}
-    return [(0, c) for c in [*pinned, *by_name(c for c in cases if id(c) not in ids)]]
-
-
 def _parts(query):
     return [p for p in search.split(query, search_separator()) if len(p) >= MIN_QUERY]
 
@@ -169,26 +164,17 @@ def _suggest(cases, query):
     return [f'{search_separator()} '.join(fixed)] if fixed != parts else []
 
 
-def _run(cases, text):
-    if text.lower() in ('l', 'list'):
-        return _all(cases), None, '', True
-    results, groups = _find(cases, text)
-    return results, groups, text, False
-
-
-def _remember(results, query, list_mode):
-    if results and not list_mode:
+def _remember(results, query):
+    if results:
         history.add(query)
 
 
-def _again(cases, query, list_mode):
-    if list_mode:
-        return _all(cases), None
+def _again(cases, query):
     return _find(cases, query) if query else ([], None)
 
 
 def _too_short(text):
-    return not _parts(text) and text.lower() not in ('l', 'list')
+    return not _parts(text)
 
 
 def _as_query(text):
@@ -196,8 +182,8 @@ def _as_query(text):
     return text.replace(sep, ' ') if sep else text
 
 
-def _exact(results, query, list_mode):
-    if list_mode or not query:
+def _exact(results, query):
+    if not query:
         return None
     return sum(1 for score, _ in results if search.is_exact(score))
 
@@ -213,7 +199,7 @@ def search_screen(initial_query=None, remember=True):
         pause(feedback='warning')
         return
     query = (initial_query or '').strip()
-    results, groups, list_mode, page, back = [], None, False, 0, None
+    results, groups, page = [], None, 0
     exact, exact_for = None, None
     if query and _too_short(query):
         clear_screen()
@@ -221,9 +207,9 @@ def search_screen(initial_query=None, remember=True):
         pause(feedback='warning')
         return
     if query:
-        results, groups, query, list_mode = _run(cases, query)
+        results, groups = _find(cases, query)
         if remember:
-            _remember(results, query, list_mode)
+            _remember(results, query)
     while True:
         if query and not results:
             clear_screen()
@@ -237,9 +223,8 @@ def search_screen(initial_query=None, remember=True):
             haptic('warning')
         elif results:
             if exact_for is not results:
-                exact, exact_for = _exact(results, query, list_mode), results
-            ps = page_rows() if list_mode else PAGE
-            page = show_list(results, page, query, ps, exact=exact, groups=groups, compact=list_mode)
+                exact, exact_for = _exact(results, query), results
+            page = show_list(results, page, query, exact=exact, groups=groups)
         else:
             clear_screen()
             print(dim('Search the archive'))
@@ -258,22 +243,16 @@ def search_screen(initial_query=None, remember=True):
             settings_screen()
             archives.load()
             cases = archives.cases()
-            results, groups = _again(cases, query, list_mode)
+            results, groups = _again(cases, query)
             continue
         if low in ('b', 'back'):
-            if not back:
-                return
-            (query, page), back, list_mode = back, None, False
-            archives.load()
-            cases = archives.cases()
-            results, groups = _again(cases, query, False)
-            continue
+            return
         if command == '':
             if not results:
                 return
             archives.load(force=True)
             cases = archives.cases()
-            results, groups = _again(cases, query, list_mode)
+            results, groups = _again(cases, query)
             continue
         if low == 'n' and results:
             page += 1
@@ -292,16 +271,13 @@ def search_screen(initial_query=None, remember=True):
             if not new_query and any(_deleted(c) for _, c in results):
                 archives.load(force=True)
                 cases = archives.cases()
-                results, groups = _again(cases, query, list_mode)
+                results, groups = _again(cases, query)
             if new_query:
-                if new_query != 'l':
-                    back = None
-                elif not list_mode:
-                    back = query, page
                 archives.load()
                 cases = archives.cases()
-                results, groups, query, list_mode = _run(cases, new_query)
-                _remember(results, query, list_mode)
+                query = new_query
+                results, groups = _find(cases, query)
+                _remember(results, query)
                 page = 0
             continue
         if _too_short(command):
@@ -311,9 +287,10 @@ def search_screen(initial_query=None, remember=True):
             continue
         archives.load()
         cases = archives.cases()
-        results, groups, query, list_mode = _run(cases, command)
-        _remember(results, query, list_mode)
-        page, back = 0, None
+        query = command
+        results, groups = _find(cases, query)
+        _remember(results, query)
+        page = 0
 
 
 def create_case():
@@ -567,8 +544,11 @@ def open_case(results, number, query, rerun=True, trail=()):
             keeper_screen(case)
             results = _refresh(results, query, False)
             continue
-        if low in ('l', 'list'):
-            return 'l'
+        if low == 'l':
+            from screens.tree_screen import tree_screen
+            tree_screen()
+            results = _refresh(results, query, False)
+            continue
         if low in ('s', 'settings'):
             from screens.settings_screen import settings_screen
             settings_screen()
@@ -620,7 +600,7 @@ def list_rows(cases, start, total, width, query=''):
     return rows
 
 
-def show_list(results, page, query, page_size=PAGE, note=None, exact=None, groups=None, compact=False):
+def show_list(results, page, query, page_size=PAGE, note=None, exact=None, groups=None):
     clear_screen()
     total = len(results)
     pages = max(1, (total + page_size - 1) // page_size)
@@ -649,7 +629,7 @@ def show_list(results, page, query, page_size=PAGE, note=None, exact=None, group
         print('No exact matches — showing similar cases.')
         print()
     for n, row in enumerate(list_rows([c for _, c in chunk], start, total, width, query), start + 1):
-        if n > start + 1 and not compact:
+        if n > start + 1:
             print()
         group = _group_at(layout, n - 1)
         head = group and n - 1 in (group[1], start)
@@ -771,7 +751,7 @@ def first_line(case):
 
 
 def by_name(cases):
-    return sorted(cases, key=lambda c: first_line(c).casefold())
+    return sorted(cases, key=lambda c: order(first_line(c)))
 
 
 def _wrap(text, width):

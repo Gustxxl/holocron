@@ -11,41 +11,37 @@ class Back(unittest.TestCase):
         with mock.patch.object(search_screen.archives, 'cases', return_value=[CASE]), \
              mock.patch.object(search_screen.archives, 'load'), \
              mock.patch.object(search_screen, '_find', return_value=([(0, CASE)], None)), \
-             mock.patch.object(search_screen.favorites, 'resolve', return_value=[]), \
              mock.patch.object(search_screen, 'search_separator', return_value=';'), \
-             mock.patch.object(search_screen, 'page_rows', return_value=15), \
              mock.patch.object(search_screen, '_exact', return_value=None), \
              mock.patch.object(search_screen, 'clear_screen'), mock.patch('builtins.print'), \
              mock.patch.object(search_screen, 'show_list', side_effect=lambda r, page, *a, **k: page) as shown, \
              mock.patch.object(search_screen, 'open_case', side_effect=opened), \
              mock.patch.object(search_screen, 'read_command', side_effect=commands):
             search_screen.search_screen(query)
-        return [(c.args[2], c.args[1], c.kwargs['compact']) for c in shown.call_args_list]
+        return [(c.args[2], c.args[1]) for c in shown.call_args_list]
 
-    def test_back_from_list_returns_to_results(self):
-        shown = self.run_screen('alpha', ['1', 'b', 'b'], ['l'])
-        self.assertEqual(shown, [('alpha', 0, False), ('', 0, True), ('alpha', 0, False)])
+    def test_back_leaves(self):
+        self.assertEqual(self.run_screen('alpha', ['b'], []), [('alpha', 0)])
 
-    def test_page_kept(self):
-        shown = self.run_screen('alpha', ['n', '1', 'b', 'b'], ['l'])
-        self.assertEqual(shown[-1], ('alpha', 1, False))
+    def test_query_from_case_runs(self):
+        shown = self.run_screen('alpha', ['n', '1', 'b'], ['gamma'])
+        self.assertEqual(shown, [('alpha', 0), ('alpha', 1), ('gamma', 0)])
 
-    def test_cyrillic_query(self):
-        shown = self.run_screen('альфа', ['1', 'b', 'b'], ['l'])
-        self.assertEqual(shown[-1], ('альфа', 0, False))
+    def test_l_is_too_short(self):
+        with mock.patch.object(search_screen, 'pause') as pause:
+            self.assertEqual(self.run_screen('alpha', ['l', 'b'], []), [('alpha', 0), ('alpha', 0)])
+        pause.assert_called_once_with(feedback='warning')
 
-    def test_second_l_keeps_first_results(self):
-        shown = self.run_screen('alpha', ['1', '1', 'b', 'b'], ['l', 'l'])
-        self.assertEqual(shown[-1], ('alpha', 0, False))
 
-    def test_new_search_forgets(self):
-        shown = self.run_screen('alpha', ['1', 'beta', 'b'], ['l'])
-        self.assertEqual([q for q, _, _ in shown], ['alpha', '', 'beta'])
+class CaseTree(unittest.TestCase):
+    def test_l_opens_tree(self):
+        with mock.patch.object(search_screen, 'show_case', return_value=[]), \
+             mock.patch.object(search_screen, 'read_command', side_effect=['l', 'b']), \
+             mock.patch.object(search_screen, '_refresh', side_effect=lambda results, *a, **k: results), \
+             mock.patch('screens.tree_screen.tree_screen') as tree:
+            self.assertIsNone(search_screen.open_case([(0, CASE)], 1, 'alpha'))
+        tree.assert_called_once_with()
 
-    def test_new_query_from_case_forgets(self):
-        shown = self.run_screen('alpha', ['1', '1', 'b'], ['l', 'gamma'])
-        self.assertEqual([q for q, _, _ in shown], ['alpha', '', 'gamma'])
 
-    def test_back_without_list_leaves(self):
-        shown = self.run_screen('alpha', ['b'], [])
-        self.assertEqual(shown, [('alpha', 0, False)])
+if __name__ == '__main__':
+    unittest.main()
