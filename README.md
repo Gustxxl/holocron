@@ -40,10 +40,10 @@ To look for several things at once, put `;` between them: `nginx; ERR504`. Each 
 
 ## Excalidraw from the terminal
 
-Works with drawings from the Excalidraw plugin for Obsidian, compressed or not, and with plain `.excalidraw` files or a whole folder of them.
+Works with drawings from the Excalidraw plugin for Obsidian, compressed or not, and with plain `.excalidraw` files or a whole folder of them. Drawings inside your vault are found on their own, so a path in settings is only needed for a board that lives somewhere else.
 
 - **One block, one result.** A board with 40 sticky notes gives you 40 things to find, not one file to dig through.
-- **Sorted by name.** Blocks of a board are listed by their first line, the same way as in `l`. Browse a board with `tree`.
+- **Sorted by name.** Browse a board with `tree`. Blocks are listed by their first line the same way as folders: names starting with an emoji or symbol first, then digits, then letters, and `Note 2` before `Note 10`.
 - **Edit without opening the drawing.** Press `e`, change the text and save. The drawing itself is updated, so Excalidraw shows the change next time. If the block changed on disk while you were editing, for example through iCloud, nothing is overwritten and your text goes to the clipboard, so you can paste it again.
 - **Links between blocks.** Write `[[Block title]]` in any block to link to another one. Holocron looks on the same board first, then for a note with that name, then on other boards. If the title changed or several blocks fit, `j` opens a search instead of a dead end.
 
@@ -55,7 +55,7 @@ Point Holocron to an Obsidian vault and every Markdown note becomes searchable n
 - Checkboxes like `- [ ]` can be ticked with `x 3` without leaving the note.
 - `note` opens your editor and saves a new note to the folder you chose. The first line becomes the file name, and the name follows it when you change the first line later. If other records link to the note, the name stays, so no link breaks. Clear a note's text in the editor to move it to the trash. Holocron asks first and warns if other records link to it.
 - Headings keep their level. `#` and `##` get a line under them, `###` is bold and deeper ones are bold italic.
-- `tree` browses the archive by folder and opens kanban boards list by list.
+- `tree` or `l` browses the archive by folder and opens kanban boards list by list. Type a few words there to find a file or folder anywhere below, or a block on the open board. `/words` searches the whole archive.
 - `f` pins the open record to favorites, or the board you're browsing in `tree`.
 
 ## Kanban boards
@@ -63,7 +63,7 @@ Point Holocron to an Obsidian vault and every Markdown note becomes searchable n
 Boards made with the Kanban plugin for Obsidian are read as boards, not as plain notes.
 
 - **One card, one result.** Search finds each card on its own and the board itself by its name. Cards in a done list are shown like any other, nothing is hidden or dimmed, so a board you keep as a record with notes on each card works as well as a to-do list.
-- **Lists in `tree`.** A board opens as its lists, in the same order as in Obsidian, empty ones included. Cards keep their order within a list. If you open a board from search or `l`, `n` and `p` move on to the neighbouring records once the board's pages run out.
+- **Lists in `tree`.** A board opens as its lists, in the same order as in Obsidian, empty ones included. Cards keep their order within a list. If you open a board from search, `n` and `p` move on to the neighbouring records once the board's pages run out.
 - **Add, edit, move.** `a` adds a card to the open list or to the list of the open card, `e` edits a card and `m` moves it to another list. A card moved into a done list gets ticked, and one moved out gets unticked. Changes go straight to the file. If the card changed on disk in the meantime, nothing is overwritten.
 - **Pin a board.** Press `f` on a board in `tree` to open it from favorites.
 
@@ -130,7 +130,6 @@ Type `h` in Holocron for the full list. The main ones:
 | ------------------- | ---------------------------------------------------- |
 | any words           | search the archive                                   |
 | `words; more words` | several searches at once                             |
-| `l`                 | browse all records                                   |
 | `k`, `keeper`       | ask Keeper, once a model is chosen                   |
 | `sch`, `schedule`   | shift schedule                                       |
 | `c`, `calendar`     | Apple Calendar events                                |
@@ -139,7 +138,7 @@ Type `h` in Holocron for the full list. The main ones:
 | `rt`, `routines`    | reminders by time or shift                           |
 | `f`, `favorites`    | pinned records                                       |
 | `y`, `history`      | searches from this session                           |
-| `tree`              | browse by folder and board                           |
+| `tree`, `l`         | browse and search by folder and board                |
 | `note`              | write a new note                                     |
 | `s`, `settings`     | name, archive, schedule, Keeper, reminders, calendar |
 | `check`             | run diagnostics and tests                            |
@@ -178,7 +177,7 @@ If downloads from GitHub are slow or blocked on your network, the update archive
 ## Small things
 
 - `check` runs the built-in tests and shows what's connected: editor, clipboard, reminders, calendar, Keeper and the size of your archive.
-- `s` > Lists sets how many rows `l`, `tree` and boards show per page: from 5 to 99, 15 by default.
+- `s` > Lists sets how many rows `tree` and boards show per page: from 5 to 99, 15 by default.
 - In a narrow window, long titles on the main screen get shortened so the time stays in view, and the list name is the first to go.
 - Text pasted into search or Keeper keeps its line breaks, so an error window looks the same as where you copied it from.
 - A line of `---`, `***` or `___` after a blank line is drawn across the whole window, as in Obsidian. Lines like that right under text, or the matching lines around a pasted error window, keep their own length.
