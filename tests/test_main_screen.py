@@ -51,76 +51,87 @@ class Bar(unittest.TestCase):
              patch.object(main, 'duty_line', return_value=duty), \
              patch.object(main.swiftbar, 'shortcut', return_value=''), \
              patch.object(main.swiftbar, 'render', side_effect=lambda *a: a):
-            on, title, alert, self.blocks, add = main.bar_frame(NOW)
-        return on, title, alert, dict(zip(order, self.blocks)), add
+            on, title, self.blocks, add = main.bar_frame(NOW)
+        return on, title, dict(zip(order, self.blocks)), add
 
     def test_calm(self):
         self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 13, 0))]),
-                         (False, '', False, {'calendar': [], 'schedule': [],
-                                             'reminders': [('today', [('○ 13:00 Alpha', False, ('done', 'Alpha'))])]}, ''))
+                         (False, '', {'calendar': [], 'schedule': [],
+                                      'reminders': [('today', [('○ 13:00 Alpha', False, ('done', 'Alpha'))])]}, ''))
 
     def test_soon_in_title(self):
-        self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 30))])[1:3], ('12:30 Alpha', False))
+        self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 30))])[1], '12:30 Alpha')
         self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 31))])[1], '')
+        self.assertEqual(self._bar([_task('Alpha', NOW)])[1], '12:00 Alpha')
 
-    def test_overdue_wins(self):
-        todo = _task('Todo', datetime(2026, 11, 22, 11, 0))
-        _, title, alert, blocks, _ = self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 10)), todo])
-        self.assertEqual((title, alert), ('11:00 Todo', True))
+    def test_fresh_overdue_wins(self):
+        todo = _task('Todo', datetime(2026, 11, 22, 11, 40))
+        _, title, blocks, _ = self._bar([_task('Alpha', datetime(2026, 11, 22, 12, 10)), todo])
+        self.assertEqual(title, 'late · Todo')
         self.assertEqual(blocks['reminders'], [('overdue', [(f'○ {main.when(todo, NOW)} Todo', True, ('done', 'Todo'))]),
                                                ('today', [('○ 12:10 Alpha', False, ('done', 'Alpha'))])])
 
-    def test_overdue_all_day(self):
-        self.assertEqual(self._bar([_task('Todo', datetime(2026, 11, 21), all_day=True)])[1:3], ('Todo', True))
+    def test_old_overdue_leaves_title(self):
+        self.assertEqual(self._bar([_task('Todo', datetime(2026, 11, 22, 11, 30))])[1], 'late · Todo')
+        _, title, blocks, _ = self._bar([_task('Todo', datetime(2026, 11, 22, 11, 29))])
+        self.assertEqual(title, '')
+        self.assertEqual(blocks['reminders'][0][0], 'overdue')
+        found = [_task('Todo', datetime(2026, 11, 22, 9, 0)), _task('Alpha', datetime(2026, 11, 22, 12, 20))]
+        self.assertEqual(self._bar(found)[1], '12:20 Alpha')
+
+    def test_overdue_all_day_stays_calm(self):
+        _, title, blocks, _ = self._bar([_task('Todo', datetime(2026, 11, 21), all_day=True)])
+        self.assertEqual(title, '')
+        self.assertEqual(blocks['reminders'][0][0], 'overdue')
 
     def test_all_day_today_stays_calm(self):
-        self.assertEqual(self._bar([_task('Todo', datetime(2026, 11, 22), all_day=True)])[1:3], ('', False))
+        self.assertEqual(self._bar([_task('Todo', datetime(2026, 11, 22), all_day=True)])[1], '')
 
     def test_days_grouped(self):
-        groups = self._bar([_task('Alpha', datetime(2026, 11, 23, 9, 0)), _task('Todo', datetime(2026, 11, 24, 9, 0))])[3]
+        groups = self._bar([_task('Alpha', datetime(2026, 11, 23, 9, 0)), _task('Todo', datetime(2026, 11, 24, 9, 0))])[2]
         self.assertEqual([head for head, _ in groups['reminders']], ['tomorrow', main.day_label(date(2026, 11, 24), NOW.date())])
 
     def test_on_duty_groups_shift(self):
-        on, _, _, blocks, _ = self._bar([_task('Alpha', datetime(2026, 11, 22, 23, 0)),
-                                         _task('Todo', datetime(2026, 11, 23, 9, 0))],
-                                        end=datetime(2026, 11, 23, 8, 0))
+        on, _, blocks, _ = self._bar([_task('Alpha', datetime(2026, 11, 22, 23, 0)),
+                                      _task('Todo', datetime(2026, 11, 23, 9, 0))],
+                                     end=datetime(2026, 11, 23, 8, 0))
         self.assertTrue(on)
         self.assertEqual([head for head, _ in blocks['reminders']], ['this shift · until 08:00', 'tomorrow'])
 
     def test_done_today_folded(self):
         done = [dict(_task(title, None), done=True, finished=datetime(2026, 11, 22, 11, i)) for i, title in
                 enumerate(('Todo', 'Альфа'))]
-        groups = self._bar([_task('Alpha', datetime(2026, 11, 22, 13, 0))], finished=done)[3]['reminders']
+        groups = self._bar([_task('Alpha', datetime(2026, 11, 22, 13, 0))], finished=done)[2]['reminders']
         self.assertEqual(groups[-1], ('', [('✓ 2 done today', False, ('menu', [('✓ 11:00 Todo', False, ('undo', 'Todo')),
                                                                                 ('✓ 11:01 Альфа', False, ('undo', 'Альфа'))]))]))
 
     def test_all_day_row_has_no_time(self):
-        groups = self._bar([_task('Todo', datetime(2026, 11, 23), all_day=True)])[3]['reminders']
+        groups = self._bar([_task('Todo', datetime(2026, 11, 23), all_day=True)])[2]['reminders']
         self.assertEqual(groups, [('tomorrow', [('○ Todo', False, ('done', 'Todo'))])])
 
     def test_duty_without_colors(self):
-        self.assertEqual(self._bar([], duty='\033[2m● OFF DUTY\033[0m')[3]['schedule'], [('', [('● OFF DUTY', False, None)])])
+        self.assertEqual(self._bar([], duty='\033[2m● OFF DUTY\033[0m')[2]['schedule'], [('', [('● OFF DUTY', False, None)])])
 
     def test_limit_and_undated(self):
         found = [_task(f'Alpha {i}', datetime(2026, 11, 23, 9, i)) for i in range(12)] + [_task('Todo', None)]
-        rows = [row for _, group in self._bar(found)[3]['reminders'] for row in group]
+        rows = [row for _, group in self._bar(found)[2]['reminders'] for row in group]
         self.assertEqual(len(rows), main.BAR_ROWS)
         self.assertFalse(any('Todo' in text for text, *_ in rows))
 
     def test_days_ahead_from_settings(self):
         found = [_task('Alpha', datetime(2026, 11, 22, 13, 0)), _task('Todo', datetime(2026, 11, 23, 9, 0))]
-        groups = self._bar(found, ahead=1)[3]['reminders']
+        groups = self._bar(found, ahead=1)[2]['reminders']
         self.assertEqual([text for _, rows in groups for text, *_ in rows], ['○ 13:00 Alpha'])
 
     def test_hidden_lists_skipped(self):
-        self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 23, 9, 0), list_id='L2')])[3]['reminders'], [])
+        self.assertEqual(self._bar([_task('Alpha', datetime(2026, 11, 23, 9, 0), list_id='L2')])[2]['reminders'], [])
 
     def test_unreadable(self):
-        self.assertEqual(self._bar(None)[3]['reminders'], [('', [('Could not read Reminders', True, None)])])
+        self.assertEqual(self._bar(None)[2]['reminders'], [('', [('Could not read Reminders', True, None)])])
 
     def test_no_source(self):
         self.assertEqual(self._bar([], source=False),
-                         (False, '', False, {'calendar': [], 'schedule': [], 'reminders': []}, None))
+                         (False, '', {'calendar': [], 'schedule': [], 'reminders': []}, None))
 
     def test_plans_routines(self):
         self._bar([])
@@ -135,7 +146,7 @@ class Bar(unittest.TestCase):
     def test_meetings_by_day_with_links(self):
         call = _event('Standup', datetime(2026, 11, 22, 13, 0), datetime(2026, 11, 22, 14, 0), 'https://meet.google.com/abc')
         plain = _event('Альфа', datetime(2026, 11, 23, 9, 0), datetime(2026, 11, 23, 10, 0))
-        days = self._bar([], meetings=[plain, call], calendar=True)[3]['calendar']
+        days = self._bar([], meetings=[plain, call], calendar=True)[2]['calendar']
         self.assertEqual(days, [('today', [(f'↗ {main.event_time(call, NOW)} Standup', False,
                                             ('open', 'https://meet.google.com/abc'))]),
                                 ('tomorrow', [(f'◇ {main.event_time(plain, NOW)} Альфа', False, None)])])
@@ -147,10 +158,10 @@ class Bar(unittest.TestCase):
 
     def test_meetings_ahead_from_settings(self):
         later = _event('Alpha', datetime(2026, 11, 23, 9, 0), datetime(2026, 11, 23, 10, 0))
-        self.assertEqual(self._bar([], meetings=[later], calendar=True, ahead=1)[3]['calendar'], [])
+        self.assertEqual(self._bar([], meetings=[later], calendar=True, ahead=1)[2]['calendar'], [])
 
     def test_calendar_unreadable(self):
-        self.assertEqual(self._bar([], meetings=None, calendar=True)[3]['calendar'],
+        self.assertEqual(self._bar([], meetings=None, calendar=True)[2]['calendar'],
                          [('', [('Could not read Calendar', True, None)])])
 
 

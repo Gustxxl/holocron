@@ -574,11 +574,11 @@ class SwiftbarSetup(unittest.TestCase):
 
 
 class SwiftbarRender(unittest.TestCase):
-    def _lines(self, on=False, title='', alert=False, duty='', groups=()):
+    def _lines(self, on=False, title='', duty='', groups=()):
         with patch.object(swiftbar.sys, 'executable', '/Альфа/python'), \
              patch.object(swiftbar, 'MAIN', '/Альфа/main.py'):
              blocks = ([[('', [(duty, False, None)])]] if duty else []) + [list(groups)]
-             return swiftbar.render(on, title, alert, blocks).splitlines()
+             return swiftbar.render(on, title, blocks).splitlines()
 
     def test_calm_shows_icon(self):
         self.assertEqual(self._lines(), ['◇ | length=40 symbolize=false emojize=false'])
@@ -586,9 +586,10 @@ class SwiftbarRender(unittest.TestCase):
     def test_duty_icon(self):
         self.assertEqual(self._lines(on=True)[0], '● | length=40 symbolize=false emojize=false')
 
-    def test_alert_is_red(self):
-        self.assertEqual(self._lines(title='09:00 Alpha', alert=True)[0],
-                         '◇ 09:00 Alpha | length=40 symbolize=false emojize=false color=#af5f5f')
+    def test_title_never_colored(self):
+        lines = self._lines(title='09:00 Alpha', groups=[('overdue', [('Todo', True, None)])])
+        self.assertEqual(lines[0], '◇ 09:00 Alpha | length=40 symbolize=false emojize=false')
+        self.assertTrue(lines[-1].endswith(' color=#c0392b,#ff6b6b'))
 
     def test_layout(self):
         lines = self._lines(duty='● ON DUTY', groups=[('overdue', [('Todo', True, None)]),
@@ -596,7 +597,7 @@ class SwiftbarRender(unittest.TestCase):
         self.assertEqual(lines[1:], [
             '---', '● ON DUTY | length=40 symbolize=false emojize=false', '---',
             'overdue | size=12 symbolize=false emojize=false',
-            'Todo | length=40 symbolize=false emojize=false color=#af5f5f',
+            'Todo | length=40 symbolize=false emojize=false color=#c0392b,#ff6b6b',
             'today | size=12 symbolize=false emojize=false',
             '09:00 Alpha | length=40 symbolize=false emojize=false',
         ])
@@ -669,8 +670,8 @@ class SwiftbarAsk(unittest.TestCase):
     def test_new_reminder_item(self):
         with patch.object(swiftbar.sys, 'executable', '/Альфа/python'), \
              patch.object(swiftbar, 'MAIN', '/Альфа/main.py'):
-             lines = swiftbar.render(False, '', False, [], '').splitlines()
-             calm = swiftbar.render(False, '', False, []).splitlines()
+             lines = swiftbar.render(False, '', [], '').splitlines()
+             calm = swiftbar.render(False, '', []).splitlines()
         self.assertEqual(lines[-2:], ['---', '+ New reminder | bash="/Альфа/python" param1="/Альфа/main.py" '
                                              'param2=--new terminal=false refresh=true symbolize=false emojize=false'])
         self.assertFalse(any('New reminder' in line for line in calm))
@@ -688,7 +689,7 @@ class SwiftbarKeys(unittest.TestCase):
             self.assertEqual(swiftbar.shortcut(), '')
 
     def test_new_reminder_shortcut(self):
-        line = swiftbar.render(False, '', False, [], 'option+r').splitlines()[-1]
+        line = swiftbar.render(False, '', [], 'option+r').splitlines()[-1]
         self.assertTrue(line.startswith('+ New reminder | bash='))
         self.assertIn(' refresh=true shortcut=option+r ', line)
 

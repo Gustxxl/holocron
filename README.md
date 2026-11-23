@@ -114,7 +114,7 @@ Holocron can show your shift, meetings and reminders in the macOS menu bar throu
 
 The menu bar lives as long as Holocron does. SwiftBar starts with Holocron and quits when you close it, so nothing keeps running in the background.
 
-- **At a glance.** `◇` off shift, `●` on shift. Next to it you see an overdue reminder in red, or whatever starts in the next 30 minutes.
+- **At a glance.** `◇` off shift, `●` on shift. Next to it you see what starts in the next 30 minutes, or `late ·` and a reminder that went overdue in the last 30. Older overdue reminders wait at the top of the menu, in red.
 - **Same as the main screen.** Meetings, shift and reminders come in the order you set in `s` > Main screen and cover the same days ahead you chose for Calendar and Reminders, up to 10 rows each.
 - **Click to act.** Click a reminder to tick it off. Done today folds into one line: click it to unfold, then click a reminder there to bring it back. Click a meeting marked `↗` to join the call.
 - **New reminder.** `+ New reminder` opens a small window that takes the same text as `a`, `+5` included. Give it a shortcut in `s` > Menu bar (`k`), like `option+r`, and it opens from any app. A shortcut takes those keys away from every app, so pick one you don't type with. The first time, macOS asks to let SwiftBar control System Events, which is what makes the window open fast.

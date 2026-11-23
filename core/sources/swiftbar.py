@@ -29,7 +29,7 @@ _WAIT = 15
 ICON = '◇'
 DUTY = '●'
 HEAD = 12
-RED = '#af5f5f'
+RED = '#c0392b,#ff6b6b'
 LENGTH = 40
 _PLAIN = 'symbolize=false emojize=false'
 _ID = re.compile(r'[\w:/.-]+')
@@ -218,8 +218,8 @@ def ask(prompt, text=''):
     return out.stdout.strip() if out and out.returncode == 0 else ''
 
 
-def render(on, title, alert, blocks, add=None):
-    lines = [_line(f'{DUTY if on else ICON} {title}', alert, f'length={LENGTH}')]
+def render(on, title, blocks, add=None):
+    lines = [_line(f'{DUTY if on else ICON} {title}', extra=f'length={LENGTH}')]
     for groups in blocks:
         if groups:
             lines.append('---')

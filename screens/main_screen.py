@@ -73,13 +73,12 @@ def bar_frame(now=None):
     found, groups = _bar_tasks(now, status.shift.end if on else None)
     meetings, days = _bar_events(now)
     duty = duty_line(now, sched)
-    late = [t for t in found if tasks.is_overdue(t, now)]
-    soon = sorted([(t['due'], t['title']) for t in found if not t['all_day'] and now <= t['due'] <= now + BAR_SOON]
+    soon = sorted([(t['due'], t['title']) for t in found if not t['all_day'] and abs(t['due'] - now) <= BAR_SOON]
                   + [(e['start'], e['title']) for e in meetings if not e['all_day'] and now <= e['start'] <= now + BAR_SOON])
     blocks = {'calendar': days, 'schedule': [('', [(visible(duty), False, None)])] if duty else [], 'reminders': groups}
     source = registry.active('tasks')
     ready = bool(source and source.available())
-    return swiftbar.render(on, _bar_title(late, soon), bool(late), [blocks[key] for key in home_order()],
+    return swiftbar.render(on, _bar_title(soon, now), [blocks[key] for key in home_order()],
                            swiftbar.shortcut() if ready else None)
 
 
@@ -169,11 +168,11 @@ def _bar_row(task, now):
     return ' '.join(p for p in ('○', stamp, task['title']) if p), late, ('done', task['id'])
 
 
-def _bar_title(late, soon):
-    if late:
-        task = late[0]
-        return task['title'] if task['all_day'] else f'{task["due"]:%H:%M} {task["title"]}'
-    return f'{soon[0][0]:%H:%M} {soon[0][1]}' if soon else ''
+def _bar_title(soon, now):
+    if not soon:
+        return ''
+    due, title = soon[0]
+    return f'late · {title}' if due < now else f'{due:%H:%M} {title}'
 
 
 def _frame():
