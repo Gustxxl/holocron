@@ -352,6 +352,7 @@ class Other(Screen):
     def test_keeper_opens_after_settings(self):
         conn = {'slot': 'local'}
         with patch.object(settings_screen, 'keeper_screen') as settings, \
+                patch.object(keeper_screen, '_SESSION', {'turns': [], 'records': []}), \
                 patch.object(keeper_screen, '_wake', side_effect=[None, conn, conn]):
             text = self.open(keeper_screen, keeper_screen.keeper_screen, ['b'], {'core.keeper.has_server': False})
         settings.assert_called_once()
