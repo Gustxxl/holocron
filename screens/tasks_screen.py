@@ -195,21 +195,36 @@ def _refresh_bar():
 
 
 def _edit(source, task):
-    text = editor.edit_text(tasks.to_text(task))
-    if text is None:
-        error('Could not open the editor')
+    lists = source.lists()
+    if lists is None:
+        error('Could not read the lists')
         return
-    found = tasks.changes(task, text)
-    if found is None:
-        error('Empty text — edit cancelled')
-        return
+    text = tasks.to_text(task)
+    while True:
+        text = editor.edit_text(text)
+        if text is None:
+            error('Could not open the editor')
+            return
+        found, problem = tasks.changes(task, text, lists)
+        if not problem:
+            break
+        error(problem)
+        if not text.strip():
+            return
     if not found:
         return
-    if not source.edit(task['id'], **found):
+    move = found.pop('list', None)
+    if found and not source.edit(task['id'], **found):
         error('Could not save the reminder')
         return
-    task.update(found)
-    haptic('success')
+    tasks.apply(task, found, lists)
+    if move and not source.move(task['id'], move):
+        name = next((l['title'] for l in lists if l['id'] == move), '')
+        error(f'Could not move to #{name}, move it in Reminders')
+    elif move:
+        tasks.apply(task, {'list': move}, lists)
+    if found or move:
+        haptic('success')
     _refresh_bar()
 
 

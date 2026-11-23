@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import date, datetime
 from core import dates
 
 _TAG = re.compile(r'(?<!\S)#(\S+)')
@@ -77,23 +77,59 @@ def parse_add(text, lists, default, points=None, today=None, now=None):
     return {'title': ' '.join(words), 'list': list_id, 'place': place, 'due': due}, None
 
 
-def to_text(task):
+def first_line(task, today):
+    parts = [task['title']]
+    due = task.get('due')
+    if due is not None:
+        parts.append(f'{due:%d-%m}' if due.year == today.year else f'{due:%d-%m-%Y}')
+        if not task.get('all_day'):
+            parts.append(f'{due:%H:%M}')
+    if task.get('list_name'):
+        parts.append(f'#{task["list_name"]}')
+    return ' '.join(parts)
+
+
+def to_text(task, today=None):
     notes = task.get('notes') or ''
-    return task['title'] + (f'\n\n{notes}' if notes else '')
+    return first_line(task, today or date.today()) + (f'\n\n{notes}' if notes else '')
 
 
-def changes(task, text):
+def changes(task, text, lists, today=None, now=None):
+    now = now or datetime.now()
+    today = today or now.date()
     lines = text.strip().splitlines()
-    title = lines[0].strip() if lines else ''
-    if not title:
-        return None
+    line = lines[0].strip() if lines else ''
+    if not line:
+        return None, 'Empty text — edit cancelled'
     notes = '\n'.join(lines[1:]).strip()
     found = {}
-    if title != task['title']:
-        found['title'] = title
+    if line != first_line(task, today):
+        draft, problem = parse_add(line, lists, task.get('list'), today=today, now=now)
+        if problem:
+            return None, problem
+        if draft['title'] != task['title']:
+            found['title'] = draft['title']
+        if not _same_due(task, draft['due']):
+            found['due'] = draft['due']
+            found.update(_alarm(task, draft['due']))
+        if draft['list'] != task.get('list'):
+            found['list'] = draft['list']
     if notes != (task.get('notes') or ''):
         found['notes'] = notes
-    return found
+    return found, None
+
+
+def apply(task, found, lists):
+    for key in ('title', 'notes', 'alarm'):
+        if key in found:
+            task[key] = found[key]
+    if 'due' in found:
+        due = found['due']
+        task['all_day'] = due is not None and not isinstance(due, datetime)
+        task['due'] = datetime.combine(due, datetime.min.time()) if task['all_day'] else due
+    if 'list' in found:
+        task['list'] = found['list']
+        task['list_name'] = next((l['title'] for l in lists if l['id'] == found['list']), '')
 
 
 def pick_list(tag, lists, default, kind='list'):
@@ -121,6 +157,25 @@ def _due(day, when, today, now):
     if start is None:
         return None, f'No such time: {when}'
     return datetime.combine(day or today, dates.to_time(start)), None
+
+
+def _same_due(task, due):
+    old = task.get('due')
+    if old is None or due is None:
+        return old is None and due is None
+    if task.get('all_day'):
+        return not isinstance(due, datetime) and old.date() == due
+    return isinstance(due, datetime) and old.replace(second=0, microsecond=0) == due
+
+
+def _alarm(task, due):
+    old, alarm = task.get('due'), task.get('alarm')
+    timed = old is not None and not task.get('all_day')
+    if isinstance(due, datetime):
+        if timed and alarm:
+            return {'alarm': due - (old - alarm)}
+        return {} if timed else {'alarm': due}
+    return {'alarm': None} if timed and alarm else {}
 
 
 def _key(text):

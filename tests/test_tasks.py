@@ -207,25 +207,96 @@ class ParseAdd(unittest.TestCase):
 
 
 class EditText(unittest.TestCase):
-    TASK = {'id': 'a', 'title': 'Call bank', 'notes': 'ask about card'}
+    TASK = {'id': 'a', 'title': 'Call bank', 'notes': 'ask about card', 'list': 'L1', 'list_name': 'Work',
+            'due': None, 'all_day': False}
+
+    def _task(self, **extra):
+        return {**self.TASK, **extra}
+
+    def _changes(self, text, task=None):
+        return tasks.changes(task or self.TASK, text, LISTS, NOW.date(), NOW)
 
     def test_to_text(self):
-        self.assertEqual(tasks.to_text(self.TASK), 'Call bank\n\nask about card')
-        self.assertEqual(tasks.to_text({'title': 'x', 'notes': ''}), 'x')
+        self.assertEqual(tasks.to_text(self.TASK, NOW.date()), 'Call bank #Work\n\nask about card')
+        self.assertEqual(tasks.to_text({'title': 'x', 'notes': ''}, NOW.date()), 'x')
+
+    def test_to_text_due(self):
+        cases = [(datetime(2026, 10, 12, 9, 30), False, 'Call bank 12-10 09:30 #Work'),
+                 (datetime(2026, 10, 20), True, 'Call bank 20-10 #Work'),
+                 (datetime(2027, 1, 5, 9, 0), False, 'Call bank 05-01-2027 09:00 #Work')]
+        for due, all_day, line in cases:
+            with self.subTest(line=line):
+                self.assertEqual(tasks.first_line(self._task(due=due, all_day=all_day), NOW.date()), line)
 
     def test_no_changes(self):
-        self.assertEqual(tasks.changes(self.TASK, ' Call bank \n\n ask about card \n'), {})
+        self.assertEqual(self._changes(' Call bank #Work \n\n ask about card \n'), ({}, None))
+
+    def test_untouched_line_keeps_time_in_title(self):
+        task = self._task(title='Call at 10:30', due=datetime(2026, 10, 11, 15, 0))
+        self.assertEqual(self._changes(tasks.to_text(task, NOW.date()), task), ({}, None))
 
     def test_title_only(self):
-        self.assertEqual(tasks.changes(self.TASK, 'Call the bank\n\nask about card'), {'title': 'Call the bank'})
+        self.assertEqual(self._changes('Call the bank #Work\n\nask about card'), ({'title': 'Call the bank'}, None))
 
     def test_notes_changed_and_cleared(self):
-        self.assertEqual(tasks.changes(self.TASK, 'Call bank\nnew'), {'notes': 'new'})
-        self.assertEqual(tasks.changes(self.TASK, 'Call bank'), {'notes': ''})
+        self.assertEqual(self._changes('Call bank #Work\nnew'), ({'notes': 'new'}, None))
+        self.assertEqual(self._changes('Call bank #Work'), ({'notes': ''}, None))
 
     def test_empty_cancels(self):
-        self.assertIsNone(tasks.changes(self.TASK, '  \n\n'))
-        self.assertEqual(tasks.changes(self.TASK, '\n\nonly notes'), {'title': 'only notes', 'notes': ''})
+        self.assertEqual(self._changes('  \n\n'), (None, 'Empty text — edit cancelled'))
+        self.assertEqual(self._changes('\n\nonly notes')[0], {'title': 'only notes', 'notes': ''})
+
+    def test_move_to_list(self):
+        self.assertEqual(self._changes('Call bank #Pets\n\nask about card'), ({'list': 'L5'}, None))
+
+    def test_no_tag_keeps_list(self):
+        self.assertEqual(self._changes('Call bank\n\nask about card'), ({}, None))
+
+    def test_set_time(self):
+        due = datetime(2026, 10, 11, 18, 0)
+        self.assertEqual(self._changes('Call bank 18:00\n\nask about card'), ({'due': due, 'alarm': due}, None))
+
+    def test_alarm_keeps_offset(self):
+        task = self._task(due=datetime(2026, 10, 11, 12, 0), alarm=datetime(2026, 10, 11, 11, 50))
+        found, _ = self._changes('Call bank 11-10 15:00\n\nask about card', task)
+        self.assertEqual(found, {'due': datetime(2026, 10, 11, 15, 0), 'alarm': datetime(2026, 10, 11, 14, 50)})
+
+    def test_no_alarm_stays_without(self):
+        task = self._task(due=datetime(2026, 10, 11, 12, 0), alarm=None)
+        found, _ = self._changes('Call bank 11-10 15:00\n\nask about card', task)
+        self.assertEqual(found, {'due': datetime(2026, 10, 11, 15, 0)})
+
+    def test_clear_due(self):
+        task = self._task(due=datetime(2026, 10, 11, 12, 0), alarm=datetime(2026, 10, 11, 12, 0))
+        self.assertEqual(self._changes('Call bank\n\nask about card', task), ({'due': None, 'alarm': None}, None))
+
+    def test_to_all_day(self):
+        task = self._task(due=datetime(2026, 10, 11, 12, 0), alarm=datetime(2026, 10, 11, 12, 0))
+        found, _ = self._changes('Call bank 20-10\n\nask about card', task)
+        self.assertEqual(found, {'due': date(2026, 10, 20), 'alarm': None})
+
+    def test_all_day_same_day_unchanged(self):
+        task = self._task(due=datetime(2026, 10, 20), all_day=True)
+        self.assertEqual(self._changes('Call bank 20-10 #Pets\n\nask about card', task), ({'list': 'L5'}, None))
+
+    def test_relative(self):
+        found, _ = self._changes('Call bank +30\n\nask about card')
+        self.assertEqual(found['due'], datetime(2026, 10, 11, 15, 30))
+
+    def test_problems(self):
+        self.assertEqual(self._changes('Call bank 25:00'), (None, 'No such time: 25:00'))
+        self.assertEqual(self._changes('Call bank @home'), (None, 'No waypoint @home'))
+        self.assertEqual(self._changes('Call bank #zzz'), (None, 'No list #zzz'))
+
+
+class Apply(unittest.TestCase):
+    def test_due_and_list(self):
+        task = {'title': 'Alpha', 'due': datetime(2026, 10, 11, 12, 0), 'all_day': False, 'list': 'L1', 'list_name': 'Work'}
+        tasks.apply(task, {'due': date(2026, 10, 20), 'list': 'L5', 'alarm': None}, LISTS)
+        self.assertEqual((task['due'], task['all_day'], task['list'], task['list_name'], task['alarm']),
+                         (datetime(2026, 10, 20), True, 'L5', 'Pets', None))
+        tasks.apply(task, {'due': datetime(2026, 10, 21, 9, 0)}, LISTS)
+        self.assertEqual((task['due'], task['all_day']), (datetime(2026, 10, 21, 9, 0), False))
 
 
 class ListWithSpaces(unittest.TestCase):

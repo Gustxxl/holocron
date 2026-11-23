@@ -70,13 +70,20 @@ def add(title, list_id, place=None, due=None):
     return cli.run_ok(PROGRAM, *args)
 
 
-def edit(task_id, title=None, notes=None):
+def edit(task_id, title=None, notes=None, **when):
     args = []
     if title is not None:
         args += ['--title', title]
     if notes is not None:
         args += ['--notes', notes]
+    for key in ('due', 'alarm'):
+        if key in when:
+            args += [f'--{key}', _stamp(when[key])] if when[key] is not None else [f'--clear-{key}']
     return cli.run_ok(PROGRAM, 'edit', task_id, *args) if args else True
+
+
+def move(task_id, list_id):
+    return cli.run_ok(PROGRAM, 'edit', task_id, '--list-id', list_id)
 
 
 def parse_lists(data):
@@ -105,6 +112,7 @@ def _task(raw):
         'title': str(raw.get('title') or '').strip() or '(untitled)',
         'due': cli.parse_time(raw.get('dueDate')),
         'all_day': raw.get('dueDateIsAllDay') is True,
+        'alarm': cli.parse_time(raw.get('alarmDate')),
         'list': raw.get('listID'),
         'list_name': str(raw.get('listName') or '').strip(),
         'notes': str(raw.get('notes') or '').strip(),
