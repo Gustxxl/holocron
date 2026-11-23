@@ -18,7 +18,8 @@ So drop everything on a board and don't worry about order or wording. Skip a wor
 - **Jump between records.** `[[Links]]` work in notes and board blocks alike. A link finds a block by its first line or a note by its name, and `j 2` takes you there.
 - **Ask your notes.** Keeper answers questions by quoting your notes. The model runs on your computer or your own server, so your notes stay private.
 - **Know your hours.** A regular 9 to 5 or a rotating cycle of up to 52 weeks, with night shifts, vacations and time zones.
-- **See what's coming.** The next reminders and calendar events are on the main screen, with meeting links pulled out of the invite.
+- **See what's coming.** The next reminders and calendar events are on the main screen and in the macOS menu bar, with meeting links pulled out of the invite.
+- **Routines.** Reminders that set themselves before every shift or every day (macOS only).
 - **Remind by place.** Waypoints tie reminders to an address, so they fire when you arrive or leave (macOS only).
 - **Pin what you use.** Favorites open with a single key.
 
@@ -98,12 +99,28 @@ Then choose which lists and calendars to show, which one is the default, how man
 
 Settings also show which copy of the tool Holocron uses, the one it downloaded or the one from Homebrew. Press `i` to see where it is and delete it.
 
-- **Reminders.** View, tick off (`x 2`) and edit reminders. Add one with `a`: `Call the vendor #work @office`. `#list` and `@waypoint` are optional.
+- **Reminders.** View, tick off (`x 2`) and edit reminders. What you finished today stays at the bottom under done today, and `x` on it brings it back, so a slip doesn't send you to the Reminders app. The main screen counts it as `✓ 3 done today`. During a night shift, today starts when the shift does.
+- **Adding.** `a` takes the title with an optional time, date, `#list` and `@waypoint`: `Call the vendor 14:30 tomorrow #work @office`. For a quick one, `+5` sets it five minutes from now: `Turn the alerts back on +5`. `+90`, `+2h` and `+1h30` work too.
+- **Routines.** For things you do at the same time on every shift, like a check at 00:05. Add one in `rt`, or with `t` in reminders: `Check the queue 00:05 #work`. Holocron puts the next one into Reminders by itself whenever the main screen or the menu bar updates. `t` on a routine switches between on shift, every day and by hand, where `r` sets it only when you ask. If your schedule has a team time zone, the time is kept in it and the card shows both, like `00:05 MSK · 22:05 here`. `z` switches a routine to your own time.
 - **Waypoints.** Save an address under a short name like `office` once, then use `@office` in any reminder. Choose whether it fires on arrival or when you leave, and set the radius (100 m by default).
-- **Calendar.** Upcoming events grouped by day. Add one with `a`: `Standup 20:00` or `Lunch tomorrow 12:30-13:30 #work`.
+- **Calendar.** Upcoming events grouped by day. Add one with `a`: `Standup 20:00` or `Lunch tomorrow 12:30-13:30 #work`. `Sync +15` books an hour starting in 15 minutes.
 - **Meeting links.** Holocron looks for links in the event URL, location, notes and invitees and shows the meeting link right under the event: Zoom, Google Meet, Teams, Webex, Whereby, Jitsi and Telemost.
 
 On Windows and Linux everything else works the same, only reminders and calendar are macOS-only. If you need them on another system, [open an issue](https://github.com/Gustxxl/holocron/issues).
+
+## Menu bar (macOS)
+
+Holocron can show your shift, meetings and reminders in the macOS menu bar through [SwiftBar](https://github.com/swiftbar/SwiftBar), a free app. Open settings (`s` > Menu bar) and Holocron walks you through it: it links to SwiftBar or installs it with Homebrew, creates `~/SwiftBar` for its plugins and adds itself there.
+
+The menu bar lives as long as Holocron does. SwiftBar starts with Holocron and quits when you close it, so nothing keeps running in the background.
+
+- **At a glance.** `◇` off shift, `●` on shift. Next to it you see an overdue reminder in red, or whatever starts in the next 30 minutes.
+- **Same as the main screen.** Meetings, shift and reminders come in the order you set in `s` > Main screen and cover the same days ahead you chose for Calendar and Reminders, up to 10 rows each.
+- **Click to act.** Click a reminder to tick it off. Done today folds into one line: click it to unfold, then click a reminder there to bring it back. Click a meeting marked `↗` to join the call.
+- **New reminder.** `+ New reminder` opens a small window that takes the same text as `a`, `+5` included. Give it a shortcut in `s` > Menu bar (`k`), like `option+r`, and it opens from any app. A shortcut takes those keys away from every app, so pick one you don't type with. The first time, macOS asks to let SwiftBar control System Events, which is what makes the window open fast.
+- **Up to date.** The menu refreshes every minute and right after you change something in Holocron.
+
+To take it out, press `d` in `s` > Menu bar. If Holocron created `~/SwiftBar` and nothing else is in it, the folder goes too.
 
 ## Commands
 
@@ -119,6 +136,7 @@ Type `h` in Holocron for the full list. The main ones:
 | `c`, `calendar`     | Apple Calendar events                                |
 | `r`, `reminders`    | Apple Reminders                                      |
 | `wp`, `waypoints`   | places for location reminders                        |
+| `rt`, `routines`    | reminders by time or shift                           |
 | `f`, `favorites`    | pinned records                                       |
 | `y`, `history`      | searches from this session                           |
 | `tree`              | browse by folder and board                           |
@@ -161,6 +179,7 @@ If downloads from GitHub are slow or blocked on your network, the update archive
 
 - `check` runs the built-in tests and shows what's connected: editor, clipboard, reminders, calendar, Keeper and the size of your archive.
 - `s` > Lists sets how many rows `l`, `tree` and boards show per page: from 5 to 99, 15 by default.
+- In a narrow window, long titles on the main screen get shortened so the time stays in view, and the list name is the first to go.
 - Text pasted into search or Keeper keeps its line breaks, so an error window looks the same as where you copied it from.
 - A line of `---`, `***` or `___` after a blank line is drawn across the whole window, as in Obsidian. Lines like that right under text, or the matching lines around a pasted error window, keep their own length.
 - On a MacBook, the trackpad gives a light tap when you toggle something and a different pattern for success or error.
