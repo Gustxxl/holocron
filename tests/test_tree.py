@@ -155,6 +155,7 @@ class KanbanScreen(unittest.TestCase):
              mock.patch.object(tree_screen.editor, 'available', return_value=True), \
              mock.patch.object(tree_screen.favorites, 'is_pinned', return_value=False), \
              mock.patch.object(tree_screen, 'add_card') as add, \
+             mock.patch.object(tree_screen, 'pause'), \
              redirect_stdout(io.StringIO()) as out:
             tree_screen.tree_screen('/v/board.md')
         return read, add, out.getvalue()
@@ -175,6 +176,7 @@ class KanbanScreen(unittest.TestCase):
         _, add, out = self.screen(['a', 'b'])
         add.assert_not_called()
         self.assertNotIn('[a] add card', out)
+        self.assertIn('Type at least 3 characters.', out)
 
     def edge(self, commands, before=False, after=False, rows=15, pinned=False):
         with mock.patch.object(tree_screen, '_build', return_value=self.root), \
@@ -185,6 +187,7 @@ class KanbanScreen(unittest.TestCase):
              mock.patch.object(tree_screen.favorites, 'is_pinned', return_value=pinned) as is_pinned, \
              mock.patch.object(tree_screen.favorites, 'toggle') as toggle, \
              mock.patch.object(tree_screen, 'haptic') as hap, \
+             mock.patch.object(tree_screen, 'pause'), \
              redirect_stdout(io.StringIO()) as out:
             step = tree_screen.tree_screen('/v/board.md', before, after)
         self.is_pinned, self.toggle, self.hap = is_pinned, toggle, hap
