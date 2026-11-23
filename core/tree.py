@@ -95,3 +95,11 @@ def trail(node, filepath):
             if found:
                 return [child['name'], *found]
     return None
+
+
+def descendants(node, path=()):
+    for child in entries(node):
+        here = (*path, child['name'])
+        yield here, child
+        if child['kind'] == 'folder':
+            yield from descendants(child, here)

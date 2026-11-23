@@ -248,5 +248,96 @@ class KanbanScreen(unittest.TestCase):
         self.assertEqual([n['kind'] for n in stack], ['folder', 'kanban', 'lane'])
 
 
+class TreeSearch(unittest.TestCase):
+    CASES = [
+        {'filepath': '/v/Work/Tools/Keyboard shortcuts.md', 'filename': 'Keyboard shortcuts', 'text': 'Keyboard shortcuts'},
+        {'filepath': '/v/Work/Plan.excalidraw.md', 'element_id': 'b1', 'text': 'Todo nginx timeout'},
+        {'filepath': '/v/Work/Plan.excalidraw.md', 'element_id': 'b2', 'text': 'Альфа'},
+        {'filepath': '/v/Alpha.md', 'filename': 'Alpha', 'text': 'Alpha'},
+    ]
+
+    def setUp(self):
+        self.root = tree.build([dict(c) for c in self.CASES], '/v')
+        self.plan = tree.entries(tree.entries(self.root)[0])[1]
+
+    def screen(self, commands):
+        with mock.patch.object(tree_screen, '_build', return_value=self.root), \
+             mock.patch.object(tree_screen, 'read_command', side_effect=commands), \
+             mock.patch.object(tree_screen, 'clear_screen'), \
+             mock.patch.object(tree_screen, 'page_rows', return_value=15), \
+             mock.patch.object(tree_screen.archives, 'load'), \
+             mock.patch.object(tree_screen.favorites, 'is_pinned', return_value=False), \
+             mock.patch.object(tree_screen, '_read') as read, \
+             mock.patch.object(tree_screen, 'search_screen') as full, \
+             mock.patch.object(tree_screen, 'haptic'), \
+             mock.patch.object(tree_screen, 'pause') as self.pause, \
+             redirect_stdout(io.StringIO()) as out:
+            tree_screen.tree_screen()
+        return read, full, out.getvalue()
+
+    def test_names_in_subtree(self):
+        query, items, trails, _ = tree_screen._search(self.root, 'keyboard')
+        self.assertEqual((query, [n['name'] for n in items]), ('keyboard', ['Keyboard shortcuts']))
+        self.assertEqual(trails, [('Work', 'Tools', 'Keyboard shortcuts')])
+
+    def test_blocks_on_board(self):
+        _, items, trails, _ = tree_screen._search(self.plan, 'nginx')
+        self.assertEqual([c['element_id'] for c in items], ['b1'])
+        self.assertIsNone(trails)
+
+    def test_cards_on_kanban(self):
+        kanban = tree.entries(tree.build([dict(c) for c in KanbanScreen.CASES], '/v'))[0]
+        _, items, _, _ = tree_screen._search(kanban, 'gamma')
+        self.assertEqual([c['text'] for c in items], ['Gamma'])
+
+    def test_open_found_note(self):
+        read, _, out = self.screen(['keyboard', '1', 'b', 'b'])
+        self.assertEqual(read.call_args.args[0][0]['filename'], 'Keyboard shortcuts')
+        self.assertEqual(read.call_args.args[1], 1)
+        self.assertIn('"keyboard"   1 result', out)
+        self.assertIn(dim('Work > Tools'), out)
+
+    def test_open_found_folder(self):
+        read, _, out = self.screen(['work', '1', 'b', 'b'])
+        read.assert_not_called()
+        self.assertIn(dim('Archive > Work'), out)
+
+    def test_board_search_opens_with_query(self):
+        read, _, _ = self.screen(['1', '2', 'nginx', '1', 'b', 'b', 'b', 'b'])
+        self.assertEqual(read.call_args.args[0][0]['element_id'], 'b1')
+        self.assertEqual(read.call_args.args[1:], (1, 'nginx'))
+
+    def test_slash_searches_archive(self):
+        _, full, _ = self.screen(['/nginx timeout', 'b'])
+        full.assert_called_once_with('nginx timeout')
+
+    def test_short_text_warns(self):
+        for text in ('zz', '/ab'):
+            with self.subTest(text=text):
+                read, full, out = self.screen([text, 'b'])
+                read.assert_not_called()
+                full.assert_not_called()
+                self.assertIn('Type at least 3 characters.', out)
+                self.pause.assert_called_once_with(feedback='warning')
+
+    def test_nothing_found(self):
+        _, _, out = self.screen(['zzzz', 'b', 'b'])
+        shown = out.split('Nothing found for')[1]
+        self.assertTrue(shown.startswith(' "zzzz".'))
+        self.assertIn('  [b] back   [h] help', shown)
+        self.assertNotIn('Archive', shown.split('tree>')[0] if 'tree>' in shown else shown.split('  [b] back')[0])
+
+    def test_enter_leaves_nothing_found(self):
+        _, _, out = self.screen(['zzzz', '', 'b'])
+        self.assertIn(dim('Archive'), out.split('Nothing found for')[1])
+
+    def test_nothing_found_suggests(self):
+        with mock.patch.object(tree_screen, '_suggest', return_value=['keyboard']) as suggest:
+            _, _, out = self.screen(['keybord zz', 'b', 'b'])
+        self.assertEqual(suggest.call_args.args[1], 'keybord zz')
+        self.assertEqual({n['text'] for n in suggest.call_args.args[0]} >= {'Keyboard shortcuts', 'Work'}, True)
+        self.assertIn('Maybe: keyboard', out)
+
+
 if __name__ == '__main__':
     unittest.main()

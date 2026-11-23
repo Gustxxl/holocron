@@ -184,6 +184,7 @@ HELP_SECTIONS = [
         HelpEntry('n / p',        'next / previous page or case'),
         HelpEntry('nn / pp',      'last / first page or case'),
         HelpEntry('l / list',     'browse all cases'),
+        HelpEntry('/word(s)',     'in tree: search the whole archive'),
         HelpEntry('e',            'edit the open case', editor.available),
         HelpEntry('d',            'move the open note to the trash'),
         HelpEntry('f',            'pin / unpin the open case'),
