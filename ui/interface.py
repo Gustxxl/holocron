@@ -336,7 +336,7 @@ def confirm(question):
 
 
 
-def show_menu(breadcrumb, options, footer='  [number] open section   [b] back   [q] quit'):
+def show_menu(breadcrumb, options, footer='  [number] open section   [b] back'):
     clear_screen()
     print(dim(breadcrumb))
     print()
