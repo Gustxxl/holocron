@@ -24,7 +24,7 @@ MAIN = str(Path(config.APP_DIR) / 'main.py')
 REFRESH = f'swiftbar://refreshplugin?name={FILE.split(".")[0]}'
 _TAGS = ('hideAbout', 'hideRunInTerminal', 'hideLastUpdated', 'collapseOnClose')
 _LEFTOVERS = ('.DS_Store', f'.{FILE}.tmp')
-_RUNNING = f'application id "{DOMAIN}" is running'
+_QUIT = f'tell application id "{DOMAIN}" to quit'
 _WAIT = 15
 ICON = '◇'
 DUTY = '●'
@@ -111,13 +111,21 @@ def owned():
 
 
 def running():
-    out = system.run(['osascript', '-e', f'return {_RUNNING}'], timeout=cli.TIMEOUT)
-    return out is not None and out.stdout.strip() == 'true'
+    out = system.run(['pgrep', '-x', APP], timeout=cli.TIMEOUT)
+    return out is not None and out.returncode == 0
 
 
 def stop():
-    system.run(['osascript', '-e', f'if {_RUNNING} then tell application id "{DOMAIN}" to quit'],
-               timeout=cli.TIMEOUT)
+    if not running():
+        return True
+    system.run(['osascript', '-e', _QUIT], timeout=cli.TIMEOUT)
+    if _gone():
+        return True
+    system.run(['pkill', '-x', APP], timeout=cli.TIMEOUT)
+    return _gone()
+
+
+def _gone():
     for _ in range(_WAIT):
         if not running():
             return True

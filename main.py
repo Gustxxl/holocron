@@ -1,3 +1,4 @@
+import signal
 import sys
 
 if sys.version_info < (3, 12):
@@ -23,6 +24,15 @@ from core import config
 from core.sources import registry
 
 
+SIGNALS = [getattr(signal, name) for name in ('SIGHUP', 'SIGTERM') if hasattr(signal, name)]
+
+
+def _hang_up(signum, frame):
+    for found in SIGNALS:
+        signal.signal(found, signal.SIG_IGN)
+    sys.exit(0)
+
+
 def start():
     action, value = launch.parse(sys.argv[1:])
     if action == 'help':
@@ -44,6 +54,8 @@ def start():
     query = value if action == 'search' else None
     bar = registry.active('bar')
     opened = False
+    for found in SIGNALS:
+        signal.signal(found, _hang_up)
     try:
         clear_screen()
         with Spinner('Accessing the archives'):

@@ -353,7 +353,7 @@ class Swiftbar(unittest.TestCase):
         self.root = Path(tmp.name)
         self.folder = self.root / 'Plugins'
         self.folder.mkdir()
-        self.mine, self.on, self.quits, self.calls = '', False, True, []
+        self.mine, self.on, self.quits, self.calls = '', False, ('osascript', 'pkill'), []
         self._patch(patch.object(swiftbar, 'folder', side_effect=lambda: self.folder))
         self._patch(patch.object(swiftbar.sources, 'text', side_effect=lambda key, name: self.mine))
         self._patch(patch.object(swiftbar.system, 'run', side_effect=self._run))
@@ -367,11 +367,32 @@ class Swiftbar(unittest.TestCase):
 
     def _run(self, args, timeout=None):
         self.calls.append(args)
-        if args[0] == 'osascript':
-            if 'quit' in args[2] and self.quits:
-                self.on = False
-            return _done(0, 'true\n' if self.on else 'false\n')
+        if self.quits and args[0] in self.quits:
+            self.on = False
+        if args[0] == 'pgrep':
+            return _done(0 if self.on else 1, '')
         return _done(0, '')
+
+    def test_running_asks_processes(self):
+        self.assertFalse(swiftbar.running())
+        self.on = True
+        self.assertTrue(swiftbar.running())
+        self.assertEqual(self.calls[-1], ['pgrep', '-x', 'SwiftBar'])
+
+    def test_stop_quits_politely(self):
+        self.on = True
+        self.assertTrue(swiftbar.stop())
+        self.assertFalse(self.on)
+        self.assertFalse(any(c[0] == 'pkill' for c in self.calls))
+
+    def test_stop_ends_stuck_app(self):
+        self.on, self.quits = True, ('pkill',)
+        self.assertTrue(swiftbar.stop())
+        self.assertIn(['pkill', '-x', 'SwiftBar'], self.calls)
+
+    def test_stop_nothing_running(self):
+        self.assertTrue(swiftbar.stop())
+        self.assertEqual([c[0] for c in self.calls], ['pgrep'])
 
     def _defaults(self):
         return [c[1:] for c in self.calls if c[0] == 'defaults']
@@ -484,7 +505,7 @@ class Swiftbar(unittest.TestCase):
 
     def test_finish_leaves_foreign_app(self):
         self.assertTrue(self._finish(opened=False, mine=False))
-        self.assertEqual([c for c in self.calls if c[0] == 'osascript'], [])
+        self.assertEqual([c for c in self.calls if c[0] in ('osascript', 'pkill')], [])
 
     def test_remove_waits_for_app(self):
         self.mine, self.on, self.quits = str(self.folder), True, False
